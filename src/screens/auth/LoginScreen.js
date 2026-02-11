@@ -41,7 +41,7 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <ScreenContainer>
+    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -138,6 +138,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingHorizontal: darkTheme.spacing.xl,
     paddingBottom: darkTheme.spacing.xxl,
   },
   logoWrap: {

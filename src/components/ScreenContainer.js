@@ -3,9 +3,15 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { darkTheme } from '../theme';
 
-const ScreenContainer = ({ children, style, padded = true, safeAreaStyle }) => {
+const ScreenContainer = ({
+  children,
+  style,
+  padded = true,
+  safeAreaStyle,
+  edges = ['top', 'left', 'right', 'bottom'],
+}) => {
   return (
-    <SafeAreaView style={[styles.safeArea, safeAreaStyle]}>
+    <SafeAreaView edges={edges} style={[styles.safeArea, safeAreaStyle]}>
       <View style={[styles.content, padded ? styles.padded : null, style]}>{children}</View>
     </SafeAreaView>
   );

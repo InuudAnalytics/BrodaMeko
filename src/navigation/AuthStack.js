@@ -11,9 +11,16 @@ const AuthStack = () => {
     <Stack.Navigator
       initialRouteName={ROUTES.SPLASH}
       screenOptions={{
-        headerStyle: { backgroundColor: darkTheme.colors.background },
+        headerStyle: {
+          backgroundColor: darkTheme.colors.background,
+        },
         headerTintColor: darkTheme.colors.accent,
-        headerTitleStyle: { color: darkTheme.colors.accent },
+        headerTitleStyle: {
+          color: darkTheme.colors.accent,
+          fontSize: 16,
+          fontWeight: darkTheme.typography.fontWeights.semibold,
+        },
+        headerBackTitleVisible: false,
         contentStyle: { backgroundColor: darkTheme.colors.background },
       }}
     >
