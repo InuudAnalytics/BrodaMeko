@@ -11,19 +11,19 @@ import {
 } from '../../components';
 import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
-import { ROLES, ROUTES } from '../../utils';
+import { ROUTES } from '../../utils';
+
+const ERROR_COLOR = '#FF7B8A';
 
 const LoginScreen = ({ navigation }) => {
-  const { login } = useAuth();
+  const { signIn, isLoading, error, clearError } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSignIn = () => {
-    // Placeholder auth behavior for now:
-    // we mark the user as authenticated and route to the Car Owner dashboard.
-    login(ROLES.CAR_OWNER);
+  const handleSignIn = async () => {
+    await signIn({ email, password });
   };
 
   return (
@@ -49,7 +49,10 @@ const LoginScreen = ({ navigation }) => {
             label="Email Address"
             placeholder="Youremail.com"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) clearError();
+            }}
             keyboardType="email-address"
           />
 
@@ -65,7 +68,10 @@ const LoginScreen = ({ navigation }) => {
           <AppInput
             placeholder="....."
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) clearError();
+            }}
             secureTextEntry={!showPassword}
             right={
               <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
@@ -76,13 +82,19 @@ const LoginScreen = ({ navigation }) => {
             }
           />
 
+          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+
           <View style={styles.primaryCta}>
-            <AppButton label="Sign In" onPress={handleSignIn} />
+            <AppButton
+              label={isLoading ? 'Signing In...' : 'Sign In'}
+              onPress={handleSignIn}
+              disabled={isLoading}
+            />
           </View>
 
           <DividerOr />
 
-          <GoogleButton label="Sign in with Google" onPress={() => {}} />
+          <GoogleButton label="Sign in with Google" onPress={() => {}} disabled={isLoading} />
 
           <View style={styles.footer}>
             <AppText variant="muted">Dont have an account? </AppText>
@@ -130,6 +142,11 @@ const styles = StyleSheet.create({
   toggleText: {
     color: darkTheme.colors.muted,
     fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  errorText: {
+    color: ERROR_COLOR,
+    marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
   },
   primaryCta: {
     marginTop: darkTheme.spacing.sm,

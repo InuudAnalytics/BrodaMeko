@@ -9,12 +9,15 @@ import {
   LogoLockup,
   ScreenContainer,
 } from '../../components';
+import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
 
 const ERROR_COLOR = '#FF7B8A';
 
 const SignUpScreen = ({ navigation }) => {
+  const { signUp, isLoading, error, clearError } = useAuth();
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -22,20 +25,33 @@ const SignUpScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
 
-  const handleSignUp = () => {
+  const activeError = localError || error;
+
+  const resetErrors = () => {
+    if (localError) {
+      setLocalError('');
+    }
+
+    if (error) {
+      clearError();
+    }
+  };
+
+  const handleSignUp = async () => {
     if (!fullName.trim() || !email.trim() || !phone.trim() || !password.trim() || !confirmPassword.trim()) {
-      setError('Please fill in all fields.');
+      setLocalError('Please fill in all fields.');
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setLocalError('Passwords do not match.');
       return;
     }
 
-    setError('');
+    setLocalError('');
+    await signUp({ fullName, email, phone, password });
   };
 
   return (
@@ -63,7 +79,7 @@ const SignUpScreen = ({ navigation }) => {
             value={fullName}
             onChangeText={(text) => {
               setFullName(text);
-              if (error) setError('');
+              resetErrors();
             }}
             autoCapitalize="words"
           />
@@ -74,7 +90,7 @@ const SignUpScreen = ({ navigation }) => {
             value={email}
             onChangeText={(text) => {
               setEmail(text);
-              if (error) setError('');
+              resetErrors();
             }}
             keyboardType="email-address"
           />
@@ -85,7 +101,7 @@ const SignUpScreen = ({ navigation }) => {
             value={phone}
             onChangeText={(text) => {
               setPhone(text);
-              if (error) setError('');
+              resetErrors();
             }}
             keyboardType="phone-pad"
           />
@@ -96,7 +112,7 @@ const SignUpScreen = ({ navigation }) => {
             value={password}
             onChangeText={(text) => {
               setPassword(text);
-              if (error) setError('');
+              resetErrors();
             }}
             secureTextEntry={!showPassword}
             right={
@@ -114,7 +130,7 @@ const SignUpScreen = ({ navigation }) => {
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text);
-              if (error) setError('');
+              resetErrors();
             }}
             secureTextEntry={!showConfirmPassword}
             right={
@@ -126,15 +142,19 @@ const SignUpScreen = ({ navigation }) => {
             }
           />
 
-          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+          {activeError ? <AppText style={styles.errorText}>{activeError}</AppText> : null}
 
           <View style={styles.primaryCta}>
-            <AppButton label="Sign Up" onPress={handleSignUp} />
+            <AppButton
+              label={isLoading ? 'Signing Up...' : 'Sign Up'}
+              onPress={handleSignUp}
+              disabled={isLoading}
+            />
           </View>
 
           <DividerOr />
 
-          <GoogleButton label="Sign up with Google" onPress={() => {}} />
+          <GoogleButton label="Sign up with Google" onPress={() => {}} disabled={isLoading} />
 
           <View style={styles.footer}>
             <AppText variant="muted">Have an account? </AppText>

@@ -1,6 +1,6 @@
 import api from './api';
 import { ENDPOINTS } from '../config/endpoints';
-import { mockLogin, mockSignup } from './mockServer';
+import { mockLogin, mockSignup } from './mockServer.js';
 
 const USE_MOCK_SERVER = true;
 

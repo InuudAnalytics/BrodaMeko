@@ -2,6 +2,8 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { darkTheme } from '../theme';
 
+const radius = darkTheme.radius || { md: 12, lg: 16, xl: 20 };
+
 const GoogleButton = ({ label = 'Continue with Google', onPress, disabled = false, style, ...rest }) => {
   return (
     <TouchableOpacity
@@ -22,7 +24,7 @@ const GoogleButton = ({ label = 'Continue with Google', onPress, disabled = fals
 const styles = StyleSheet.create({
   button: {
     minHeight: 52,
-    borderRadius: darkTheme.radius.lg,
+    borderRadius: radius.lg,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,

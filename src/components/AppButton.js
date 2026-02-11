@@ -2,6 +2,8 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { darkTheme } from '../theme';
 
+const radius = darkTheme.radius || { md: 12, lg: 16, xl: 20 };
+
 const AppButton = ({
   label,
   onPress,
@@ -31,7 +33,7 @@ const styles = StyleSheet.create({
   button: {
     minHeight: 52,
     backgroundColor: darkTheme.colors.accent,
-    borderRadius: darkTheme.radius.lg,
+    borderRadius: radius.lg,
     paddingHorizontal: darkTheme.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',

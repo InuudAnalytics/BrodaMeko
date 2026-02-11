@@ -3,6 +3,8 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { darkTheme } from '../theme';
 import AppText from './AppText';
 
+const radius = darkTheme.radius || { md: 12, lg: 16, xl: 20 };
+
 const AppInput = ({
   label,
   value,
@@ -53,7 +55,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,
-    borderRadius: darkTheme.radius.lg,
+    borderRadius: radius.lg,
     paddingHorizontal: darkTheme.spacing.md,
     backgroundColor: 'transparent',
     flexDirection: 'row',
