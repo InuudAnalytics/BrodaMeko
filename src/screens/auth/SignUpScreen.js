@@ -1,34 +1,195 @@
-import React from 'react';
-import { StyleSheet } from 'react-native';
-import { AppButton, AppText, ScreenContainer } from '../../components';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  AppButton,
+  AppInput,
+  AppText,
+  DividerOr,
+  GoogleButton,
+  LogoLockup,
+  ScreenContainer,
+} from '../../components';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
 
+const ERROR_COLOR = '#FF7B8A';
+
 const SignUpScreen = ({ navigation }) => {
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSignUp = () => {
+    if (!fullName.trim() || !email.trim() || !phone.trim() || !password.trim() || !confirmPassword.trim()) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setError('');
+  };
+
   return (
     <ScreenContainer>
-      <AppText variant="title" color={darkTheme.colors.accent}>
-        Sign Up
-      </AppText>
-      <AppText style={styles.roleText}>Role: Guest</AppText>
-      <AppText variant="muted" style={styles.bodyText}>
-        Placeholder registration screen. Real onboarding will be added later.
-      </AppText>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.logoWrap}>
+          <LogoLockup style={styles.logoScale} markSize={44} stacked />
+        </View>
 
-      <AppButton label="Back to Login" onPress={() => navigation.navigate(ROUTES.LOGIN)} />
+        <AppText variant="title" style={styles.heading}>
+          SIGN UP
+        </AppText>
+        <AppText variant="muted" style={styles.subtitle}>
+          Are you ready for the road?
+        </AppText>
+
+        <View style={styles.form}>
+          <AppInput
+            label="Full name"
+            placeholder="Toluwalase Daniel"
+            value={fullName}
+            onChangeText={(text) => {
+              setFullName(text);
+              if (error) setError('');
+            }}
+            autoCapitalize="words"
+          />
+
+          <AppInput
+            label="Email Address"
+            placeholder="Youremail.com"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) setError('');
+            }}
+            keyboardType="email-address"
+          />
+
+          <AppInput
+            label="Phone number"
+            placeholder="09075156578"
+            value={phone}
+            onChangeText={(text) => {
+              setPhone(text);
+              if (error) setError('');
+            }}
+            keyboardType="phone-pad"
+          />
+
+          <AppInput
+            label="Password"
+            placeholder="....."
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError('');
+            }}
+            secureTextEntry={!showPassword}
+            right={
+              <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                <AppText variant="muted" style={styles.toggleText}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </AppText>
+              </TouchableOpacity>
+            }
+          />
+
+          <AppInput
+            label="Confirm password"
+            placeholder="....."
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (error) setError('');
+            }}
+            secureTextEntry={!showConfirmPassword}
+            right={
+              <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
+                <AppText variant="muted" style={styles.toggleText}>
+                  {showConfirmPassword ? 'Hide' : 'Show'}
+                </AppText>
+              </TouchableOpacity>
+            }
+          />
+
+          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+
+          <View style={styles.primaryCta}>
+            <AppButton label="Sign Up" onPress={handleSignUp} />
+          </View>
+
+          <DividerOr />
+
+          <GoogleButton label="Sign up with Google" onPress={() => {}} />
+
+          <View style={styles.footer}>
+            <AppText variant="muted">Have an account? </AppText>
+            <TouchableOpacity onPress={() => navigation.navigate(ROUTES.LOGIN)}>
+              <AppText variant="muted" color={darkTheme.colors.accent}>
+                Sign In
+              </AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  roleText: {
-    marginTop: darkTheme.spacing.sm,
-    color: darkTheme.colors.textSecondary,
+  scrollContent: {
+    paddingBottom: darkTheme.spacing.xxl,
   },
-  bodyText: {
+  logoWrap: {
+    alignItems: 'center',
+    marginTop: darkTheme.spacing.sm,
+    marginBottom: darkTheme.spacing.lg,
+  },
+  logoScale: {
+    transform: [{ scale: 0.35 }],
+  },
+  heading: {
+    color: darkTheme.colors.text,
+    marginBottom: darkTheme.spacing.xs,
+  },
+  subtitle: {
+    color: darkTheme.colors.muted,
+    marginBottom: darkTheme.spacing.lg,
+  },
+  form: {
+    marginTop: darkTheme.spacing.xs,
+  },
+  toggleText: {
+    color: darkTheme.colors.muted,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  errorText: {
+    color: ERROR_COLOR,
+    marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
+  },
+  primaryCta: {
+    marginTop: darkTheme.spacing.sm,
+  },
+  footer: {
     marginTop: darkTheme.spacing.md,
-    marginBottom: darkTheme.spacing.xl,
-    color: darkTheme.colors.textSecondary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

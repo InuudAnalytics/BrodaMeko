@@ -2,10 +2,10 @@ import React from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
 import { darkTheme } from '../theme';
 
-const ScreenContainer = ({ children, style }) => {
+const ScreenContainer = ({ children, style, padded = true, safeAreaStyle }) => {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.content, style]}>{children}</View>
+    <SafeAreaView style={[styles.safeArea, safeAreaStyle]}>
+      <View style={[styles.content, padded ? styles.padded : null, style]}>{children}</View>
     </SafeAreaView>
   );
 };
@@ -18,7 +18,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: darkTheme.colors.background,
-    padding: darkTheme.spacing.xl,
+  },
+  padded: {
+    paddingHorizontal: darkTheme.spacing.xl,
+    paddingVertical: darkTheme.spacing.md,
   },
 });
 
