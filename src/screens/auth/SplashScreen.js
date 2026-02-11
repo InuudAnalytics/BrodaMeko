@@ -1,39 +1,44 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { AppText, LogoLockup, ScreenContainer } from '../../components';
+import React, { useEffect, useRef } from 'react';
+import { StatusBar, StyleSheet, View } from 'react-native';
+import AnimatedLogo from '../../components/AnimatedLogo';
+import { AppText, ScreenContainer } from '../../components';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
+
+const SPLASH_DURATION_MS = 3000;
 
 const SplashScreen = ({ navigation }) => {
   const hasNavigated = useRef(false);
 
-  const goToLogin = useCallback(() => {
-    if (hasNavigated.current) {
-      return;
-    }
-
-    hasNavigated.current = true;
-    navigation.navigate(ROUTES.LOGIN);
-  }, [navigation]);
-
   useEffect(() => {
-    const timer = setTimeout(goToLogin, 1200);
-    return () => clearTimeout(timer);
-  }, [goToLogin]);
+    const timer = setTimeout(() => {
+      if (hasNavigated.current) {
+        return;
+      }
+
+      hasNavigated.current = true;
+      navigation.navigate(ROUTES.LOGIN);
+    }, SPLASH_DURATION_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [navigation]);
 
   return (
     <ScreenContainer padded={false} style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
 
       <View style={styles.centerContent}>
-        <LogoLockup markSize={86} stacked />
-      </View>
+        <AnimatedLogo size={92} />
 
-      <TouchableOpacity onPress={goToLogin} activeOpacity={0.7} style={styles.fallbackButton}>
-        <AppText variant="muted" style={styles.fallbackText}>
-          Tap to continue
+        <AppText variant="subtitle" style={styles.wordmark}>
+          Broda
+          <AppText variant="subtitle" color={darkTheme.colors.accent} style={styles.wordmarkAccent}>
+            Meko
+          </AppText>
         </AppText>
-      </TouchableOpacity>
+      </View>
     </ScreenContainer>
   );
 };
@@ -50,13 +55,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  fallbackButton: {
-    paddingVertical: darkTheme.spacing.xs,
-    marginBottom: darkTheme.spacing.xxl,
+  wordmark: {
+    marginTop: darkTheme.spacing.lg,
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  fallbackText: {
-    color: darkTheme.colors.muted,
-    opacity: 0.8,
+  wordmarkAccent: {
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
 });
 
