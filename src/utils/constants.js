@@ -8,6 +8,7 @@ export const ROUTES = {
   SPLASH: 'Splash',
   LOGIN: 'Login',
   SIGN_UP: 'SignUp',
+  OTP_VERIFICATION: 'OTPVerification',
   CAR_OWNER_DASHBOARD: 'CarOwnerDashboard',
   MECH_DASHBOARD: 'MechDashboard',
   ADMIN_DASHBOARD: 'AdminDashboard',

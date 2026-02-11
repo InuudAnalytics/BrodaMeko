@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -18,14 +18,47 @@ import {
   LogoLockup,
   ScreenContainer,
 } from '../../components';
-import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
 
 const ERROR_COLOR = '#FF7B8A';
 
+const METHODS = {
+  PHONE: 'phone',
+  EMAIL: 'email',
+};
+
+const maskPhone = (value) => {
+  const raw = String(value || '').replace(/\D/g, '');
+
+  if (raw.length <= 7) {
+    return raw;
+  }
+
+  const start = raw.slice(0, 4);
+  const end = raw.slice(-3);
+  const hidden = '*'.repeat(Math.max(0, raw.length - 7));
+
+  return `${start}${hidden}${end}`;
+};
+
+const maskEmail = (value) => {
+  const email = String(value || '').trim();
+  const [name, domain] = email.split('@');
+
+  if (!name || !domain) {
+    return email;
+  }
+
+  if (name.length <= 3) {
+    return `${name[0] || ''}***@${domain}`;
+  }
+
+  return `${name.slice(0, 3)}***@${domain}`;
+};
+
 const SignUpScreen = ({ navigation }) => {
-  const { signUp, isLoading, error, clearError } = useAuth();
+  const [method, setMethod] = useState(METHODS.PHONE);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -34,33 +67,43 @@ const SignUpScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [localError, setLocalError] = useState('');
+  const [error, setError] = useState('');
 
-  const activeError = localError || error;
+  const destinationPreview = useMemo(() => {
+    return method === METHODS.PHONE ? maskPhone(phone) : maskEmail(email);
+  }, [method, phone, email]);
 
-  const resetErrors = () => {
-    if (localError) {
-      setLocalError('');
-    }
-
+  const resetError = () => {
     if (error) {
-      clearError();
+      setError('');
     }
   };
 
-  const handleSignUp = async () => {
-    if (!fullName.trim() || !email.trim() || !phone.trim() || !password.trim() || !confirmPassword.trim()) {
-      setLocalError('Please fill in all fields.');
+  const handleSignUp = () => {
+    if (!fullName.trim() || !password.trim() || !confirmPassword.trim()) {
+      setError('Please fill in all required fields.');
+      return;
+    }
+
+    if (method === METHODS.PHONE && !phone.trim()) {
+      setError('Phone number is required.');
+      return;
+    }
+
+    if (method === METHODS.EMAIL && !email.trim()) {
+      setError('Email address is required.');
       return;
     }
 
     if (password !== confirmPassword) {
-      setLocalError('Passwords do not match.');
+      setError('Passwords do not match.');
       return;
     }
 
-    setLocalError('');
-    await signUp({ fullName, email, phone, password });
+    navigation.navigate(ROUTES.OTP_VERIFICATION, {
+      method,
+      destination: destinationPreview,
+    });
   };
 
   return (
@@ -87,39 +130,73 @@ const SignUpScreen = ({ navigation }) => {
             </AppText>
 
             <View style={styles.form}>
+              <View style={styles.segmentWrap}>
+                <TouchableOpacity
+                  style={[styles.segment, method === METHODS.PHONE ? styles.segmentActive : null]}
+                  onPress={() => {
+                    setMethod(METHODS.PHONE);
+                    resetError();
+                  }}
+                >
+                  <AppText
+                    variant="muted"
+                    style={method === METHODS.PHONE ? styles.segmentTextActive : styles.segmentText}
+                  >
+                    Phone Number
+                  </AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.segment, method === METHODS.EMAIL ? styles.segmentActive : null]}
+                  onPress={() => {
+                    setMethod(METHODS.EMAIL);
+                    resetError();
+                  }}
+                >
+                  <AppText
+                    variant="muted"
+                    style={method === METHODS.EMAIL ? styles.segmentTextActive : styles.segmentText}
+                  >
+                    Email Address
+                  </AppText>
+                </TouchableOpacity>
+              </View>
+
               <AppInput
                 label="Full name"
                 placeholder="Toluwalase Daniel"
                 value={fullName}
                 onChangeText={(text) => {
                   setFullName(text);
-                  resetErrors();
+                  resetError();
                 }}
                 autoCapitalize="words"
               />
 
-              <AppInput
-                label="Email Address"
-                placeholder="Youremail.com"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  resetErrors();
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-
-              <AppInput
-                label="Phone number"
-                placeholder="09075156578"
-                value={phone}
-                onChangeText={(text) => {
-                  setPhone(text);
-                  resetErrors();
-                }}
-                keyboardType="phone-pad"
-              />
+              {method === METHODS.EMAIL ? (
+                <AppInput
+                  label="Email Address"
+                  placeholder="Youremail.com"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    resetError();
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              ) : (
+                <AppInput
+                  label="Phone number"
+                  placeholder="09075156578"
+                  value={phone}
+                  onChangeText={(text) => {
+                    setPhone(text);
+                    resetError();
+                  }}
+                  keyboardType="phone-pad"
+                />
+              )}
 
               <AppInput
                 label="Password"
@@ -127,7 +204,7 @@ const SignUpScreen = ({ navigation }) => {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  resetErrors();
+                  resetError();
                 }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -146,7 +223,7 @@ const SignUpScreen = ({ navigation }) => {
                 value={confirmPassword}
                 onChangeText={(text) => {
                   setConfirmPassword(text);
-                  resetErrors();
+                  resetError();
                 }}
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
@@ -159,19 +236,15 @@ const SignUpScreen = ({ navigation }) => {
                 }
               />
 
-              {activeError ? <AppText style={styles.errorText}>{activeError}</AppText> : null}
+              {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
               <View style={styles.primaryCta}>
-                <AppButton
-                  label={isLoading ? 'Signing Up...' : 'Sign Up'}
-                  onPress={handleSignUp}
-                  disabled={isLoading}
-                />
+                <AppButton label="Sign Up" onPress={handleSignUp} />
               </View>
 
               <DividerOr />
 
-              <GoogleButton label="Sign up with Google" onPress={() => {}} disabled={isLoading} />
+              <GoogleButton label="Sign up with Google" onPress={() => {}} />
 
               <View style={styles.footer}>
                 <AppText variant="muted">Have an account? </AppText>
@@ -215,6 +288,32 @@ const styles = StyleSheet.create({
   },
   form: {
     marginTop: darkTheme.spacing.xs,
+  },
+  segmentWrap: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: darkTheme.radius.lg,
+    overflow: 'hidden',
+    marginBottom: darkTheme.spacing.md,
+  },
+  segment: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  segmentActive: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  segmentText: {
+    color: darkTheme.colors.muted,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  segmentTextActive: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   toggleText: {
     color: darkTheme.colors.muted,
