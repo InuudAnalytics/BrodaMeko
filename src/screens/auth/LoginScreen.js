@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import {
   AppButton,
   AppInput,
@@ -26,91 +36,107 @@ const LoginScreen = ({ navigation }) => {
     await signIn({ email, password });
   };
 
+  const handleForgotPassword = () => {
+    Alert.alert('Forgot Password', 'Password reset flow will be added soon.');
+  };
+
   return (
     <ScreenContainer>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.logoWrap}>
-          <LogoLockup style={styles.logoScale} markSize={44} stacked />
-        </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.logoWrap}>
+              <LogoLockup style={styles.logoScale} markSize={44} stacked />
+            </View>
 
-        <AppText variant="title" style={styles.heading}>
-          SIGN IN
-        </AppText>
-        <AppText variant="muted" style={styles.subtitle}>
-          Are you ready for the road?
-        </AppText>
+            <AppText variant="title" style={styles.heading}>
+              SIGN IN
+            </AppText>
+            <AppText variant="muted" style={styles.subtitle}>
+              Are you ready for the road?
+            </AppText>
 
-        <View style={styles.form}>
-          <AppInput
-            label="Email Address"
-            placeholder="Youremail.com"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (error) clearError();
-            }}
-            keyboardType="email-address"
-          />
+            <View style={styles.form}>
+              <AppInput
+                label="Email Address"
+                placeholder="Youremail.com"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (error) clearError();
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
 
-          <View style={styles.passwordLabelRow}>
-            <AppText variant="body">Password</AppText>
-            <TouchableOpacity onPress={() => {}}>
-              <AppText variant="muted" color={darkTheme.colors.accent}>
-                Forgot password
-              </AppText>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.passwordLabelRow}>
+                <AppText variant="body">Password</AppText>
+                <TouchableOpacity onPress={handleForgotPassword}>
+                  <AppText variant="muted" color={darkTheme.colors.accent}>
+                    Forgot password
+                  </AppText>
+                </TouchableOpacity>
+              </View>
 
-          <AppInput
-            placeholder="....."
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              if (error) clearError();
-            }}
-            secureTextEntry={!showPassword}
-            right={
-              <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
-                <AppText variant="muted" style={styles.toggleText}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </AppText>
-              </TouchableOpacity>
-            }
-          />
+              <AppInput
+                placeholder="....."
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (error) clearError();
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                right={
+                  <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                    <AppText variant="muted" style={styles.toggleText}>
+                      {showPassword ? 'Hide' : 'Show'}
+                    </AppText>
+                  </TouchableOpacity>
+                }
+              />
 
-          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+              {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
-          <View style={styles.primaryCta}>
-            <AppButton
-              label={isLoading ? 'Signing In...' : 'Sign In'}
-              onPress={handleSignIn}
-              disabled={isLoading}
-            />
-          </View>
+              <View style={styles.primaryCta}>
+                <AppButton
+                  label={isLoading ? 'Signing In...' : 'Sign In'}
+                  onPress={handleSignIn}
+                  disabled={isLoading}
+                />
+              </View>
 
-          <DividerOr />
+              <DividerOr />
 
-          <GoogleButton label="Sign in with Google" onPress={() => {}} disabled={isLoading} />
+              <GoogleButton label="Sign in with Google" onPress={() => {}} disabled={isLoading} />
 
-          <View style={styles.footer}>
-            <AppText variant="muted">Dont have an account? </AppText>
-            <TouchableOpacity onPress={() => navigation.navigate(ROUTES.SIGN_UP)}>
-              <AppText variant="muted" color={darkTheme.colors.accent}>
-                Sign Up
-              </AppText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+              <View style={styles.footer}>
+                <AppText variant="muted">Dont have an account? </AppText>
+                <TouchableOpacity onPress={() => navigation.navigate(ROUTES.SIGN_UP)}>
+                  <AppText variant="muted" color={darkTheme.colors.accent}>
+                    Sign Up
+                  </AppText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+  },
   scrollContent: {
     paddingBottom: darkTheme.spacing.xxl,
   },

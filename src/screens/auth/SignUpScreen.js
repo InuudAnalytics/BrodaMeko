@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import {
   AppButton,
   AppInput,
@@ -56,121 +65,134 @@ const SignUpScreen = ({ navigation }) => {
 
   return (
     <ScreenContainer>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.logoWrap}>
-          <LogoLockup style={styles.logoScale} markSize={44} stacked />
-        </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.logoWrap}>
+              <LogoLockup style={styles.logoScale} markSize={44} stacked />
+            </View>
 
-        <AppText variant="title" style={styles.heading}>
-          SIGN UP
-        </AppText>
-        <AppText variant="muted" style={styles.subtitle}>
-          Are you ready for the road?
-        </AppText>
+            <AppText variant="title" style={styles.heading}>
+              SIGN UP
+            </AppText>
+            <AppText variant="muted" style={styles.subtitle}>
+              Are you ready for the road?
+            </AppText>
 
-        <View style={styles.form}>
-          <AppInput
-            label="Full name"
-            placeholder="Toluwalase Daniel"
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              resetErrors();
-            }}
-            autoCapitalize="words"
-          />
+            <View style={styles.form}>
+              <AppInput
+                label="Full name"
+                placeholder="Toluwalase Daniel"
+                value={fullName}
+                onChangeText={(text) => {
+                  setFullName(text);
+                  resetErrors();
+                }}
+                autoCapitalize="words"
+              />
 
-          <AppInput
-            label="Email Address"
-            placeholder="Youremail.com"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              resetErrors();
-            }}
-            keyboardType="email-address"
-          />
+              <AppInput
+                label="Email Address"
+                placeholder="Youremail.com"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  resetErrors();
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
 
-          <AppInput
-            label="Phone number"
-            placeholder="09075156578"
-            value={phone}
-            onChangeText={(text) => {
-              setPhone(text);
-              resetErrors();
-            }}
-            keyboardType="phone-pad"
-          />
+              <AppInput
+                label="Phone number"
+                placeholder="09075156578"
+                value={phone}
+                onChangeText={(text) => {
+                  setPhone(text);
+                  resetErrors();
+                }}
+                keyboardType="phone-pad"
+              />
 
-          <AppInput
-            label="Password"
-            placeholder="....."
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              resetErrors();
-            }}
-            secureTextEntry={!showPassword}
-            right={
-              <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
-                <AppText variant="muted" style={styles.toggleText}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </AppText>
-              </TouchableOpacity>
-            }
-          />
+              <AppInput
+                label="Password"
+                placeholder="....."
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  resetErrors();
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                right={
+                  <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                    <AppText variant="muted" style={styles.toggleText}>
+                      {showPassword ? 'Hide' : 'Show'}
+                    </AppText>
+                  </TouchableOpacity>
+                }
+              />
 
-          <AppInput
-            label="Confirm password"
-            placeholder="....."
-            value={confirmPassword}
-            onChangeText={(text) => {
-              setConfirmPassword(text);
-              resetErrors();
-            }}
-            secureTextEntry={!showConfirmPassword}
-            right={
-              <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
-                <AppText variant="muted" style={styles.toggleText}>
-                  {showConfirmPassword ? 'Hide' : 'Show'}
-                </AppText>
-              </TouchableOpacity>
-            }
-          />
+              <AppInput
+                label="Confirm password"
+                placeholder="....."
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  resetErrors();
+                }}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                right={
+                  <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
+                    <AppText variant="muted" style={styles.toggleText}>
+                      {showConfirmPassword ? 'Hide' : 'Show'}
+                    </AppText>
+                  </TouchableOpacity>
+                }
+              />
 
-          {activeError ? <AppText style={styles.errorText}>{activeError}</AppText> : null}
+              {activeError ? <AppText style={styles.errorText}>{activeError}</AppText> : null}
 
-          <View style={styles.primaryCta}>
-            <AppButton
-              label={isLoading ? 'Signing Up...' : 'Sign Up'}
-              onPress={handleSignUp}
-              disabled={isLoading}
-            />
-          </View>
+              <View style={styles.primaryCta}>
+                <AppButton
+                  label={isLoading ? 'Signing Up...' : 'Sign Up'}
+                  onPress={handleSignUp}
+                  disabled={isLoading}
+                />
+              </View>
 
-          <DividerOr />
+              <DividerOr />
 
-          <GoogleButton label="Sign up with Google" onPress={() => {}} disabled={isLoading} />
+              <GoogleButton label="Sign up with Google" onPress={() => {}} disabled={isLoading} />
 
-          <View style={styles.footer}>
-            <AppText variant="muted">Have an account? </AppText>
-            <TouchableOpacity onPress={() => navigation.navigate(ROUTES.LOGIN)}>
-              <AppText variant="muted" color={darkTheme.colors.accent}>
-                Sign In
-              </AppText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+              <View style={styles.footer}>
+                <AppText variant="muted">Have an account? </AppText>
+                <TouchableOpacity onPress={() => navigation.navigate(ROUTES.LOGIN)}>
+                  <AppText variant="muted" color={darkTheme.colors.accent}>
+                    Sign In
+                  </AppText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+  },
   scrollContent: {
     paddingBottom: darkTheme.spacing.xxl,
   },
