@@ -26,12 +26,12 @@ const DashboardScreen = () => {
 const styles = StyleSheet.create({
   roleText: {
     marginTop: darkTheme.spacing.sm,
-    color: darkTheme.colors.textSecondary,
+    color: darkTheme.colors.muted,
   },
   bodyText: {
     marginTop: darkTheme.spacing.md,
     marginBottom: darkTheme.spacing.xl,
-    color: darkTheme.colors.textSecondary,
+    color: darkTheme.colors.muted,
   },
 });
 
