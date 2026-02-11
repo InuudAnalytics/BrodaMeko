@@ -9,7 +9,13 @@ export const ROUTES = {
   LOGIN: 'Login',
   SIGN_UP: 'SignUp',
   OTP_VERIFICATION: 'OTPVerification',
+
   CAR_OWNER_DASHBOARD: 'CarOwnerDashboard',
+  CAR_OWNER_HISTORY: 'CarOwnerHistory',
+  CAR_OWNER_REWARDS: 'CarOwnerRewards',
+  CAR_OWNER_SETTINGS: 'CarOwnerSettings',
+  CAR_OWNER_PROFILE: 'CarOwnerProfile',
+
   MECH_DASHBOARD: 'MechDashboard',
   ADMIN_DASHBOARD: 'AdminDashboard',
 };
