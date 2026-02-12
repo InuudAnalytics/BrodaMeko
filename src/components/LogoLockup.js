@@ -6,14 +6,16 @@ import AppText from './AppText';
 
 const LogoLockup = ({ style, markSize = 86, stacked = true }) => {
   const innerSize = Math.round(markSize * 0.44);
+  const wordmarkSize = Math.max(12, Math.round(markSize / 3));
+  const wordmarkLineHeight = Math.round(wordmarkSize * 1.15);
 
-  const octagonPoints = useMemo(() => {
+  const nonagonPoints = useMemo(() => {
     const center = markSize / 2;
     const radius = markSize / 2;
-    const startAngleDeg = 22.5;
+    const startAngleDeg = -90;
 
-    const points = Array.from({ length: 8 }, (_, i) => {
-      const angleDeg = startAngleDeg + i * 45;
+    const points = Array.from({ length: 9 }, (_, i) => {
+      const angleDeg = startAngleDeg + i * 40;
       const angleRad = (angleDeg * Math.PI) / 180;
       const x = center + radius * Math.cos(angleRad);
       const y = center + radius * Math.sin(angleRad);
@@ -25,9 +27,9 @@ const LogoLockup = ({ style, markSize = 86, stacked = true }) => {
 
   return (
     <View style={[stacked ? styles.stack : styles.row, style]}>
-      <View style={[styles.markWrap, { width: markSize, height: markSize }]}>
+      <View style={[styles.markWrap, { width: markSize, height: markSize }]}> 
         <Svg width={markSize} height={markSize} viewBox={`0 0 ${markSize} ${markSize}`}>
-          <Polygon points={octagonPoints} fill={darkTheme.colors.text} />
+          <Polygon points={nonagonPoints} fill={darkTheme.colors.text} />
         </Svg>
         <View
           style={[
@@ -41,9 +43,28 @@ const LogoLockup = ({ style, markSize = 86, stacked = true }) => {
         />
       </View>
 
-      <AppText variant="subtitle" style={styles.wordmark}>
+      <AppText
+        variant="subtitle"
+        style={[
+          styles.wordmark,
+          {
+            fontSize: wordmarkSize,
+            lineHeight: wordmarkLineHeight,
+          },
+        ]}
+      >
         Broda
-        <AppText variant="subtitle" color={darkTheme.colors.accent} style={styles.wordmarkAccent}>
+        <AppText
+          variant="subtitle"
+          color={darkTheme.colors.accent}
+          style={[
+            styles.wordmarkAccent,
+            {
+              fontSize: wordmarkSize,
+              lineHeight: wordmarkLineHeight,
+            },
+          ]}
+        >
           Meko
         </AppText>
       </AppText>
@@ -64,7 +85,7 @@ const styles = StyleSheet.create({
   markWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: darkTheme.spacing.md,
+    marginBottom: Math.round(darkTheme.spacing.md * 0.67),
   },
   innerMark: {
     position: 'absolute',
@@ -72,15 +93,14 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     color: darkTheme.colors.text,
-    fontSize: 46,
-    lineHeight: 52,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   wordmarkAccent: {
-    fontSize: 46,
-    lineHeight: 52,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
 });
 
 export default LogoLockup;
+
+
+

@@ -4,15 +4,15 @@ import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
-const RewardsScreen = ({ navigation }) => {
+const WalletScreen = ({ navigation }) => {
   return (
     <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
       <View style={styles.content}>
         <AppText variant="title" style={styles.heading}>
-          Rewards
+          Wallet
         </AppText>
         <AppText variant="muted" style={styles.subtext}>
-          Rewards page coming soon.
+          Wallet page coming soon.
         </AppText>
       </View>
 
@@ -37,4 +37,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RewardsScreen;
+export default WalletScreen;
+
+

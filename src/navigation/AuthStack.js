@@ -1,6 +1,14 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LoginScreen, OTPVerificationScreen, SignUpScreen, SplashScreen } from '../screens';
+import {
+  ForgotPasswordScreen,
+  LoginScreen,
+  OTPVerificationScreen,
+  ResetPasswordScreen,
+  RoleSelectionScreen,
+  SignUpScreen,
+  SplashScreen,
+} from '../screens';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -11,27 +19,17 @@ const AuthStack = () => {
     <Stack.Navigator
       initialRouteName={ROUTES.SPLASH}
       screenOptions={{
-        headerStyle: {
-          backgroundColor: darkTheme.colors.background,
-        },
-        headerTintColor: darkTheme.colors.accent,
-        headerTitleStyle: {
-          color: darkTheme.colors.accent,
-          fontSize: 16,
-          fontWeight: darkTheme.typography.fontWeights.semibold,
-        },
-        headerBackTitleVisible: false,
+        headerShown: false,
         contentStyle: { backgroundColor: darkTheme.colors.background },
       }}
     >
-      <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
+      <Stack.Screen name={ROUTES.ROLE_SELECTION} component={RoleSelectionScreen} />
+      <Stack.Screen name={ROUTES.SIGN_UP} component={SignUpScreen} />
       <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
-      <Stack.Screen name={ROUTES.SIGN_UP} component={SignUpScreen} options={{ title: 'Sign Up' }} />
-      <Stack.Screen
-        name={ROUTES.OTP_VERIFICATION}
-        component={OTPVerificationScreen}
-        options={{ title: 'OTP Verification' }}
-      />
+      <Stack.Screen name={ROUTES.OTP_VERIFICATION} component={OTPVerificationScreen} />
+      <Stack.Screen name={ROUTES.FORGOT_PASSWORD} component={ForgotPasswordScreen} />
+      <Stack.Screen name={ROUTES.RESET_PASSWORD} component={ResetPasswordScreen} />
     </Stack.Navigator>
   );
 };

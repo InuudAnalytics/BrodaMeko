@@ -3,7 +3,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   CarOwnerDashboardScreen,
   CarOwnerHistoryScreen,
+  CarOwnerLiveTrackingScreen,
+  CarOwnerMechanicDiscoveryScreen,
   CarOwnerProfileScreen,
+  CarOwnerReportIssueScreen,
+  CarOwnerRequestDiagnosticsScreen,
   CarOwnerRewardsScreen,
   CarOwnerSettingsScreen,
 } from '../screens';
@@ -32,13 +36,33 @@ const CarOwnerStack = () => {
         options={{ title: 'Home', headerShown: false }}
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_HISTORY} component={CarOwnerHistoryScreen} options={{ title: 'History' }} />
-      <Stack.Screen name={ROUTES.CAR_OWNER_REWARDS} component={CarOwnerRewardsScreen} options={{ title: 'Rewards' }} />
+      <Stack.Screen name={ROUTES.CAR_OWNER_REWARDS} component={CarOwnerRewardsScreen} options={{ title: 'Wallet' }} />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_SETTINGS}
         component={CarOwnerSettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_PROFILE} component={CarOwnerProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_REPORT_ISSUE}
+        component={CarOwnerReportIssueScreen}
+        options={{ title: 'What is the issue' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS}
+        component={CarOwnerRequestDiagnosticsScreen}
+        options={{ title: 'Book a diagnostic expert' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_MECHANIC_DISCOVERY}
+        component={CarOwnerMechanicDiscoveryScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_LIVE_TRACKING}
+        component={CarOwnerLiveTrackingScreen}
+        options={{ title: 'Live tracking' }}
+      />
     </Stack.Navigator>
   );
 };

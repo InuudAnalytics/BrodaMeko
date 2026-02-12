@@ -1,31 +1,35 @@
-// Placeholder base URL. Replace with your real backend host when available.
-export const BASE_URL = 'https://api.example.com';
+export const BASE_URL = 'https://brodameko-server-50cv.onrender.com';
 
 export const ENDPOINTS = {
   auth: {
-    login: '/auth/login',
-    signup: '/auth/signup',
-    requestOtp: '/auth/request-otp',
-    verifyOtp: '/auth/verify-otp',
+    signup: '/api/v1/auth/signup',
+    verifyOtp: '/api/v1/auth/verify-otp',
+    resendOtp: '/api/v1/auth/resend-otp',
+    login: '/api/v1/auth/login',
+    logout: '/api/v1/auth/logout',
+    forgotPassword: '/api/v1/auth/forgot-password',
+    resetPassword: '/api/v1/auth/reset-password/reset',
+    me: '/api/v1/auth/me',
+    updatePassword: '/api/v1/auth/update-password',
   },
   providers: {
-    nearby: '/providers/nearby',
+    nearby: '/api/v1/providers/nearby',
   },
   bookings: {
-    create: '/bookings/create',
-    status: '/bookings/status',
-    accept: '/bookings/accept',
-    complete: '/bookings/complete',
+    create: '/api/v1/bookings/create',
+    status: '/api/v1/bookings/status',
+    accept: '/api/v1/bookings/accept',
+    complete: '/api/v1/bookings/complete',
   },
   wallet: {
-    balance: '/wallet/balance',
-    fund: '/wallet/fund',
-    pay: '/wallet/pay',
-    transactions: '/wallet/transactions',
+    balance: '/api/v1/wallet/balance',
+    fund: '/api/v1/wallet/fund',
+    pay: '/api/v1/wallet/pay',
+    transactions: '/api/v1/wallet/transactions',
   },
   chat: {
-    threads: '/chat/threads',
-    messages: '/chat/messages',
+    threads: '/api/v1/chat/threads',
+    messages: '/api/v1/chat/messages',
   },
 };
 

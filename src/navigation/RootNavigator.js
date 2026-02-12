@@ -1,6 +1,6 @@
 import React from 'react';
 import { DarkTheme as NavigationDarkTheme, NavigationContainer } from '@react-navigation/native';
-import { ScreenContainer } from '../components';
+import { AppText, ScreenContainer } from '../components';
 import { useAuth } from '../context';
 import { darkTheme } from '../theme';
 import { ROLES } from '../utils';
@@ -22,8 +22,21 @@ const navTheme = {
   },
 };
 
+const InvalidRoleScreen = ({ role }) => {
+  return (
+    <ScreenContainer style={{ justifyContent: 'center', alignItems: 'center' }}>
+      <AppText variant="title" style={{ color: darkTheme.colors.accent, marginBottom: darkTheme.spacing.sm }}>
+        Invalid account role
+      </AppText>
+      <AppText variant="muted" style={{ textAlign: 'center' }}>
+        Signed in, but role "{String(role || 'unknown')}" is not allowed. Please sign out and sign in again.
+      </AppText>
+    </ScreenContainer>
+  );
+};
+
 const RootNavigator = () => {
-  const { token, role, isLoading } = useAuth();
+  const { token, role, isBootstrapped } = useAuth();
 
   const renderRoleStack = () => {
     if (role === ROLES.CAR_OWNER) {
@@ -38,11 +51,11 @@ const RootNavigator = () => {
       return <AdminStack />;
     }
 
-    // Fallback when token exists but role is missing/unknown.
-    return <CarOwnerStack />;
+    // Strict mode: never fall back to another role stack.
+    return <InvalidRoleScreen role={role} />;
   };
 
-  if (isLoading) {
+  if (!isBootstrapped) {
     return <ScreenContainer padded={false} />;
   }
 
@@ -50,3 +63,4 @@ const RootNavigator = () => {
 };
 
 export default RootNavigator;
+

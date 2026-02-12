@@ -51,13 +51,13 @@ const AnimatedLogo = ({ size = 92, innerScale = 0.42, duration = 1400, style }) 
 
   const innerSize = Math.round(size * innerScale);
 
-  const octagonPoints = useMemo(() => {
+  const nonagonPoints = useMemo(() => {
     const center = size / 2;
     const radius = size / 2;
-    const startAngleDeg = 22.5;
+    const startAngleDeg = -90;
 
-    const points = Array.from({ length: 8 }, (_, i) => {
-      const angleDeg = startAngleDeg + i * 45;
+    const points = Array.from({ length: 9 }, (_, i) => {
+      const angleDeg = startAngleDeg + i * 40;
       const angleRad = (angleDeg * Math.PI) / 180;
       const x = center + radius * Math.cos(angleRad);
       const y = center + radius * Math.sin(angleRad);
@@ -69,9 +69,9 @@ const AnimatedLogo = ({ size = 92, innerScale = 0.42, duration = 1400, style }) 
 
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
-      <Animated.View style={[styles.layer, { transform: [{ rotate: outerSpin }] }]}>
+      <Animated.View style={[styles.layer, { transform: [{ rotate: outerSpin }] }]}> 
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          <Polygon points={octagonPoints} fill={darkTheme.colors.text} />
+          <Polygon points={nonagonPoints} fill={darkTheme.colors.text} />
         </Svg>
       </Animated.View>
 
@@ -107,3 +107,5 @@ const styles = StyleSheet.create({
 });
 
 export default AnimatedLogo;
+
+

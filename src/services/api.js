@@ -1,17 +1,33 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { BASE_URL } from '../config/endpoints';
 
-const getAuthToken = async () => {
-  // Stub token getter for now. Replace with AsyncStorage/SecureStore lookup later.
-  return null;
+export const TOKEN_STORAGE_KEY = '@brodameko/token';
+
+const pickErrorMessage = (payload) => {
+  if (!payload) {
+    return null;
+  }
+
+  if (typeof payload === 'string') {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.errors) && payload.errors.length) {
+    return payload.errors[0]?.message || payload.errors[0] || null;
+  }
+
+  return payload.message || payload.error || null;
 };
 
 const normalizeError = (error) => {
   if (error?.response) {
+    const payload = error.response.data;
+
     return {
-      message: error.response.data?.message || 'Request failed',
+      message: pickErrorMessage(payload) || 'Request failed',
       status: error.response.status,
-      data: error.response.data || null,
+      data: payload || null,
     };
   }
 
@@ -32,7 +48,7 @@ const normalizeError = (error) => {
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -41,7 +57,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
-    const token = await getAuthToken();
+    const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
