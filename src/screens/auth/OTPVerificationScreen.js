@@ -1,41 +1,78 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { UserSettings01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../components';
 import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
+import { ROUTES, useKeyboardLift } from '../../utils';
 
-const ERROR_COLOR = '#FF7B8A';
 const OTP_LENGTH = 4;
 
-const OTPVerificationScreen = ({ route }) => {
-  const { signIn, signUp, isLoading } = useAuth();
+const OTPVerificationScreen = ({ route, navigation }) => {
+  const { verifyOtp, resendOtp, error, clearError, pendingVerification } = useAuth();
+  const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
-  const { method = 'phone', destination = '', signupPayload = null } = route.params || {};
+  const routeParams = route.params || {};
+  const method = routeParams.method || pendingVerification?.method || 'phone';
+  const destination = routeParams.destination || pendingVerification?.email || pendingVerification?.phoneNumber || '';
 
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
+  const [info, setInfo] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const inputRefs = useRef([]);
 
-  const methodLabel = method === 'email' ? 'email address' : 'phone number';
-
   const otpValue = useMemo(() => otp.join(''), [otp]);
+  const mergedError = localError || error;
 
-  const setDigit = (value, index) => {
-    const numericValue = value.replace(/\D/g, '');
-    const nextDigit = numericValue.slice(-1);
-
-    const nextOtp = [...otp];
-    nextOtp[index] = nextDigit;
-    setOtp(nextOtp);
+  const clearFeedback = () => {
+    if (localError) {
+      setLocalError('');
+    }
 
     if (error) {
-      setError('');
+      clearError();
     }
 
-    if (nextDigit && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
+    if (info) {
+      setInfo('');
     }
+  };
+
+  const fillFromIndex = (rawText, startIndex) => {
+    const digits = String(rawText || '').replace(/\D/g, '');
+
+    if (!digits) {
+      const nextOtp = [...otp];
+      nextOtp[startIndex] = '';
+      setOtp(nextOtp);
+      return;
+    }
+
+    const nextOtp = [...otp];
+    let cursor = startIndex;
+
+    for (let i = 0; i < digits.length && cursor < OTP_LENGTH; i += 1) {
+      nextOtp[cursor] = digits[i];
+      cursor += 1;
+    }
+
+    setOtp(nextOtp);
+
+    if (cursor < OTP_LENGTH) {
+      inputRefs.current[cursor]?.focus();
+    } else {
+      inputRefs.current[OTP_LENGTH - 1]?.blur();
+      Keyboard.dismiss();
+    }
+  };
+
+  const setDigit = (value, index) => {
+    clearFeedback();
+    fillFromIndex(value, index);
   };
 
   const handleKeyPress = (event, index) => {
@@ -43,15 +80,15 @@ const OTPVerificationScreen = ({ route }) => {
       return;
     }
 
-    if (otp[index]) {
-      const nextOtp = [...otp];
+    const nextOtp = [...otp];
+
+    if (nextOtp[index]) {
       nextOtp[index] = '';
       setOtp(nextOtp);
       return;
     }
 
     if (index > 0) {
-      const nextOtp = [...otp];
       nextOtp[index - 1] = '';
       setOtp(nextOtp);
       inputRefs.current[index - 1]?.focus();
@@ -59,44 +96,71 @@ const OTPVerificationScreen = ({ route }) => {
   };
 
   const handleVerify = async () => {
+    if (isVerifying || isResending) {
+      return;
+    }
+
     if (otpValue.length !== OTP_LENGTH || otp.some((digit) => !digit)) {
-      setError('Please enter the 4-digit verification code.');
+      setLocalError('Please enter the 4-digit verification code.');
       return;
     }
 
-    setError('');
+    setLocalError('');
+    setIsVerifying(true);
 
-    if (signupPayload) {
-      await signUp(signupPayload);
+    try {
+      await verifyOtp({ otp: otpValue });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (isResending || isVerifying) {
       return;
     }
 
-    // Backward-compatible placeholder flow.
-    await signIn({ email: 'otp@brodameko.local', password: '1234' });
+    setLocalError('');
+    setOtp(Array(OTP_LENGTH).fill(''));
+    setIsResending(true);
+
+    try {
+      const ok = await resendOtp();
+
+      if (ok) {
+        setInfo('OTP resent successfully.');
+        requestAnimationFrame(() => {
+          inputRefs.current[0]?.focus();
+        });
+      }
+    } finally {
+      setIsResending(false);
+    }
   };
 
-  const handleResend = () => {
-    Alert.alert('Resend code', 'A new verification code will be sent (placeholder).');
+  const handleCancel = () => {
+    navigation.navigate(ROUTES.SIGN_UP, pendingVerification?.role ? { role: pendingVerification.role } : undefined);
   };
+
+  const destinationLabel = destination ? ` (${destination})` : '';
 
   return (
-    <ScreenContainer style={styles.screen}>
-      <View style={styles.card}>
+    <ScreenContainer style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
+      <Animated.View style={[styles.card, animatedStyle]}>
+        <View style={styles.iconBadge}>
+          <HugeiconsIcon icon={UserSettings01Icon} size={20} color="rgba(17,17,51,0.7)" strokeWidth={1.9} />
+        </View>
+
         <AppText variant="subtitle" style={styles.title}>
           Enter verification code
         </AppText>
 
         <AppText variant="muted" style={styles.subtitle}>
-          Verification code has been sent to your {methodLabel}
+          Verification code has been sent to your {method}
+          {destinationLabel}
         </AppText>
 
-        {destination ? (
-          <AppText variant="muted" style={styles.destination}>
-            {destination}
-          </AppText>
-        ) : null}
-
-        <View style={styles.otpRow}>
+        <View ref={targetRef} style={styles.otpRow}>
           {otp.map((digit, index) => (
             <TextInput
               key={`otp-${index}`}
@@ -108,34 +172,36 @@ const OTPVerificationScreen = ({ route }) => {
               onKeyPress={(event) => handleKeyPress(event, index)}
               keyboardType="number-pad"
               textContentType="oneTimeCode"
-              maxLength={1}
+              autoComplete="sms-otp"
               style={styles.otpInput}
               selectionColor={darkTheme.colors.accent}
+              contextMenuHidden={false}
             />
           ))}
         </View>
 
-        {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+        {mergedError ? <AppText style={styles.errorText}>{mergedError}</AppText> : null}
+        {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
 
         <View style={styles.verifyButtonWrap}>
-          <AppButton
-            label={isLoading ? 'Verifying...' : 'Verify'}
-            onPress={handleVerify}
-            disabled={isLoading}
-          />
+          <AppButton label={isVerifying ? 'Verifying...' : 'Verify'} onPress={handleVerify} disabled={isVerifying || isResending} />
         </View>
 
         <View style={styles.resendRow}>
           <AppText variant="muted" style={styles.resendText}>
             Didn't receive the code?{' '}
           </AppText>
-          <TouchableOpacity onPress={handleResend}>
-            <AppText variant="muted" color={darkTheme.colors.accent} style={styles.resendLink}>
-              Resend code
+          <TouchableOpacity onPress={handleResend} disabled={isResending || isVerifying}>
+            <AppText variant="muted" color="#000033" style={styles.resendLink}>
+              {isResending ? 'Resending...' : 'Resend code'}
             </AppText>
           </TouchableOpacity>
         </View>
-      </View>
+
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={isVerifying || isResending}>
+          <AppText style={styles.cancelButtonText}>Cancel</AppText>
+        </TouchableOpacity>
+      </Animated.View>
     </ScreenContainer>
   );
 };
@@ -154,17 +220,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: darkTheme.spacing.lg,
     paddingVertical: darkTheme.spacing.xl,
   },
+  iconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(17,17,51,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: darkTheme.spacing.sm,
+  },
   title: {
     color: '#111133',
     marginBottom: darkTheme.spacing.xs,
+    textAlign: 'center',
   },
   subtitle: {
     color: 'rgba(17,17,51,0.75)',
-  },
-  destination: {
-    color: 'rgba(17,17,51,0.75)',
-    marginTop: darkTheme.spacing.xs,
-    marginBottom: darkTheme.spacing.md,
+    textAlign: 'center',
   },
   otpRow: {
     flexDirection: 'row',
@@ -181,9 +254,16 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#111133',
     fontWeight: darkTheme.typography.fontWeights.semibold,
+    paddingVertical: 0,
   },
   errorText: {
-    color: ERROR_COLOR,
+    color: '#FF6B7A',
+    fontSize: darkTheme.typography.fontSizes.xs,
+    lineHeight: 16,
+    marginTop: darkTheme.spacing.sm,
+  },
+  infoText: {
+    color: '#40C67A',
     marginTop: darkTheme.spacing.sm,
   },
   verifyButtonWrap: {
@@ -202,6 +282,20 @@ const styles = StyleSheet.create({
   resendLink: {
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
+  cancelButton: {
+    marginTop: darkTheme.spacing.md,
+    backgroundColor: '#D94B59',
+    borderRadius: darkTheme.radius.md,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: darkTheme.spacing.md,
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
 });
 
 export default OTPVerificationScreen;
+

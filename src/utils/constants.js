@@ -10,6 +10,7 @@ export const ROUTES = {
   LOGIN: 'Login',
   SIGN_UP: 'SignUp',
   FORGOT_PASSWORD: 'ForgotPassword',
+  RESET_PASSWORD: 'ResetPassword',
   OTP_VERIFICATION: 'OTPVerification',
 
   CAR_OWNER_DASHBOARD: 'CarOwnerDashboard',

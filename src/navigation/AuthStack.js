@@ -4,6 +4,7 @@ import {
   ForgotPasswordScreen,
   LoginScreen,
   OTPVerificationScreen,
+  ResetPasswordScreen,
   RoleSelectionScreen,
   SignUpScreen,
   SplashScreen,
@@ -26,8 +27,9 @@ const AuthStack = () => {
       <Stack.Screen name={ROUTES.ROLE_SELECTION} component={RoleSelectionScreen} />
       <Stack.Screen name={ROUTES.SIGN_UP} component={SignUpScreen} />
       <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
-      <Stack.Screen name={ROUTES.FORGOT_PASSWORD} component={ForgotPasswordScreen} />
       <Stack.Screen name={ROUTES.OTP_VERIFICATION} component={OTPVerificationScreen} />
+      <Stack.Screen name={ROUTES.FORGOT_PASSWORD} component={ForgotPasswordScreen} />
+      <Stack.Screen name={ROUTES.RESET_PASSWORD} component={ResetPasswordScreen} />
     </Stack.Navigator>
   );
 };

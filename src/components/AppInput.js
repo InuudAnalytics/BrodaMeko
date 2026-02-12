@@ -17,6 +17,7 @@ const AppInput = ({
   containerStyle,
   inputStyle,
   labelStyle,
+  left,
   right,
   ...rest
 }) => {
@@ -25,6 +26,7 @@ const AppInput = ({
       {label ? <AppText variant="muted" style={[styles.label, labelStyle]}>{label}</AppText> : null}
 
       <View style={styles.inputWrap}>
+        {left ? <View style={styles.left}>{left}</View> : null}
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -66,6 +68,11 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.text,
     fontSize: darkTheme.typography.fontSizes.md,
     paddingVertical: darkTheme.spacing.sm,
+  },
+  left: {
+    marginRight: darkTheme.spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   right: {
     marginLeft: darkTheme.spacing.xs,

@@ -21,6 +21,7 @@ const AppText = ({ children, variant = 'body', color, style, numberOfLines, ...r
 const styles = StyleSheet.create({
   base: {
     color: darkTheme.colors.text,
+    fontFamily: darkTheme.typography.fontFamily,
   },
 });
 
