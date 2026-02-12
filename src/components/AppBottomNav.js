@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 import AppText from './AppText';
@@ -106,3 +106,4 @@ const styles = StyleSheet.create({
 });
 
 export default AppBottomNav;
+

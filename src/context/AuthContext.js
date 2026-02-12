@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signUp = async ({ fullName, email, phone, password }) => {
+  const signUp = async ({ fullName, email, phone, password, role: nextRole }) => {
     setIsLoading(true);
     clearError();
 
@@ -103,13 +103,16 @@ export const AuthProvider = ({ children }) => {
         email,
         phone,
         password,
+        role: nextRole,
       });
+
+      const resolvedRole = response.role || nextRole || null;
 
       setToken(response.token || null);
       setUser(response.user || null);
-      setRole(response.role || null);
+      setRole(resolvedRole);
 
-      await persistAuthState(response.token || '', response.user || null, response.role || '');
+      await persistAuthState(response.token || '', response.user || null, resolvedRole || '');
 
       return response;
     } catch (signUpError) {

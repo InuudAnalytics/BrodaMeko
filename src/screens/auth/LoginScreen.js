@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -14,34 +14,85 @@ import {
   AppButton,
   AppInput,
   AppText,
+  AuthMethodToggle,
   DividerOr,
   GoogleButton,
   LogoLockup,
   ScreenContainer,
 } from '../../components';
-import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
 
-const ERROR_COLOR = '#FF7B8A';
+const SUCCESS_COLOR = '#40C67A';
+const ERROR_COLOR = '#FF6B7A';
 
-const LoginScreen = ({ navigation }) => {
-  const { signIn, isLoading, error, clearError } = useAuth();
+const METHODS = {
+  PHONE: 'phone',
+  EMAIL: 'email',
+};
 
+const LoginScreen = ({ navigation, route }) => {
+  const roleParam = route?.params?.role;
+  const [method, setMethod] = useState(METHODS.PHONE);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authResult, setAuthResult] = useState({ type: null, message: '' });
 
-  const handleSignIn = async () => {
-    await signIn({ email, password });
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const clearFeedback = () => {
+    if (authResult.type) {
+      setAuthResult({ type: null, message: '' });
+    }
+  };
+
+  const handleSignIn = () => {
+    const identifier = method === METHODS.EMAIL ? email.trim() : phone.trim();
+
+    if (!identifier || !password.trim()) {
+      setAuthResult({ type: 'error', message: 'Please enter your credentials.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setAuthResult({ type: null, message: '' });
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      const shouldFail = identifier.toLowerCase().includes('fail') || password.trim().length < 4;
+
+      if (shouldFail) {
+        setAuthResult({ type: 'error', message: 'Incorrect credentials. Please try again.' });
+      } else {
+        setAuthResult({ type: 'success', message: 'Signed in successfully.' });
+      }
+
+      setIsSubmitting(false);
+    }, 900);
   };
 
   const handleForgotPassword = () => {
-    Alert.alert('Forgot Password', 'Password reset flow will be added soon.');
+    navigation.navigate(ROUTES.FORGOT_PASSWORD);
   };
 
+  const isSuccess = authResult.type === 'success';
+
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -64,17 +115,38 @@ const LoginScreen = ({ navigation }) => {
             </AppText>
 
             <View style={styles.form}>
-              <AppInput
-                label="Email Address"
-                placeholder="Youremail.com"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (error) clearError();
+              <AuthMethodToggle
+                initialValue={METHODS.PHONE}
+                onChange={(value) => {
+                  setMethod(value);
+                  clearFeedback();
                 }}
-                keyboardType="email-address"
-                autoCapitalize="none"
               />
+
+              {method === METHODS.EMAIL ? (
+                <AppInput
+                  label="Email Address"
+                  placeholder="Youremail.com"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    clearFeedback();
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              ) : (
+                <AppInput
+                  label="Phone number"
+                  placeholder="09075156578"
+                  value={phone}
+                  onChangeText={(text) => {
+                    setPhone(text);
+                    clearFeedback();
+                  }}
+                  keyboardType="phone-pad"
+                />
+              )}
 
               <View style={styles.passwordLabelRow}>
                 <AppText variant="body">Password</AppText>
@@ -90,7 +162,7 @@ const LoginScreen = ({ navigation }) => {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  if (error) clearError();
+                  clearFeedback();
                 }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -103,23 +175,39 @@ const LoginScreen = ({ navigation }) => {
                 }
               />
 
-              {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+              {authResult.type ? (
+                <View style={[styles.feedbackRow, isSuccess ? styles.feedbackSuccess : styles.feedbackError]}>
+                  <View style={[styles.feedbackIconWrap, isSuccess ? styles.feedbackIconSuccess : styles.feedbackIconError]}>
+                    <AppText style={[styles.feedbackIconText, isSuccess ? styles.feedbackIconTextSuccess : styles.feedbackIconTextError]}>
+                      {isSuccess ? '\u2713' : 'x'}
+                    </AppText>
+                  </View>
+                  <AppText style={styles.feedbackText}>{authResult.message}</AppText>
+                </View>
+              ) : null}
 
               <View style={styles.primaryCta}>
                 <AppButton
-                  label={isLoading ? 'Signing In...' : 'Sign In'}
+                  label={isSubmitting ? 'Signing In...' : 'Sign In'}
                   onPress={handleSignIn}
-                  disabled={isLoading}
+                  disabled={isSubmitting}
+                  left={
+                    isSubmitting ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null
+                  }
                 />
               </View>
 
               <DividerOr />
 
-              <GoogleButton label="Sign in with Google" onPress={() => {}} disabled={isLoading} />
+              <GoogleButton label="Sign in with Google" onPress={() => {}} disabled={isSubmitting} />
 
               <View style={styles.footer}>
                 <AppText variant="muted">Dont have an account? </AppText>
-                <TouchableOpacity onPress={() => navigation.navigate(ROUTES.SIGN_UP)}>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate(ROUTES.SIGN_UP, roleParam ? { role: roleParam } : undefined)
+                  }
+                >
                   <AppText variant="muted" color={darkTheme.colors.accent}>
                     Sign Up
                   </AppText>
@@ -143,11 +231,11 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     alignItems: 'center',
-    marginTop: darkTheme.spacing.sm,
-    marginBottom: darkTheme.spacing.lg,
+    marginTop: darkTheme.spacing.md,
+    marginBottom: darkTheme.spacing.xl,
   },
   logoScale: {
-    transform: [{ scale: 0.35 }],
+    transform: [{ scale: 1.4 }],
   },
   heading: {
     color: darkTheme.colors.text,
@@ -155,7 +243,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: darkTheme.colors.muted,
-    marginBottom: darkTheme.spacing.lg,
+    marginBottom: darkTheme.spacing.xl,
   },
   form: {
     marginTop: darkTheme.spacing.xs,
@@ -170,13 +258,57 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.muted,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  errorText: {
-    color: ERROR_COLOR,
+  feedbackRow: {
+    minHeight: 44,
+    borderRadius: darkTheme.radius.md,
     marginTop: darkTheme.spacing.xs,
     marginBottom: darkTheme.spacing.sm,
+    paddingHorizontal: darkTheme.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: darkTheme.spacing.sm,
+  },
+  feedbackSuccess: {
+    borderWidth: 1,
+    borderColor: 'rgba(64,198,122,0.45)',
+    backgroundColor: 'rgba(64,198,122,0.12)',
+  },
+  feedbackError: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,122,0.45)',
+    backgroundColor: 'rgba(255,107,122,0.12)',
+  },
+  feedbackIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackIconSuccess: {
+    backgroundColor: SUCCESS_COLOR,
+  },
+  feedbackIconError: {
+    backgroundColor: ERROR_COLOR,
+  },
+  feedbackIconText: {
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: darkTheme.typography.fontWeights.bold,
+    textTransform: 'uppercase',
+  },
+  feedbackIconTextSuccess: {
+    color: darkTheme.colors.background,
+  },
+  feedbackIconTextError: {
+    color: darkTheme.colors.text,
+  },
+  feedbackText: {
+    color: darkTheme.colors.text,
+    flex: 1,
   },
   primaryCta: {
-    marginTop: darkTheme.spacing.sm,
+    marginTop: darkTheme.spacing.md,
   },
   footer: {
     marginTop: darkTheme.spacing.md,
@@ -187,3 +319,4 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
+

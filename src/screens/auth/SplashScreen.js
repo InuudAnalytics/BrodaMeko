@@ -17,7 +17,7 @@ const SplashScreen = ({ navigation }) => {
       }
 
       hasNavigated.current = true;
-      navigation.navigate(ROUTES.LOGIN);
+      navigation.navigate(ROUTES.ROLE_SELECTION);
     }, SPLASH_DURATION_MS);
 
     return () => {

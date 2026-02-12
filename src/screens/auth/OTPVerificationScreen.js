@@ -8,9 +8,9 @@ const ERROR_COLOR = '#FF7B8A';
 const OTP_LENGTH = 4;
 
 const OTPVerificationScreen = ({ route }) => {
-  const { signIn, isLoading } = useAuth();
+  const { signIn, signUp, isLoading } = useAuth();
 
-  const { method = 'phone', destination = '' } = route.params || {};
+  const { method = 'phone', destination = '', signupPayload = null } = route.params || {};
 
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState('');
@@ -66,7 +66,12 @@ const OTPVerificationScreen = ({ route }) => {
 
     setError('');
 
-    // Placeholder flow for now: once OTP length is valid, mark user as signed in.
+    if (signupPayload) {
+      await signUp(signupPayload);
+      return;
+    }
+
+    // Backward-compatible placeholder flow.
     await signIn({ email: 'otp@brodameko.local', password: '1234' });
   };
 

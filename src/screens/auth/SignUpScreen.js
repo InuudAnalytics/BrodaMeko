@@ -9,19 +9,24 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { CancelCircleIcon, CheckmarkCircle02Icon, RadioButtonIcon } from '@hugeicons/core-free-icons';
 import {
   AppButton,
   AppInput,
   AppText,
+  AuthMethodToggle,
   DividerOr,
   GoogleButton,
   LogoLockup,
   ScreenContainer,
 } from '../../components';
 import { darkTheme } from '../../theme';
-import { ROUTES } from '../../utils';
+import { ROLES, ROUTES, validatePasswordRules } from '../../utils';
 
 const ERROR_COLOR = '#FF7B8A';
+const SUCCESS_COLOR = '#40C67A';
+const NEUTRAL_COLOR = 'rgba(255,255,255,0.45)';
 
 const METHODS = {
   PHONE: 'phone',
@@ -57,7 +62,8 @@ const maskEmail = (value) => {
   return `${name.slice(0, 3)}***@${domain}`;
 };
 
-const SignUpScreen = ({ navigation }) => {
+const SignUpScreen = ({ navigation, route }) => {
+  const selectedRole = route?.params?.role || ROLES.CAR_OWNER;
   const [method, setMethod] = useState(METHODS.PHONE);
 
   const [fullName, setFullName] = useState('');
@@ -72,6 +78,17 @@ const SignUpScreen = ({ navigation }) => {
   const destinationPreview = useMemo(() => {
     return method === METHODS.PHONE ? maskPhone(phone) : maskEmail(email);
   }, [method, phone, email]);
+
+  const passwordChecks = useMemo(() => validatePasswordRules(password), [password]);
+  const isPasswordValid = passwordChecks.minLength && passwordChecks.hasNumberOrSpecialCharacter;
+
+  const getRuleState = (isMet) => {
+    if (isMet) {
+      return 'success';
+    }
+
+    return error ? 'error' : 'neutral';
+  };
 
   const resetError = () => {
     if (error) {
@@ -95,19 +112,63 @@ const SignUpScreen = ({ navigation }) => {
       return;
     }
 
+    if (!isPasswordValid) {
+      setError('Password does not meet all requirements.');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
 
+    setError('');
+
     navigation.navigate(ROUTES.OTP_VERIFICATION, {
       method,
       destination: destinationPreview,
+      role: selectedRole,
+      signupPayload: {
+        fullName: fullName.trim(),
+        email: method === METHODS.EMAIL ? email.trim() : '',
+        phone: method === METHODS.PHONE ? phone.trim() : '',
+        password,
+        role: selectedRole,
+      },
     });
   };
 
+  const renderRule = (label, isMet) => {
+    const state = getRuleState(isMet);
+    const isSuccess = state === 'success';
+    const isError = state === 'error';
+    const iconColor = isSuccess ? SUCCESS_COLOR : isError ? ERROR_COLOR : NEUTRAL_COLOR;
+
+    return (
+      <View style={styles.ruleRow} key={label}>
+        <HugeiconsIcon
+          icon={isSuccess ? CheckmarkCircle02Icon : isError ? CancelCircleIcon : RadioButtonIcon}
+          size={18}
+          color={iconColor}
+          strokeWidth={1.9}
+        />
+
+        <AppText
+          variant="muted"
+          style={[
+            styles.ruleText,
+            isSuccess ? styles.ruleTextSuccess : null,
+            isError ? styles.ruleTextError : null,
+          ]}
+        >
+          {label}
+        </AppText>
+      </View>
+    );
+  };
+
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -130,37 +191,13 @@ const SignUpScreen = ({ navigation }) => {
             </AppText>
 
             <View style={styles.form}>
-              <View style={styles.segmentWrap}>
-                <TouchableOpacity
-                  style={[styles.segment, method === METHODS.PHONE ? styles.segmentActive : null]}
-                  onPress={() => {
-                    setMethod(METHODS.PHONE);
-                    resetError();
-                  }}
-                >
-                  <AppText
-                    variant="muted"
-                    style={method === METHODS.PHONE ? styles.segmentTextActive : styles.segmentText}
-                  >
-                    Phone Number
-                  </AppText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.segment, method === METHODS.EMAIL ? styles.segmentActive : null]}
-                  onPress={() => {
-                    setMethod(METHODS.EMAIL);
-                    resetError();
-                  }}
-                >
-                  <AppText
-                    variant="muted"
-                    style={method === METHODS.EMAIL ? styles.segmentTextActive : styles.segmentText}
-                  >
-                    Email Address
-                  </AppText>
-                </TouchableOpacity>
-              </View>
+              <AuthMethodToggle
+                initialValue={METHODS.PHONE}
+                onChange={(value) => {
+                  setMethod(value);
+                  resetError();
+                }}
+              />
 
               <AppInput
                 label="Full name"
@@ -217,6 +254,11 @@ const SignUpScreen = ({ navigation }) => {
                 }
               />
 
+              <View style={styles.rulesWrap}>
+                {renderRule('At least 8 characters', passwordChecks.minLength)}
+                {renderRule('Contains a number or special character', passwordChecks.hasNumberOrSpecialCharacter)}
+              </View>
+
               <AppInput
                 label="Confirm password"
                 placeholder="....."
@@ -272,11 +314,11 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     alignItems: 'center',
-    marginTop: darkTheme.spacing.sm,
-    marginBottom: darkTheme.spacing.lg,
+    marginTop: darkTheme.spacing.md,
+    marginBottom: darkTheme.spacing.xl,
   },
   logoScale: {
-    transform: [{ scale: 0.35 }],
+    transform: [{ scale: 1.4 }],
   },
   heading: {
     color: darkTheme.colors.text,
@@ -284,40 +326,33 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: darkTheme.colors.muted,
-    marginBottom: darkTheme.spacing.lg,
+    marginBottom: darkTheme.spacing.xl,
   },
   form: {
     marginTop: darkTheme.spacing.xs,
   },
-  segmentWrap: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: darkTheme.radius.lg,
-    overflow: 'hidden',
-    marginBottom: darkTheme.spacing.md,
-  },
-  segment: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  segmentActive: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  segmentText: {
-    color: darkTheme.colors.muted,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  segmentTextActive: {
-    color: darkTheme.colors.text,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
   toggleText: {
     color: darkTheme.colors.muted,
     fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  rulesWrap: {
+    marginTop: -darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.md,
+    rowGap: darkTheme.spacing.xs,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: darkTheme.spacing.xs,
+  },
+  ruleText: {
+    fontSize: darkTheme.typography.fontSizes.sm,
+  },
+  ruleTextSuccess: {
+    color: SUCCESS_COLOR,
+  },
+  ruleTextError: {
+    color: ERROR_COLOR,
   },
   errorText: {
     color: ERROR_COLOR,
@@ -325,7 +360,7 @@ const styles = StyleSheet.create({
     marginBottom: darkTheme.spacing.sm,
   },
   primaryCta: {
-    marginTop: darkTheme.spacing.sm,
+    marginTop: darkTheme.spacing.md,
   },
   footer: {
     marginTop: darkTheme.spacing.md,
@@ -336,3 +371,4 @@ const styles = StyleSheet.create({
 });
 
 export default SignUpScreen;
+

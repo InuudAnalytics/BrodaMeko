@@ -6,8 +6,10 @@ export const ROLES = {
 
 export const ROUTES = {
   SPLASH: 'Splash',
+  ROLE_SELECTION: 'RoleSelection',
   LOGIN: 'Login',
   SIGN_UP: 'SignUp',
+  FORGOT_PASSWORD: 'ForgotPassword',
   OTP_VERIFICATION: 'OTPVerification',
 
   CAR_OWNER_DASHBOARD: 'CarOwnerDashboard',
