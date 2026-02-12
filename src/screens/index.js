@@ -5,7 +5,9 @@ export { default as CarOwnerHistoryScreen } from './carowner/history/HistoryScre
 export { default as CarOwnerRewardsScreen } from './carowner/wallet/WalletScreen';
 export { default as CarOwnerSettingsScreen } from './carowner/chat/ChatScreen';
 export { default as CarOwnerProfileScreen } from './carowner/profile/ProfileScreen';
+export { default as CarOwnerReportIssueScreen } from './carowner/assistance/ReportIssueScreen';
+export { default as CarOwnerRequestDiagnosticsScreen } from './carowner/assistance/RequestDiagnosticsScreen';
+export { default as CarOwnerMechanicDiscoveryScreen } from './carowner/assistance/MechanicDiscoveryScreen';
 
 export { MechDashboardScreen } from './mech/home';
 export { AdminDashboardScreen } from './admin/home';
-

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -23,6 +23,29 @@ const BellIcon = ({ color }) => {
         strokeLinejoin="round"
       />
     </Svg>
+  );
+};
+
+const ChevronRightIcon = ({ color }) => {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9 6L15 12L9 18"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
+
+const HelpActionRow = ({ label, onPress }) => {
+  return (
+    <TouchableOpacity style={styles.helpRow} activeOpacity={0.9} onPress={onPress}>
+      <AppText style={styles.helpRowText}>{label}</AppText>
+      <ChevronRightIcon color="#1A1A1A" />
+    </TouchableOpacity>
   );
 };
 
@@ -74,23 +97,24 @@ const DashboardScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.bottomSheet}>
+        <View style={styles.handle} />
+
         <AppText variant="title" style={styles.sheetTitle}>
           Need help now?
         </AppText>
+
         <AppText variant="muted" style={styles.sheetSubtitle}>
           Our certified mechanics are nearby
         </AppText>
 
-        <AppButton
+        <HelpActionRow
           label="I know the issues"
-          onPress={() => Alert.alert('Flow', 'Issue-based booking flow coming soon.')}
-          style={styles.cta}
+          onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)}
         />
 
-        <AppButton
+        <HelpActionRow
           label="Diagnose my car"
-          onPress={() => Alert.alert('Flow', 'Guided diagnose flow coming soon.')}
-          style={styles.cta}
+          onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS)}
         />
       </View>
 
@@ -203,26 +227,52 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     backgroundColor: darkTheme.colors.background,
-    borderTopLeftRadius: 42,
-    borderTopRightRadius: 42,
-    paddingTop: darkTheme.spacing.xl,
+    borderTopLeftRadius: 52,
+    borderTopRightRadius: 52,
+    marginTop: -18,
+    paddingTop: darkTheme.spacing.md,
     paddingHorizontal: darkTheme.spacing.xl,
     paddingBottom: darkTheme.spacing.lg,
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 76,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    marginBottom: darkTheme.spacing.md,
   },
   sheetTitle: {
     color: darkTheme.colors.text,
     textAlign: 'center',
-    fontSize: 40,
-    lineHeight: 44,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: darkTheme.typography.fontWeights.bold,
   },
   sheetSubtitle: {
     marginTop: darkTheme.spacing.xs,
     textAlign: 'center',
     color: darkTheme.colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '300',
     marginBottom: darkTheme.spacing.lg,
   },
-  cta: {
+  helpRow: {
+    minHeight: 56,
+    borderRadius: darkTheme.radius.lg,
+    backgroundColor: darkTheme.colors.accent,
+    paddingHorizontal: darkTheme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: darkTheme.spacing.md,
+  },
+  helpRowText: {
+    color: '#1A1A1A',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.regular,
   },
 });
 

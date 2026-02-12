@@ -18,6 +18,9 @@ export const ROUTES = {
   CAR_OWNER_REWARDS: 'CarOwnerRewards',
   CAR_OWNER_SETTINGS: 'CarOwnerSettings',
   CAR_OWNER_PROFILE: 'CarOwnerProfile',
+  CAR_OWNER_REPORT_ISSUE: 'CarOwnerReportIssue',
+  CAR_OWNER_REQUEST_DIAGNOSTICS: 'CarOwnerRequestDiagnostics',
+  CAR_OWNER_MECHANIC_DISCOVERY: 'CarOwnerMechanicDiscovery',
 
   MECH_DASHBOARD: 'MechDashboard',
   ADMIN_DASHBOARD: 'AdminDashboard',

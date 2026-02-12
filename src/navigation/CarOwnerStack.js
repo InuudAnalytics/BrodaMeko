@@ -3,7 +3,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   CarOwnerDashboardScreen,
   CarOwnerHistoryScreen,
+  CarOwnerMechanicDiscoveryScreen,
   CarOwnerProfileScreen,
+  CarOwnerReportIssueScreen,
+  CarOwnerRequestDiagnosticsScreen,
   CarOwnerRewardsScreen,
   CarOwnerSettingsScreen,
 } from '../screens';
@@ -39,6 +42,21 @@ const CarOwnerStack = () => {
         options={{ title: 'Chat' }}
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_PROFILE} component={CarOwnerProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_REPORT_ISSUE}
+        component={CarOwnerReportIssueScreen}
+        options={{ title: 'What is the issue' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS}
+        component={CarOwnerRequestDiagnosticsScreen}
+        options={{ title: 'Book a diagnostic expert' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_MECHANIC_DISCOVERY}
+        component={CarOwnerMechanicDiscoveryScreen}
+        options={{ title: 'Nearby mechanics' }}
+      />
     </Stack.Navigator>
   );
 };
