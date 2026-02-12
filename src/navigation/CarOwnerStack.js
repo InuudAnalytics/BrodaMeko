@@ -32,11 +32,11 @@ const CarOwnerStack = () => {
         options={{ title: 'Home', headerShown: false }}
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_HISTORY} component={CarOwnerHistoryScreen} options={{ title: 'History' }} />
-      <Stack.Screen name={ROUTES.CAR_OWNER_REWARDS} component={CarOwnerRewardsScreen} options={{ title: 'Rewards' }} />
+      <Stack.Screen name={ROUTES.CAR_OWNER_REWARDS} component={CarOwnerRewardsScreen} options={{ title: 'Wallet' }} />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_SETTINGS}
         component={CarOwnerSettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{ title: 'Chat' }}
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_PROFILE} component={CarOwnerProfileScreen} options={{ title: 'Profile' }} />
     </Stack.Navigator>

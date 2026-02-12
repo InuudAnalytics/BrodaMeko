@@ -4,19 +4,19 @@ import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
-const RewardsScreen = ({ navigation }) => {
+const ChatScreen = ({ navigation }) => {
   return (
     <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
       <View style={styles.content}>
         <AppText variant="title" style={styles.heading}>
-          Rewards
+          Chat
         </AppText>
         <AppText variant="muted" style={styles.subtext}>
-          Rewards page coming soon.
+          Chat page coming soon.
         </AppText>
       </View>
 
-      <AppBottomNav activeTab={ROUTES.CAR_OWNER_REWARDS} onTabPress={(routeName) => navigation.navigate(routeName)} />
+      <AppBottomNav activeTab={ROUTES.CAR_OWNER_SETTINGS} onTabPress={(routeName) => navigation.navigate(routeName)} />
     </ScreenContainer>
   );
 };
@@ -37,4 +37,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RewardsScreen;
+export default ChatScreen;
+
