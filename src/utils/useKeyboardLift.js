@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Keyboard, Platform } from 'react-native';
 
-const useKeyboardLift = ({ extraOffset = 8, enabled = true } = {}) => {
+const useKeyboardLift = ({ extraOffset = 8, enabled = true, anchor = 'center' } = {}) => {
   const targetRef = useRef(null);
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -23,9 +23,16 @@ const useKeyboardLift = ({ extraOffset = 8, enabled = true } = {}) => {
         }
 
         targetRef.current.measureInWindow((x, y, width, height) => {
-          const targetCenterY = y + height / 2;
-          const visibleCenterY = keyboardTop / 2;
-          const shift = Math.max(0, targetCenterY - visibleCenterY + extraOffset);
+          const shift = (() => {
+            if (anchor === 'bottom') {
+              const targetBottomY = y + height;
+              return Math.max(0, targetBottomY - keyboardTop + extraOffset);
+            }
+
+            const targetCenterY = y + height / 2;
+            const visibleCenterY = keyboardTop / 2;
+            return Math.max(0, targetCenterY - visibleCenterY + extraOffset);
+          })();
 
           Animated.timing(translateY, {
             toValue: -shift,
@@ -51,7 +58,7 @@ const useKeyboardLift = ({ extraOffset = 8, enabled = true } = {}) => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [enabled, extraOffset, translateY]);
+  }, [anchor, enabled, extraOffset, translateY]);
 
   return {
     targetRef,

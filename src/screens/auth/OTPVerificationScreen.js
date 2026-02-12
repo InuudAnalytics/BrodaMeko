@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { UserSettings01Icon } from '@hugeicons/core-free-icons';
@@ -8,6 +8,7 @@ import { darkTheme } from '../../theme';
 import { ROUTES, useKeyboardLift } from '../../utils';
 
 const OTP_LENGTH = 4;
+const MAX_OTP_ATTEMPTS = 3;
 
 const OTPVerificationScreen = ({ route, navigation }) => {
   const { verifyOtp, resendOtp, error, clearError, pendingVerification } = useAuth();
@@ -22,13 +23,20 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   const [info, setInfo] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
 
   const inputRefs = useRef([]);
+  const redirectTimerRef = useRef(null);
 
   const otpValue = useMemo(() => otp.join(''), [otp]);
   const mergedError = localError || error;
 
   const clearFeedback = () => {
+    if (isLockedOut) {
+      return;
+    }
+
     if (localError) {
       setLocalError('');
     }
@@ -41,6 +49,14 @@ const OTPVerificationScreen = ({ route, navigation }) => {
       setInfo('');
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
 
   const fillFromIndex = (rawText, startIndex) => {
     const digits = String(rawText || '').replace(/\D/g, '');
@@ -96,7 +112,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   };
 
   const handleVerify = async () => {
-    if (isVerifying || isResending) {
+    if (isVerifying || isResending || isLockedOut) {
       return;
     }
 
@@ -109,14 +125,38 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     setIsVerifying(true);
 
     try {
-      await verifyOtp({ otp: otpValue });
+      const ok = await verifyOtp({ otp: otpValue });
+
+      if (!ok) {
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+
+        if (nextAttempts >= MAX_OTP_ATTEMPTS) {
+          setIsLockedOut(true);
+          setInfo('');
+          setLocalError(
+            'You have tried 3 times and failed. You will be sent back to Sign Up to start again.',
+          );
+
+          if (redirectTimerRef.current) {
+            clearTimeout(redirectTimerRef.current);
+          }
+
+          redirectTimerRef.current = setTimeout(() => {
+            navigation.navigate(ROUTES.SIGN_UP, pendingVerification?.role ? { role: pendingVerification.role } : undefined);
+          }, 1600);
+          return;
+        }
+
+        setLocalError(`Incorrect OTP. Attempt ${nextAttempts} of ${MAX_OTP_ATTEMPTS}.`);
+      }
     } finally {
       setIsVerifying(false);
     }
   };
 
   const handleResend = async () => {
-    if (isResending || isVerifying) {
+    if (isResending || isVerifying || isLockedOut) {
       return;
     }
 
@@ -173,6 +213,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
               keyboardType="number-pad"
               textContentType="oneTimeCode"
               autoComplete="sms-otp"
+              editable={!isLockedOut}
               style={styles.otpInput}
               selectionColor={darkTheme.colors.accent}
               contextMenuHidden={false}
@@ -184,14 +225,18 @@ const OTPVerificationScreen = ({ route, navigation }) => {
         {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
 
         <View style={styles.verifyButtonWrap}>
-          <AppButton label={isVerifying ? 'Verifying...' : 'Verify'} onPress={handleVerify} disabled={isVerifying || isResending} />
+          <AppButton
+            label={isVerifying ? 'Verifying...' : 'Verify'}
+            onPress={handleVerify}
+            disabled={isVerifying || isResending || isLockedOut}
+          />
         </View>
 
         <View style={styles.resendRow}>
           <AppText variant="muted" style={styles.resendText}>
             Didn't receive the code?{' '}
           </AppText>
-          <TouchableOpacity onPress={handleResend} disabled={isResending || isVerifying}>
+          <TouchableOpacity onPress={handleResend} disabled={isResending || isVerifying || isLockedOut}>
             <AppText variant="muted" color="#000033" style={styles.resendLink}>
               {isResending ? 'Resending...' : 'Resend code'}
             </AppText>

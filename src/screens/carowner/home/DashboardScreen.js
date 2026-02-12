@@ -59,7 +59,7 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.mapBackdrop}>
         <View style={styles.mapLineA} />
         <View style={styles.mapLineB} />

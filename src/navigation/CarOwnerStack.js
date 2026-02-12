@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   CarOwnerDashboardScreen,
   CarOwnerHistoryScreen,
+  CarOwnerLiveTrackingScreen,
   CarOwnerMechanicDiscoveryScreen,
   CarOwnerProfileScreen,
   CarOwnerReportIssueScreen,
@@ -39,7 +40,7 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_SETTINGS}
         component={CarOwnerSettingsScreen}
-        options={{ title: 'Chat' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_PROFILE} component={CarOwnerProfileScreen} options={{ title: 'Profile' }} />
       <Stack.Screen
@@ -55,7 +56,12 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_MECHANIC_DISCOVERY}
         component={CarOwnerMechanicDiscoveryScreen}
-        options={{ title: 'Nearby mechanics' }}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_LIVE_TRACKING}
+        component={CarOwnerLiveTrackingScreen}
+        options={{ title: 'Live tracking' }}
       />
     </Stack.Navigator>
   );
