@@ -7,11 +7,19 @@ import { darkTheme } from '../theme';
 // - Dependency: npm i react-native-svg
 // - iOS only: cd ios && pod install && cd ..
 
-const AnimatedLogo = ({ size = 92, innerScale = 0.42, duration = 1400, style }) => {
+const AnimatedLogo = ({ size = 92, innerScale = 0.42, duration = 1400, spinning = true, style }) => {
   const outerRotate = useRef(new Animated.Value(0)).current;
   const innerRotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (!spinning) {
+      outerRotate.stopAnimation();
+      innerRotate.stopAnimation();
+      outerRotate.setValue(0);
+      innerRotate.setValue(0);
+      return;
+    }
+
     outerRotate.setValue(0);
     innerRotate.setValue(0);
 
@@ -37,7 +45,7 @@ const AnimatedLogo = ({ size = 92, innerScale = 0.42, duration = 1400, style }) 
     return () => {
       loop.stop();
     };
-  }, [duration, innerRotate, outerRotate]);
+  }, [duration, innerRotate, outerRotate, spinning]);
 
   const outerSpin = outerRotate.interpolate({
     inputRange: [0, 1],

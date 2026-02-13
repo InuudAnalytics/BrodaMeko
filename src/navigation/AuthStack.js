@@ -23,8 +23,8 @@ const AuthStack = () => {
         contentStyle: { backgroundColor: darkTheme.colors.background },
       }}
     >
-      <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
-      <Stack.Screen name={ROUTES.ROLE_SELECTION} component={RoleSelectionScreen} />
+      <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name={ROUTES.ROLE_SELECTION} component={RoleSelectionScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name={ROUTES.SIGN_UP} component={SignUpScreen} />
       <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
       <Stack.Screen name={ROUTES.OTP_VERIFICATION} component={OTPVerificationScreen} />
