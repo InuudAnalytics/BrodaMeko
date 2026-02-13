@@ -1,22 +1,38 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import {
+  BatteryCharging02Icon,
+  HelpCircleIcon,
+  OilBarrelIcon,
+  StopCircleIcon,
+  TemperatureIcon,
+  TireIcon,
+  ZapIcon,
+} from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const ISSUES = [
-  'Flat tires',
-  'Battery problem',
-  'Brake failure',
-  'Engine overheating',
-  'Oil leak',
-  'Electrical fault',
+  { label: 'Flat tires', icon: TireIcon },
+  { label: 'Battery problem', icon: BatteryCharging02Icon },
+  { label: 'Brake failure', icon: StopCircleIcon },
+  { label: 'Engine overheating', icon: TemperatureIcon },
+  { label: 'Oil leak', icon: OilBarrelIcon },
+  { label: 'Electrical fault', icon: ZapIcon },
+  { label: 'Other', icon: HelpCircleIcon },
 ];
 
-const IssueCard = ({ label, selected, onPress }) => {
+const IssueCard = ({ label, icon, selected, onPress }) => {
+  const iconColor = selected ? darkTheme.colors.accent : darkTheme.colors.text;
+
   return (
     <Pressable onPress={onPress} style={[styles.issueCard, selected ? styles.issueCardSelected : null]}>
+      <View style={[styles.issueIconWrap, selected ? styles.issueIconWrapSelected : null]}>
+        <HugeiconsIcon icon={icon} size={20} color={iconColor} strokeWidth={2} />
+      </View>
       <AppText style={[styles.issueText, selected ? styles.issueTextSelected : null]}>{label}</AppText>
     </Pressable>
   );
@@ -37,7 +53,7 @@ const UploadImageGlyph = ({ color }) => {
   );
 };
 
-const UploadBox = ({ images, onAddPress }) => {
+const UploadBox = ({ images, onAddPress, isPickingImage }) => {
   return (
     <View style={styles.uploadWrap}>
       <View style={styles.uploadIconBadge}>
@@ -49,13 +65,20 @@ const UploadBox = ({ images, onAddPress }) => {
       </AppText>
 
       <TouchableOpacity onPress={onAddPress} activeOpacity={0.85} style={styles.addPhotosButton}>
-        <AppText style={styles.addPhotosText}>Add photos</AppText>
+        <AppText style={styles.addPhotosText}>{isPickingImage ? 'Opening...' : 'Add photos'}</AppText>
       </TouchableOpacity>
 
       {images.length ? (
-        <AppText variant="muted" style={styles.uploadCount}>
-          {images.length} photo{images.length > 1 ? 's' : ''} selected
-        </AppText>
+        <>
+          <AppText variant="muted" style={styles.uploadCount}>
+            {images.length} photo{images.length > 1 ? 's' : ''} selected
+          </AppText>
+          <View style={styles.previewRow}>
+            {images.map((image) => (
+              <Image key={image.id} source={{ uri: image.uri }} style={styles.previewImage} />
+            ))}
+          </View>
+        </>
       ) : null}
     </View>
   );
@@ -67,20 +90,54 @@ const ReportIssueScreen = ({ navigation }) => {
   const [carMake, setCarMake] = useState('');
   const [images, setImages] = useState([]);
   const [error, setError] = useState('');
+  const [isPickingImage, setIsPickingImage] = useState(false);
 
   const issuePayload = useMemo(
     () => ({ selectedIssue, description: description.trim(), carMake: carMake.trim(), images }),
     [selectedIssue, description, carMake, images],
   );
 
-  const handleAddPhotos = () => {
-    setImages((prev) => [...prev, { id: `img-${Date.now()}` }]);
-    Alert.alert('Upload', 'Image picker will be connected here.');
+  const handleAddPhotos = async () => {
+    setIsPickingImage(true);
+
+    try {
+      const { asset, cancelled, error: pickerError } = await pickSingleImageFromGallery();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (pickerError) {
+        Alert.alert('Upload failed', pickerError);
+        return;
+      }
+
+      if (asset?.uri) {
+        setImages((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-${prev.length}`,
+            uri: asset.uri,
+            fileName: asset.fileName || '',
+            type: asset.type || '',
+          },
+        ]);
+      }
+    } catch {
+      Alert.alert('Upload failed', 'Could not open gallery. Please try again.');
+    } finally {
+      setIsPickingImage(false);
+    }
   };
 
   const handleFindMechanics = () => {
     if (!selectedIssue) {
       setError('Please select at least one issue.');
+      return;
+    }
+
+    if (selectedIssue === 'Other' && !description.trim()) {
+      setError('Please describe the issue when selecting Other.');
       return;
     }
 
@@ -98,11 +155,12 @@ const ReportIssueScreen = ({ navigation }) => {
         <View style={styles.issueGrid}>
           {ISSUES.map((issue) => (
             <IssueCard
-              key={issue}
-              label={issue}
-              selected={selectedIssue === issue}
+              key={issue.label}
+              label={issue.label}
+              icon={issue.icon}
+              selected={selectedIssue === issue.label}
               onPress={() => {
-                setSelectedIssue(issue);
+                setSelectedIssue(issue.label);
                 if (error) {
                   setError('');
                 }
@@ -114,10 +172,19 @@ const ReportIssueScreen = ({ navigation }) => {
         {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
         <AppInput
-          label="Description (optional)"
-          placeholder="Describe your problem here"
+          label={selectedIssue === 'Other' ? 'Description (required)' : 'Description (optional)'}
+          placeholder={
+            selectedIssue === 'Other'
+              ? 'Please describe your issue'
+              : 'Describe your problem here'
+          }
           value={description}
-          onChangeText={setDescription}
+          onChangeText={(text) => {
+            setDescription(text);
+            if (error) {
+              setError('');
+            }
+          }}
           multiline
           textAlignVertical="top"
           inputStyle={styles.descriptionInput}
@@ -131,7 +198,7 @@ const ReportIssueScreen = ({ navigation }) => {
           autoCapitalize="words"
         />
 
-        <UploadBox images={images} onAddPress={handleAddPhotos} />
+        <UploadBox images={images} onAddPress={handleAddPhotos} isPickingImage={isPickingImage} />
 
         <AppButton label="Find mechanics" onPress={handleFindMechanics} style={styles.cta} />
       </ScrollView>
@@ -163,15 +230,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
     paddingVertical: darkTheme.spacing.md,
     paddingHorizontal: darkTheme.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 112,
+    rowGap: darkTheme.spacing.xs,
   },
   issueCardSelected: {
     borderColor: darkTheme.colors.accent,
     backgroundColor: 'rgba(226,255,49,0.14)',
   },
+  issueIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  issueIconWrapSelected: {
+    backgroundColor: 'rgba(226,255,49,0.22)',
+  },
   issueText: {
     color: darkTheme.colors.text,
     textAlign: 'center',
     fontSize: darkTheme.typography.fontSizes.sm,
+    lineHeight: 18,
   },
   issueTextSelected: {
     color: darkTheme.colors.accent,
@@ -222,6 +305,20 @@ const styles = StyleSheet.create({
   uploadCount: {
     marginTop: darkTheme.spacing.xs,
     color: darkTheme.colors.muted,
+  },
+  previewRow: {
+    marginTop: darkTheme.spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: darkTheme.spacing.xs,
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: 52,
+    height: 52,
+    borderRadius: darkTheme.radius.sm,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
   },
   cta: {
     marginTop: darkTheme.spacing.sm,
