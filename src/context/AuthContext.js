@@ -66,6 +66,24 @@ const makeAuthResult = ({ ok, status, message }) => ({
   message: message || '',
 });
 
+const parseStoredUser = (rawUser) => {
+  if (!rawUser) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawUser);
+
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    return Object.keys(parsed).length ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -121,8 +139,11 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
 
       try {
-        const [storedToken] = await AsyncStorage.multiGet([STORAGE_KEYS.token]);
-        const nextToken = storedToken?.[1] || null;
+        const entries = await AsyncStorage.multiGet([STORAGE_KEYS.token, STORAGE_KEYS.user, STORAGE_KEYS.role]);
+        const map = Object.fromEntries(entries);
+        const nextToken = map?.[STORAGE_KEYS.token] || null;
+        const storedUser = parseStoredUser(map?.[STORAGE_KEYS.user]);
+        const storedRole = normalizeRole(map?.[STORAGE_KEYS.role]);
 
         if (!nextToken) {
           setToken(null);
@@ -132,17 +153,29 @@ export const AuthProvider = ({ children }) => {
         }
 
         setToken(nextToken);
+        setUser(storedUser);
+        setRole(storedRole);
 
-        const me = await getCurrentUser();
-        const mePayload = pickAuthPayload(me);
+        try {
+          const me = await getCurrentUser();
+          const mePayload = pickAuthPayload(me);
 
-        const nextUser = mePayload.user || null;
-        const nextRole = mePayload.role || null;
+          const nextUser = mePayload.user || storedUser || null;
+          const nextRole = mePayload.role || storedRole || null;
 
-        setUser(nextUser);
-        setRole(nextRole);
+          setUser(nextUser);
+          setRole(nextRole);
+          await persistAuthState(nextToken, nextUser, nextRole || '');
+        } catch (meError) {
+          const isUnauthorized = Number(meError?.statusCode || 0) === 401;
 
-        await persistAuthState(nextToken, nextUser, nextRole || '');
+          if (isUnauthorized) {
+            throw meError;
+          }
+
+          // Preserve existing local session/user when profile refresh fails transiently.
+          await persistAuthState(nextToken, storedUser, storedRole || '');
+        }
       } catch (bootstrapError) {
         setError(bootstrapError?.message || 'Failed to restore your session.');
         await clearPersistedAuthState();

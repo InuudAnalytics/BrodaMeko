@@ -10,6 +10,7 @@ const AdminStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
+        animation: 'slide_from_right',
         headerStyle: { backgroundColor: darkTheme.colors.background },
         headerTintColor: darkTheme.colors.accent,
         headerTitleStyle: { color: darkTheme.colors.accent },

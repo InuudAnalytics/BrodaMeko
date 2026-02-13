@@ -24,6 +24,7 @@ const CarOwnerStack = () => {
     <Stack.Navigator
       initialRouteName={ROUTES.CAR_OWNER_DASHBOARD}
       screenOptions={{
+        animation: 'slide_from_right',
         headerStyle: { backgroundColor: darkTheme.colors.background },
         headerTintColor: darkTheme.colors.accent,
         headerTitleStyle: {
