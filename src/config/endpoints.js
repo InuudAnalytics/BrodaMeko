@@ -15,6 +15,15 @@ export const ENDPOINTS = {
       register: '/api/v1/auth/devices/register',
     },
   },
+  me: {
+    mechanic: {
+      addServices: '/api/v1/me/mechanic/add-services',
+      servicesList: '/api/v1/me/mechanic/services',
+      serviceUpdate: (serviceId) => `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}`,
+      serviceDelete: (serviceId) =>
+        `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}/delete`,
+    },
+  },
   providers: {
     nearby: '/api/v1/providers/nearby',
   },
