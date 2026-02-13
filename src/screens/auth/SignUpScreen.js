@@ -87,7 +87,7 @@ const SignUpScreen = ({ navigation, route }) => {
     if (password !== confirmPassword) return setLocalError('Passwords do not match.');
 
     setLocalError('');
-    const ok = await signUp({
+    const result = await signUp({
       fullName: fullName.trim(),
       email: method === METHODS.EMAIL ? email.trim() : '',
       phoneNumber: method === METHODS.PHONE ? withNigerianCountryCode(phone) : '',
@@ -95,7 +95,27 @@ const SignUpScreen = ({ navigation, route }) => {
       role: selectedRole,
     });
 
-    if (ok) navigation.navigate(ROUTES.OTP_VERIFICATION, { method, destination: destinationPreview });
+    const status =
+      typeof result === 'object' && result !== null
+        ? result.status
+        : result
+          ? 'success'
+          : 'error';
+
+    if (status === 'success' || status === 'uncertain') {
+      if (status === 'uncertain' && error) {
+        clearError();
+      }
+
+      navigation.navigate(ROUTES.OTP_VERIFICATION, {
+        method,
+        destination: destinationPreview,
+        info:
+          status === 'uncertain'
+            ? 'Network was unstable. If OTP was sent, you can verify below or resend code.'
+            : '',
+      });
+    }
   };
 
   const renderRule = (label, isMet) => {

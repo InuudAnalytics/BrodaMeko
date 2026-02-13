@@ -60,6 +60,12 @@ const pickAuthPayload = (payload) => {
   return { token, user, role };
 };
 
+const makeAuthResult = ({ ok, status, message }) => ({
+  ok: Boolean(ok),
+  status,
+  message: message || '',
+});
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -156,6 +162,13 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     clearError();
 
+    const pendingData = {
+      method: email ? 'email' : 'phone',
+      email: email || '',
+      phoneNumber: phoneNumber || '',
+      role: selectedRole || ROLES.CAR_OWNER,
+    };
+
     try {
       await signupService({
         fullName,
@@ -165,22 +178,39 @@ export const AuthProvider = ({ children }) => {
         role: selectedRole,
       });
 
-      setPendingVerification({
-        method: email ? 'email' : 'phone',
-        email: email || '',
-        phoneNumber: phoneNumber || '',
-        role: selectedRole || ROLES.CAR_OWNER,
-      });
+      setPendingVerification(pendingData);
 
-      return true;
+      return makeAuthResult({
+        ok: true,
+        status: 'success',
+        message: 'Sign up successful. OTP sent.',
+      });
     } catch (signUpError) {
-      setError(signUpError?.message || 'Sign up failed.');
-      return false;
-    } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
+      const normalizedMessage = signUpError?.message || 'Sign up failed.';
+      const isTransportFailure = Number(signUpError?.statusCode || 0) === 0;
+
+      if (isTransportFailure) {
+        // Backend may still create the account/send OTP even when client times out.
+        setPendingVerification(pendingData);
+        setError('Could not confirm sign up due to network issues. If you received OTP, continue verification.');
+        return makeAuthResult({
+          ok: false,
+          status: 'uncertain',
+          message: 'Could not confirm sign up. If OTP was sent, continue to verification.',
+        });
       }
-    };
+
+      setError(normalizedMessage);
+      return makeAuthResult({
+        ok: false,
+        status: 'error',
+        message: normalizedMessage,
+      });
+    } finally {
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const verifyOtp = async ({ otp }) => {
     setIsLoading(true);
@@ -209,7 +239,7 @@ export const AuthProvider = ({ children }) => {
         nextUser: authPayload.user,
         nextRole: authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
       });
-      void registerCurrentDevice();
+      registerCurrentDevice();
 
       setPendingVerification(null);
       return true;
@@ -273,7 +303,7 @@ export const AuthProvider = ({ children }) => {
         nextUser,
         nextRole: nextRole || ROLES.CAR_OWNER,
       });
-      void registerCurrentDevice();
+      registerCurrentDevice();
 
       return true;
     } catch (signInError) {

@@ -21,6 +21,8 @@ const pickErrorMessage = (payload) => {
 };
 
 const normalizeError = (error) => {
+  const isTimeout = error?.code === 'ECONNABORTED' || String(error?.message || '').toLowerCase().includes('timeout');
+
   if (error?.response) {
     const payload = error.response.data;
     const statusCode = error.response.status;
@@ -37,7 +39,9 @@ const normalizeError = (error) => {
 
   if (error?.request) {
     return {
-      message: 'Network error. Please check your connection.',
+      message: isTimeout
+        ? 'Request timed out. Please try again.'
+        : 'Network error. Please check your connection.',
       statusCode: 0,
       data: null,
     };
