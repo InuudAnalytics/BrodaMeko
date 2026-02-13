@@ -3,8 +3,9 @@ import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-nat
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { signOut, updatePassword, isLoading, error, clearError } = useAuth();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -101,6 +102,17 @@ const ProfileScreen = () => {
           </View>
         ) : null}
 
+        {__DEV__ ? (
+          <View style={styles.devWrap}>
+            <AppButton
+              label="Open API Test Screen (Dev)"
+              onPress={() => navigation.navigate(ROUTES.DEV_API_TEST)}
+              style={styles.devButton}
+              textStyle={styles.devButtonText}
+            />
+          </View>
+        ) : null}
+
         {/* TEMP SIGNOUT: safe to comment out when no longer needed */}
         <View style={styles.signOutWrap}>
           <AppButton
@@ -145,6 +157,18 @@ const styles = StyleSheet.create({
   successText: {
     color: '#40C67A',
     marginBottom: darkTheme.spacing.sm,
+  },
+  devWrap: {
+    width: '100%',
+    marginTop: darkTheme.spacing.md,
+  },
+  devButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+  },
+  devButtonText: {
+    color: darkTheme.colors.accent,
   },
   signOutWrap: {
     width: '100%',

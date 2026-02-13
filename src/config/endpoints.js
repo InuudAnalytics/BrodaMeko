@@ -11,6 +11,9 @@ export const ENDPOINTS = {
     resetPassword: '/api/v1/auth/reset-password/reset',
     me: '/api/v1/auth/me',
     updatePassword: '/api/v1/auth/update-password',
+    devices: {
+      register: '/api/v1/auth/devices/register',
+    },
   },
   providers: {
     nearby: '/api/v1/providers/nearby',
@@ -26,10 +29,17 @@ export const ENDPOINTS = {
     fund: '/api/v1/wallet/fund',
     pay: '/api/v1/wallet/pay',
     transactions: '/api/v1/wallet/transactions',
+    topUp: '/api/v1/wallets/top-up',
+    verifyPayment: (reference, trxref) =>
+      `/api/v1/wallets/verify/payment?reference=${encodeURIComponent(String(reference || ''))}&trxref=${encodeURIComponent(String(trxref || ''))}`,
   },
   chat: {
     threads: '/api/v1/chat/threads',
     messages: '/api/v1/chat/messages',
+  },
+  transactions: {
+    list: '/api/v1/transactions/list',
+    details: (reference) => `/api/v1/transactions/${encodeURIComponent(String(reference || ''))}`,
   },
 };
 

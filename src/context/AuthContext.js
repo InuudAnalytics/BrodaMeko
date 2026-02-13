@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { MOCK_FCM_TOKEN, getMockDeviceType } from '../config/mockDevice';
 import {
   forgotPassword as forgotPasswordService,
   getCurrentUser,
@@ -11,6 +12,7 @@ import {
   updatePassword as updatePasswordService,
   verifyOtp as verifyOtpService,
 } from '../services/auth.service';
+import { registerDevice as registerDeviceService } from '../services/device.service';
 import { TOKEN_STORAGE_KEY } from '../services/api';
 import { ROLES } from '../utils';
 
@@ -86,6 +88,26 @@ export const AuthProvider = ({ children }) => {
     setUser(nextUser || null);
     setRole(nextRole || null);
     await persistAuthState(nextToken || '', nextUser || null, nextRole || '');
+  };
+
+  const registerCurrentDevice = async () => {
+    const fcmToken = String(MOCK_FCM_TOKEN || '').trim();
+
+    if (!fcmToken) {
+      return;
+    }
+
+    try {
+      await registerDeviceService({
+        fcm_token: fcmToken,
+        device_type: getMockDeviceType(),
+      });
+    } catch (deviceError) {
+      if (__DEV__) {
+        // Non-blocking registration: auth flow should continue even when this fails.
+        console.log('[AuthContext] Device registration failed:', deviceError?.message || deviceError);
+      }
+    }
   };
 
   useEffect(() => {
@@ -187,6 +209,7 @@ export const AuthProvider = ({ children }) => {
         nextUser: authPayload.user,
         nextRole: authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
       });
+      void registerCurrentDevice();
 
       setPendingVerification(null);
       return true;
@@ -250,6 +273,7 @@ export const AuthProvider = ({ children }) => {
         nextUser,
         nextRole: nextRole || ROLES.CAR_OWNER,
       });
+      void registerCurrentDevice();
 
       return true;
     } catch (signInError) {

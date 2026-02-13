@@ -1,55 +1,45 @@
 import React from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ArrowRight01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { useAuth } from '../../../context';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { getWATGreeting, ROUTES } from '../../../utils';
 
-const BellIcon = ({ color }) => {
-  return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 4a4 4 0 0 0-4 4v2.2c0 .9-.3 1.8-.9 2.5L5.7 14.5c-.6.7-.2 1.7.7 1.7h11.2c.9 0 1.3-1 .7-1.7l-1.4-1.8a4 4 0 0 1-.9-2.5V8a4 4 0 0 0-4-4Z"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M10.2 18a2 2 0 0 0 3.6 0"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-};
+const extractFirstName = (user) => {
+  const rawName =
+    user?.first_name ||
+    user?.firstName ||
+    user?.full_name ||
+    user?.fullName ||
+    user?.name ||
+    '';
+  const fullName = String(rawName).trim();
 
-const ChevronRightIcon = ({ color }) => {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M9 6L15 12L9 18"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
+  if (!fullName) {
+    return '';
+  }
+
+  return fullName.split(/\s+/)[0];
 };
 
 const HelpActionRow = ({ label, onPress }) => {
   return (
     <TouchableOpacity style={styles.helpRow} activeOpacity={0.9} onPress={onPress}>
       <AppText style={styles.helpRowText}>{label}</AppText>
-      <ChevronRightIcon color="#1A1A1A" />
+      <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#1A1A1A" strokeWidth={2} />
     </TouchableOpacity>
   );
 };
 
 const DashboardScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const firstName = extractFirstName(user);
+  const greetingPrefix = getWATGreeting();
+  const greetingText = firstName ? `${greetingPrefix}, ${firstName}` : greetingPrefix;
+  const avatarInitial = firstName.charAt(0).toUpperCase() || 'U';
+
   const handleTabPress = (routeName) => {
     if (routeName === ROUTES.CAR_OWNER_DASHBOARD) {
       return;
@@ -74,11 +64,11 @@ const DashboardScreen = ({ navigation }) => {
             onPress={() => navigation.navigate(ROUTES.CAR_OWNER_PROFILE)}
           >
             <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>D</AppText>
+              <AppText style={styles.avatarText}>{avatarInitial}</AppText>
             </View>
             <View>
               <AppText variant="body" style={styles.greeting}>
-                Good morning Danclem
+                {greetingText}
               </AppText>
               <AppText variant="muted" style={styles.greetingSub}>
                 Ready for the road?
@@ -91,7 +81,7 @@ const DashboardScreen = ({ navigation }) => {
             activeOpacity={0.85}
             onPress={() => Alert.alert('Notifications', 'Notifications page coming soon.')}
           >
-            <BellIcon color={darkTheme.colors.text} />
+            <HugeiconsIcon icon={Notification01Icon} size={22} color={darkTheme.colors.text} strokeWidth={1.8} />
           </TouchableOpacity>
         </View>
       </View>

@@ -11,6 +11,7 @@ import {
   CarOwnerRewardsScreen,
   CarOwnerSettingsScreen,
 } from '../screens';
+import ApiTestScreen from '../screens/dev/ApiTestScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -63,6 +64,9 @@ const CarOwnerStack = () => {
         component={CarOwnerLiveTrackingScreen}
         options={{ title: 'Live tracking' }}
       />
+      {__DEV__ ? (
+        <Stack.Screen name={ROUTES.DEV_API_TEST} component={ApiTestScreen} options={{ title: 'API Test (Dev)' }} />
+      ) : null}
     </Stack.Navigator>
   );
 };
