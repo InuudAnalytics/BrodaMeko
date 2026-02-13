@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   CarOwnerDashboardScreen,
+  CarOwnerFundWalletScreen,
   CarOwnerHistoryScreen,
   CarOwnerLiveTrackingScreen,
   CarOwnerMechanicDiscoveryScreen,
@@ -10,6 +11,7 @@ import {
   CarOwnerRequestDiagnosticsScreen,
   CarOwnerRewardsScreen,
   CarOwnerSettingsScreen,
+  CarOwnerWithdrawScreen,
 } from '../screens';
 import ApiTestScreen from '../screens/dev/ApiTestScreen';
 import { darkTheme } from '../theme';
@@ -38,6 +40,16 @@ const CarOwnerStack = () => {
       />
       <Stack.Screen name={ROUTES.CAR_OWNER_HISTORY} component={CarOwnerHistoryScreen} options={{ title: 'History' }} />
       <Stack.Screen name={ROUTES.CAR_OWNER_REWARDS} component={CarOwnerRewardsScreen} options={{ title: 'Wallet' }} />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_FUND_WALLET}
+        component={CarOwnerFundWalletScreen}
+        options={{ title: 'Fund Wallet' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_WITHDRAW}
+        component={CarOwnerWithdrawScreen}
+        options={{ title: 'Withdraw' }}
+      />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_SETTINGS}
         component={CarOwnerSettingsScreen}
