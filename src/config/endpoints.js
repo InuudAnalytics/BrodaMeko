@@ -33,6 +33,13 @@ export const ENDPOINTS = {
     accept: '/api/v1/bookings/accept',
     complete: '/api/v1/bookings/complete',
   },
+  jobs: {
+    create: '/api/v1/jobs/create',
+    carOwnerList: '/api/v1/jobs/car-owner?limit=5&page=1',
+    carOwnerDetails: (jobId) => `/api/v1/jobs/car-owner/${encodeURIComponent(String(jobId || ''))}`,
+    carOwnerUpdate: (jobId) => `/api/v1/jobs/car-owner/${encodeURIComponent(String(jobId || ''))}/update`,
+    delete: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}`,
+  },
   wallet: {
     balance: '/api/v1/wallet/balance',
     fund: '/api/v1/wallet/fund',
@@ -45,6 +52,14 @@ export const ENDPOINTS = {
   chat: {
     threads: '/api/v1/chat/threads',
     messages: '/api/v1/chat/messages',
+    createConversation: '/api/v1/chat/conversations/create',
+    conversations: '/api/v1/chat/conversations',
+    conversationMessages: (conversationId) =>
+      `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/messages?limit=50&offset=0`,
+    uploadConversationImages: (conversationId) =>
+      `/api/v1/chat/conversations/images/upload/${encodeURIComponent(String(conversationId || ''))}`,
+    markConversationRead: (conversationId) =>
+      `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/read`,
   },
   transactions: {
     list: '/api/v1/transactions/list',
