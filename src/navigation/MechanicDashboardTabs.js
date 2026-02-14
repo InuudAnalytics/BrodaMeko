@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, ScreenContainer } from '../components';
 import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
+import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
 import { darkTheme } from '../theme';
 
 const TabPlaceholder = ({ title, subtitle }) => {
@@ -14,7 +15,7 @@ const TabPlaceholder = ({ title, subtitle }) => {
   );
 };
 
-const MechanicDashboardTabs = () => {
+const MechanicDashboardTabs = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('home');
 
   const renderTabScreen = () => {
@@ -27,7 +28,7 @@ const MechanicDashboardTabs = () => {
     }
 
     if (activeTab === 'wallet') {
-      return <TabPlaceholder title="Wallet coming soon" subtitle="Mechanic wallet screen will be added here next." />;
+      return <MechanicWalletScreen navigation={navigation} onTabPress={setActiveTab} showTabBar={false} />;
     }
 
     return <TabPlaceholder title="Chat coming soon" subtitle="Mechanic chat list will appear here." />;
