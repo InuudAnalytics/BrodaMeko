@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import JobsContext from '../../../context/JobsContext';
 import { darkTheme } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
@@ -24,6 +25,16 @@ const ISSUES = [
   { label: 'Electrical fault', icon: ZapIcon },
   { label: 'Other', icon: HelpCircleIcon },
 ];
+
+const ISSUE_TYPE_MAP = {
+  'Flat tires': 'flat_tires',
+  'Battery problem': 'battery_problem',
+  'Brake failure': 'brake_failure',
+  'Engine overheating': 'engine_trouble',
+  'Oil leak': 'engine_trouble',
+  'Electrical fault': 'engine_trouble',
+  Other: 'other',
+};
 
 const IssueCard = ({ label, icon, selected, onPress }) => {
   const iconColor = selected ? darkTheme.colors.accent : darkTheme.colors.text;
@@ -85,17 +96,17 @@ const UploadBox = ({ images, onAddPress, isPickingImage }) => {
 };
 
 const ReportIssueScreen = ({ navigation }) => {
+  const jobsContext = useContext(JobsContext);
   const [selectedIssue, setSelectedIssue] = useState('');
   const [description, setDescription] = useState('');
   const [carMake, setCarMake] = useState('');
   const [images, setImages] = useState([]);
   const [error, setError] = useState('');
   const [isPickingImage, setIsPickingImage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isCreatingJob = Boolean(jobsContext?.loading?.createJob);
 
-  const issuePayload = useMemo(
-    () => ({ selectedIssue, description: description.trim(), carMake: carMake.trim(), images }),
-    [selectedIssue, description, carMake, images],
-  );
+  const resolveIssueType = () => ISSUE_TYPE_MAP[selectedIssue] || 'other';
 
   const handleAddPhotos = async () => {
     setIsPickingImage(true);
@@ -130,19 +141,59 @@ const ReportIssueScreen = ({ navigation }) => {
     }
   };
 
-  const handleFindMechanics = () => {
+  const handleFindMechanics = async () => {
     if (!selectedIssue) {
       setError('Please select at least one issue.');
       return;
     }
 
-    if (selectedIssue === 'Other' && !description.trim()) {
+    const issueType = resolveIssueType();
+
+    if (issueType === 'other' && !description.trim()) {
       setError('Please describe the issue when selecting Other.');
       return;
     }
 
+    if (!jobsContext?.createJob) {
+      setError('Could not submit issue right now. Please try again.');
+      return;
+    }
+
+    setIsSubmitting(true);
     setError('');
-    navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, { report: issuePayload });
+
+    try {
+      const response = await jobsContext.createJob({
+        issue_type: issueType,
+        description: description.trim(),
+        car_make: carMake.trim(),
+        images,
+      });
+
+      if (!response?.success) {
+        setError(response?.message || 'We could not submit your request. Please try again.');
+        return;
+      }
+
+      const jobPayload = response?.data?.job || response?.data || null;
+      const jobId = String(
+        jobPayload?.id || jobPayload?._id || jobPayload?.job_id || jobPayload?.jobId || ''
+      ).trim();
+
+      if (!jobPayload && !jobId) {
+        setError('Request submitted, but we could not load job details. Please try again.');
+        return;
+      }
+
+      navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
+        jobId: jobId || undefined,
+        job: jobPayload || undefined,
+      });
+    } catch {
+      setError('We could not submit your request. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -194,13 +245,23 @@ const ReportIssueScreen = ({ navigation }) => {
           label="Car make"
           placeholder="Toyota Corolla"
           value={carMake}
-          onChangeText={setCarMake}
+          onChangeText={(text) => {
+            setCarMake(text);
+            if (error) {
+              setError('');
+            }
+          }}
           autoCapitalize="words"
         />
 
         <UploadBox images={images} onAddPress={handleAddPhotos} isPickingImage={isPickingImage} />
 
-        <AppButton label="Find mechanics" onPress={handleFindMechanics} style={styles.cta} />
+        <AppButton
+          label={isSubmitting || isCreatingJob ? 'Submitting...' : 'Find mechanics'}
+          onPress={handleFindMechanics}
+          style={styles.cta}
+          disabled={isSubmitting || isCreatingJob}
+        />
       </ScrollView>
     </ScreenContainer>
   );
