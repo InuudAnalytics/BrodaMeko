@@ -15,6 +15,7 @@ import {
   CarOwnerWithdrawScreen,
 } from '../screens';
 import MechanicServicesApiTestScreen from '../screens/dev/MechanicServicesApiTestScreen';
+import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -62,7 +63,11 @@ const CarOwnerStack = () => {
         component={CarOwnerChatScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name={ROUTES.CAR_OWNER_PROFILE} component={CarOwnerProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_PROFILE}
+        component={CarOwnerProfileScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REPORT_ISSUE}
         component={CarOwnerReportIssueScreen}
@@ -82,6 +87,11 @@ const CarOwnerStack = () => {
         name={ROUTES.CAR_OWNER_LIVE_TRACKING}
         component={CarOwnerLiveTrackingScreen}
         options={{ title: 'Live tracking' }}
+      />
+      <Stack.Screen
+        name="Placeholder"
+        component={PlaceholderScreen}
+        options={{ headerShown: false }}
       />
       {__DEV__ ? (
         <Stack.Screen
