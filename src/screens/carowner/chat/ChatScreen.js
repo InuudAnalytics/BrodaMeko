@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   StyleSheet,
@@ -9,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { SentIcon } from '@hugeicons/core-free-icons';
+import { BubbleChatIcon, PlusSignIcon, SentIcon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { useChat } from '../../../context/ChatContext';
 import { darkTheme } from '../../../theme';
-import { ROUTES, useKeyboardLift } from '../../../utils';
+import { pickSingleImageFromGallery, ROUTES, useKeyboardLift } from '../../../utils';
 
 const BackIcon = ({ color }) => {
   return (
@@ -37,52 +40,58 @@ const CallIcon = ({ color }) => {
   );
 };
 
-const formatTime = (date = new Date()) => {
+const formatTime = (dateValue) => {
+  const date = dateValue ? new Date(dateValue) : new Date();
+
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
-const createSeedMessages = () => {
-  const entries = [
-    { sender: 'mechanic', text: "Hi, I've received your location and i'm on my way, i will be there in 15 minutes." },
-    { sender: 'user', text: "Great, thank you, i'm right beside that church sign post." },
-    { sender: 'mechanic', text: 'Got it, i will be right there.' },
-    { sender: 'mechanic', text: 'Please keep your phone line open.' },
-    { sender: 'user', text: 'Sure, i will.' },
-    { sender: 'mechanic', text: 'Have you turned off the engine?' },
-    { sender: 'user', text: 'Yes, engine is off now.' },
-    { sender: 'mechanic', text: 'Perfect. I am 1.2km away now.' },
-    { sender: 'user', text: 'Okay noted.' },
-    { sender: 'mechanic', text: 'Any dashboard warning light?' },
-    { sender: 'user', text: 'Battery and brake light showed up.' },
-    { sender: 'mechanic', text: 'That helps, thanks.' },
-    { sender: 'user', text: 'Will diagnostics happen onsite?' },
-    { sender: 'mechanic', text: 'Yes, quick scan onsite first.' },
-    { sender: 'user', text: 'How long should that take?' },
-    { sender: 'mechanic', text: 'About 20 minutes.' },
-    { sender: 'user', text: 'Alright, waiting here.' },
-    { sender: 'mechanic', text: 'I can see the junction now.' },
-    { sender: 'user', text: 'I am wearing a blue shirt.' },
-    { sender: 'mechanic', text: 'Seen you. Parking now.' },
-    { sender: 'user', text: 'Perfect.' },
-    { sender: 'mechanic', text: 'Coming over in 1 minute.' },
-    { sender: 'user', text: 'Thanks.' },
-  ];
+const resolveConversationId = (routeParams) => {
+  const fromParam = String(routeParams?.conversationId || '').trim();
 
-  const base = new Date();
-  return entries.map((entry, index) => {
-    const at = new Date(base.getTime() - (entries.length - index) * 60 * 1000);
-    return {
-      id: `seed_${index + 1}`,
-      sender: entry.sender,
-      text: entry.text,
-      timestamp: formatTime(at),
-      type: 'message',
-    };
-  });
+  if (fromParam) {
+    return fromParam;
+  }
+
+  const conversation = routeParams?.conversation;
+  const fromConversation = String(
+    conversation?.id || conversation?._id || conversation?.conversation_id || conversation?.conversationId || ''
+  ).trim();
+
+  if (fromConversation) {
+    return fromConversation;
+  }
+
+  return 'local-preview';
+};
+
+const isUserSender = (item) => {
+  const sender = String(item?.sender || item?.sender_type || item?.role || '').toLowerCase();
+  return sender === 'user' || sender === 'me' || sender === 'self' || sender === 'car_owner';
+};
+
+const getMessageText = (item) => {
+  if (item?.type === 'image') {
+    if (item?.status === 'uploading') {
+      return 'Uploading image...';
+    }
+
+    if (item?.status === 'upload-failed') {
+      return 'Image upload failed';
+    }
+
+    return 'Image sent';
+  }
+
+  return item?.text || item?.message || '';
 };
 
 const MessageBubble = ({ item }) => {
-  if (item.type === 'system') {
+  if (item?.type === 'system') {
     return (
       <View style={styles.systemWrap}>
         <AppText style={styles.systemText}>{item.text}</AppText>
@@ -90,27 +99,35 @@ const MessageBubble = ({ item }) => {
     );
   }
 
-  const isUser = item.sender === 'user';
+  const isUser = isUserSender(item);
+
   return (
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowMechanic]}>
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.mechanicBubble]}>
         <AppText style={[styles.messageText, isUser ? styles.userMessageText : styles.mechanicMessageText]}>
-          {item.text}
+          {getMessageText(item)}
         </AppText>
       </View>
-      <AppText style={styles.timestamp}>{item.timestamp}</AppText>
+      <AppText style={styles.timestamp}>{item?.timestamp || formatTime(item?.created_at)}</AppText>
     </View>
   );
 };
 
 const ChatScreen = ({ navigation, route }) => {
-  const seededMessages = useMemo(() => createSeedMessages(), []);
   const listRef = useRef(null);
-  const acceptanceTimerRef = useRef(null);
   const { targetRef, animatedStyle } = useKeyboardLift({
     extraOffset: darkTheme.spacing.xxxl,
     anchor: 'bottom',
   });
+
+  const {
+    messagesByConversationId,
+    fetchMessages,
+    markConversationRead,
+    addMockTextMessage,
+    uploadImages,
+    uploadingImages,
+  } = useChat();
 
   const mechanic = route?.params?.mechanic || {
     name: 'Samuel Olamilekan',
@@ -119,52 +136,39 @@ const ChatScreen = ({ navigation, route }) => {
   };
   const jobId = route?.params?.jobId || `job_${Date.now()}`;
 
-  const [messages, setMessages] = useState(seededMessages);
+  const conversationId = useMemo(() => resolveConversationId(route?.params), [route?.params]);
+  const hasRealConversation = conversationId !== 'local-preview';
+
   const [inputValue, setInputValue] = useState('');
   const [accepted, setAccepted] = useState(false);
+
+  const messages = useMemo(
+    () => messagesByConversationId[conversationId] || [],
+    [conversationId, messagesByConversationId]
+  );
   const isSendEnabled = inputValue.trim().length > 0;
 
-  const appendMessage = (message) => {
-    setMessages((prev) => [...prev, message]);
-  };
-
-  const appendAcceptanceMessage = () => {
-    setMessages((prev) => {
-      const exists = prev.some((m) => m.type === 'system' && m.text === 'Mechanic accepted your request');
-      if (exists) {
-        return prev;
-      }
-      return [
-        ...prev,
-        {
-          id: `sys_${Date.now()}`,
-          type: 'system',
-          text: 'Mechanic accepted your request',
-        },
-      ];
-    });
-  };
-
-  const acceptMechanic = () => {
-    setAccepted((prev) => {
-      if (!prev) {
-        appendAcceptanceMessage();
-      }
-      return true;
-    });
-  };
-
   useEffect(() => {
-    acceptanceTimerRef.current = setTimeout(() => {
-      acceptMechanic();
-    }, 2000);
+    let mounted = true;
 
-    return () => {
-      if (acceptanceTimerRef.current) {
-        clearTimeout(acceptanceTimerRef.current);
+    const bootstrapConversation = async () => {
+      if (!hasRealConversation) {
+        return;
+      }
+
+      await fetchMessages(conversationId, { limit: 50, offset: 0 });
+
+      if (mounted) {
+        await markConversationRead(conversationId);
       }
     };
-  }, []);
+
+    bootstrapConversation();
+
+    return () => {
+      mounted = false;
+    };
+  }, [conversationId, fetchMessages, hasRealConversation, markConversationRead]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -180,29 +184,36 @@ const ChatScreen = ({ navigation, route }) => {
       return;
     }
 
-    appendMessage({
-      id: `user_${Date.now()}`,
-      sender: 'user',
-      text,
-      timestamp: formatTime(),
-      type: 'message',
-    });
+    addMockTextMessage(conversationId, text);
     setInputValue('');
+    setAccepted(true);
+  };
 
-    acceptMechanic();
-    if (acceptanceTimerRef.current) {
-      clearTimeout(acceptanceTimerRef.current);
+  const handleAttach = async () => {
+    if (!hasRealConversation) {
+      Alert.alert('Unavailable', 'Open a real conversation before uploading images.');
+      return;
     }
 
-    setTimeout(() => {
-      appendMessage({
-        id: `mech_${Date.now()}`,
-        sender: 'mechanic',
-        text: 'Received. I am on it.',
-        timestamp: formatTime(),
-        type: 'message',
-      });
-    }, 1000);
+    try {
+      const { asset, cancelled, error } = await pickSingleImageFromGallery();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (error) {
+        Alert.alert('Upload failed', error);
+        return;
+      }
+
+      if (asset?.uri) {
+        await uploadImages(conversationId, [asset]);
+        setAccepted(true);
+      }
+    } catch {
+      Alert.alert('Upload failed', 'Could not attach image. Please try again.');
+    }
   };
 
   return (
@@ -242,17 +253,34 @@ const ChatScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         ) : null}
 
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <MessageBubble item={item} />}
-          ListHeaderComponent={<AppText style={styles.todayLabel}>Today</AppText>}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-        />
+        {messages.length ? (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item, index) => String(item?.id || `${conversationId}_${index}`)}
+            renderItem={({ item }) => <MessageBubble item={item} />}
+            ListHeaderComponent={<AppText style={styles.todayLabel}>Today</AppText>}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View style={styles.emptyStateWrap}>
+            <HugeiconsIcon icon={BubbleChatIcon} size={42} color={darkTheme.colors.muted} strokeWidth={1.8} />
+            <AppText variant="muted" style={styles.emptyStateText}>
+              No message.
+            </AppText>
+          </View>
+        )}
 
         <View style={styles.composerWrap}>
+          <Pressable style={styles.attachButton} onPress={handleAttach}>
+            {uploadingImages ? (
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            ) : (
+              <HugeiconsIcon icon={PlusSignIcon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
+            )}
+          </Pressable>
+
           <TextInput
             value={inputValue}
             onChangeText={setInputValue}
@@ -377,8 +405,20 @@ const styles = StyleSheet.create({
     marginVertical: darkTheme.spacing.sm,
   },
   messagesContent: {
+    flexGrow: 1,
     paddingHorizontal: darkTheme.spacing.md,
     paddingBottom: darkTheme.spacing.sm,
+  },
+  emptyStateWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    rowGap: darkTheme.spacing.xs,
+    paddingHorizontal: darkTheme.spacing.lg,
+  },
+  emptyStateText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
   },
   messageRow: {
     marginBottom: darkTheme.spacing.sm,
@@ -439,6 +479,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     columnGap: darkTheme.spacing.xs,
+  },
+  attachButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,

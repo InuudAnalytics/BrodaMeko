@@ -19,6 +19,7 @@ export const ROUTES = {
   CAR_OWNER_FUND_WALLET: 'CarOwnerFundWallet',
   CAR_OWNER_WITHDRAW: 'CarOwnerWithdraw',
   CAR_OWNER_SETTINGS: 'CarOwnerSettings',
+  CAR_OWNER_CHAT: 'CarOwnerChat',
   CAR_OWNER_PROFILE: 'CarOwnerProfile',
   CAR_OWNER_REPORT_ISSUE: 'CarOwnerReportIssue',
   CAR_OWNER_REQUEST_DIAGNOSTICS: 'CarOwnerRequestDiagnostics',
