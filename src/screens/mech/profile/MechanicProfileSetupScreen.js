@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     marginTop: 14,
     color: darkTheme.colors.text,
-    fontSize: 34,
+    fontSize: 30,
     lineHeight: 40,
     textAlign: 'center',
     fontWeight: darkTheme.typography.fontWeights.semibold,
@@ -239,7 +239,8 @@ const styles = StyleSheet.create({
   heroSubtext: {
     marginTop: 10,
     color: darkTheme.colors.muted,
-    fontSize: 15,
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.light,
     lineHeight: 21,
     textAlign: 'center',
     maxWidth: 330,
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
   checklistTitle: {
     marginTop: 14,
     color: darkTheme.colors.muted,
-    fontSize: 22,
+    fontSize: 17,
     lineHeight: 26,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },

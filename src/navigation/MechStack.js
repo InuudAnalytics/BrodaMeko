@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { MechDashboardScreen } from '../screens';
+import MechanicDashboardTabs from './MechanicDashboardTabs';
 import MechanicProfileSetupScreen from '../screens/mech/profile/MechanicProfileSetupScreen';
 import { darkTheme } from '../theme';
 
@@ -36,7 +36,11 @@ const MechStack = () => {
           )}
         </Stack.Screen>
       ) : null}
-      <Stack.Screen name={MECH_DASHBOARD_TABS_ROUTE} component={MechDashboardScreen} options={{ title: 'Mechanic' }} />
+      <Stack.Screen
+        name={MECH_DASHBOARD_TABS_ROUTE}
+        component={MechanicDashboardTabs}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };

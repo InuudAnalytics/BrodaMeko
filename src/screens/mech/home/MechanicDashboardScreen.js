@@ -1,0 +1,404 @@
+import React, { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { FilterHorizontalIcon, Location01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
+import { AppButton, AppText } from '../../../components';
+import { darkTheme } from '../../../theme';
+
+const FILTERS = [
+  { key: 'all', label: 'All jobs' },
+  { key: 'urgent', label: 'Urgent' },
+  { key: 'high_paying', label: 'High paying' },
+  { key: 'filters', label: 'Filters', icon: FilterHorizontalIcon },
+];
+
+const JOBS = [
+  {
+    id: 'job_1',
+    name: 'Tunde Adebayo',
+    issue: 'Flat tire - Toyota Camry',
+    distance: '1.3km away',
+    eta: '2 minutes',
+    urgent: true,
+  },
+  {
+    id: 'job_2',
+    name: 'Joy Okafor',
+    issue: 'Battery problem - Honda Accord',
+    distance: '2.7km away',
+    eta: '8 minutes',
+    urgent: false,
+  },
+  {
+    id: 'job_3',
+    name: 'Femi Williams',
+    issue: 'Engine trouble - Lexus RX350',
+    distance: '3.1km away',
+    eta: '12 minutes',
+    urgent: false,
+  },
+];
+
+const initialsFromName = (name) =>
+  String(name || 'M')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+
+const MechanicDashboardScreen = () => {
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  const visibleJobs = useMemo(() => {
+    if (activeFilter === 'urgent') {
+      return JOBS.filter((job) => job.urgent);
+    }
+    if (activeFilter === 'high_paying') {
+      return JOBS.slice(0, 2);
+    }
+    return JOBS;
+  }, [activeFilter]);
+
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.avatar}>
+            <AppText style={styles.avatarText}>M</AppText>
+          </View>
+          <View>
+            <AppText style={styles.welcome}>Welcome Michael</AppText>
+            <AppText style={styles.partner}>BrodaMeko partner</AppText>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.earningsCard}>
+        <AppText style={styles.earningsLabel}>Todays earnings</AppText>
+        <AppText style={styles.earningsAmount}>#25,000.00</AppText>
+        <AppText style={styles.trendText}>1.5% increase in the past 5 days</AppText>
+      </View>
+
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <AppText style={styles.statLabel}>Total jobs</AppText>
+          <AppText style={styles.statValue}>128</AppText>
+        </View>
+        <View style={styles.statCard}>
+          <AppText style={styles.statLabel}>Ratings</AppText>
+          <View style={styles.ratingRow}>
+            <HugeiconsIcon icon={StarIcon} size={14} color={darkTheme.colors.accent} strokeWidth={2.1} />
+            <AppText style={styles.statValue}>4.9</AppText>
+          </View>
+        </View>
+        <View style={styles.statCard}>
+          <AppText style={styles.statLabel}>Wallet</AppText>
+          <AppText style={styles.statValue}>#1,250</AppText>
+        </View>
+      </View>
+
+      <AppText style={styles.sectionTitle}>Available jobs nearby</AppText>
+
+      <View style={styles.chipsRow}>
+        {FILTERS.map((filter) => {
+          const isActive = activeFilter === filter.key;
+          return (
+            <TouchableOpacity
+              key={filter.key}
+              activeOpacity={0.85}
+              onPress={() => setActiveFilter(filter.key)}
+              style={[styles.chip, isActive && styles.chipActive]}
+            >
+              {filter.icon ? (
+                <HugeiconsIcon
+                  icon={filter.icon}
+                  size={14}
+                  color={isActive ? '#1A1A1A' : darkTheme.colors.text}
+                  strokeWidth={2}
+                />
+              ) : null}
+              <AppText style={[styles.chipText, isActive && styles.chipTextActive]}>{filter.label}</AppText>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={styles.jobsList}>
+        {visibleJobs.map((job) => (
+          <View key={job.id} style={styles.jobCard}>
+            <View style={styles.jobTop}>
+              <View style={styles.jobTopLeft}>
+                <View style={styles.jobAvatar}>
+                  <AppText style={styles.jobAvatarText}>{initialsFromName(job.name)}</AppText>
+                </View>
+                <View style={styles.jobMain}>
+                  <AppText style={styles.jobName}>{job.name}</AppText>
+                  <AppText style={styles.jobIssue}>{job.issue}</AppText>
+                </View>
+              </View>
+              {job.urgent ? (
+                <View style={styles.urgentPill}>
+                  <AppText style={styles.urgentText}>Urgent</AppText>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
+                <AppText style={styles.metaText}>{job.distance}</AppText>
+              </View>
+              <View style={styles.metaItem}>
+                <HugeiconsIcon icon={Time04Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
+                <AppText style={styles.metaText}>{job.eta}</AppText>
+              </View>
+            </View>
+
+            <AppButton
+              label="Accept job"
+              onPress={() => console.log('Accept job:', job.id)}
+              style={styles.acceptBtn}
+              textStyle={styles.acceptBtnText}
+            />
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+};
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#000033',
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 28,
+  },
+  header: {
+    marginBottom: 14,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 2,
+    borderColor: '#FF8A50',
+    backgroundColor: '#392425',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    fontSize: 16,
+  },
+  welcome: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  partner: {
+    marginTop: 2,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  earningsCard: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: 16,
+    padding: 14,
+  },
+  earningsLabel: {
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+  },
+  earningsAmount: {
+    marginTop: 4,
+    color: darkTheme.colors.text,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  trendText: {
+    marginTop: 6,
+    color: darkTheme.colors.accent,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  statsRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    columnGap: 8,
+  },
+  statCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  statLabel: {
+    color: darkTheme.colors.muted,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  statValue: {
+    marginTop: 4,
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  ratingRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 4,
+  },
+  sectionTitle: {
+    marginTop: 18,
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  chipsRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    columnGap: 8,
+    flexWrap: 'wrap',
+    rowGap: 8,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
+    backgroundColor: 'transparent',
+  },
+  chipActive: {
+    backgroundColor: darkTheme.colors.accent,
+    borderColor: darkTheme.colors.accent,
+  },
+  chipText: {
+    color: darkTheme.colors.text,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  chipTextActive: {
+    color: '#1A1A1A',
+  },
+  jobsList: {
+    marginTop: 12,
+    rowGap: 10,
+  },
+  jobCard: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    padding: 12,
+  },
+  jobTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    columnGap: 10,
+  },
+  jobTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    columnGap: 10,
+  },
+  jobAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(226,255,49,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(226,255,49,0.45)',
+  },
+  jobAvatarText: {
+    color: darkTheme.colors.accent,
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  jobMain: {
+    flex: 1,
+  },
+  jobName: {
+    color: darkTheme.colors.text,
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  jobIssue: {
+    marginTop: 2,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  urgentPill: {
+    backgroundColor: 'rgba(226,255,49,0.15)',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  urgentText: {
+    color: darkTheme.colors.accent,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  metaRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 12,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 4,
+  },
+  metaText: {
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  acceptBtn: {
+    marginTop: 10,
+    minHeight: 42,
+    borderRadius: 10,
+  },
+  acceptBtnText: {
+    color: '#1A1A1A',
+    fontSize: 14,
+  },
+});
+
+export default MechanicDashboardScreen;
