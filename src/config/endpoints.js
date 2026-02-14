@@ -11,6 +11,18 @@ export const ENDPOINTS = {
     resetPassword: '/api/v1/auth/reset-password/reset',
     me: '/api/v1/auth/me',
     updatePassword: '/api/v1/auth/update-password',
+    devices: {
+      register: '/api/v1/auth/devices/register',
+    },
+  },
+  me: {
+    mechanic: {
+      addServices: '/api/v1/me/mechanic/add-services',
+      servicesList: '/api/v1/me/mechanic/services',
+      serviceUpdate: (serviceId) => `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}`,
+      serviceDelete: (serviceId) =>
+        `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}/delete`,
+    },
   },
   providers: {
     nearby: '/api/v1/providers/nearby',
@@ -21,15 +33,37 @@ export const ENDPOINTS = {
     accept: '/api/v1/bookings/accept',
     complete: '/api/v1/bookings/complete',
   },
+  jobs: {
+    create: '/api/v1/jobs/create',
+    carOwnerList: '/api/v1/jobs/car-owner?limit=5&page=1',
+    carOwnerDetails: (jobId) => `/api/v1/jobs/car-owner/${encodeURIComponent(String(jobId || ''))}`,
+    carOwnerUpdate: (jobId) => `/api/v1/jobs/car-owner/${encodeURIComponent(String(jobId || ''))}/update`,
+    delete: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}`,
+  },
   wallet: {
     balance: '/api/v1/wallet/balance',
     fund: '/api/v1/wallet/fund',
     pay: '/api/v1/wallet/pay',
     transactions: '/api/v1/wallet/transactions',
+    topUp: '/api/v1/wallets/top-up',
+    verifyPayment: (reference, trxref) =>
+      `/api/v1/wallets/verify/payment?reference=${encodeURIComponent(String(reference || ''))}&trxref=${encodeURIComponent(String(trxref || ''))}`,
   },
   chat: {
     threads: '/api/v1/chat/threads',
     messages: '/api/v1/chat/messages',
+    createConversation: '/api/v1/chat/conversations/create',
+    conversations: '/api/v1/chat/conversations',
+    conversationMessages: (conversationId) =>
+      `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/messages?limit=50&offset=0`,
+    uploadConversationImages: (conversationId) =>
+      `/api/v1/chat/conversations/images/upload/${encodeURIComponent(String(conversationId || ''))}`,
+    markConversationRead: (conversationId) =>
+      `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/read`,
+  },
+  transactions: {
+    list: '/api/v1/transactions/list',
+    details: (reference) => `/api/v1/transactions/${encodeURIComponent(String(reference || ''))}`,
   },
 };
 

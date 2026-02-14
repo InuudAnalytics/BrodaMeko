@@ -21,27 +21,35 @@ const pickErrorMessage = (payload) => {
 };
 
 const normalizeError = (error) => {
+  const isTimeout = error?.code === 'ECONNABORTED' || String(error?.message || '').toLowerCase().includes('timeout');
+
   if (error?.response) {
     const payload = error.response.data;
+    const statusCode = error.response.status;
+    const isUnauthorized = statusCode === 401;
 
     return {
-      message: pickErrorMessage(payload) || 'Request failed',
-      status: error.response.status,
+      message: isUnauthorized
+        ? 'Your session is unauthorized. Please sign in again.'
+        : pickErrorMessage(payload) || 'Request failed',
+      statusCode,
       data: payload || null,
     };
   }
 
   if (error?.request) {
     return {
-      message: 'Network error. Please check your connection.',
-      status: 0,
+      message: isTimeout
+        ? 'Request timed out. Please try again.'
+        : 'Network error. Please check your connection.',
+      statusCode: 0,
       data: null,
     };
   }
 
   return {
     message: error?.message || 'Unexpected error',
-    status: 0,
+    statusCode: 0,
     data: null,
   };
 };

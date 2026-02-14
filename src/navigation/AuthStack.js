@@ -20,6 +20,7 @@ const AuthStack = () => {
       initialRouteName={ROUTES.SPLASH}
       screenOptions={{
         headerShown: false,
+        animation: 'fade',
         contentStyle: { backgroundColor: darkTheme.colors.background },
       }}
     >

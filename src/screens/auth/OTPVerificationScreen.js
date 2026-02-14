@@ -17,10 +17,11 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   const routeParams = route.params || {};
   const method = routeParams.method || pendingVerification?.method || 'phone';
   const destination = routeParams.destination || pendingVerification?.email || pendingVerification?.phoneNumber || '';
+  const initialInfo = String(routeParams.info || '').trim();
 
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
   const [localError, setLocalError] = useState('');
-  const [info, setInfo] = useState('');
+  const [info, setInfo] = useState(initialInfo);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);

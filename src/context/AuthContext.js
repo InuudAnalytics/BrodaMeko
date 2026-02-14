@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { MOCK_FCM_TOKEN, getMockDeviceType } from '../config/mockDevice';
 import {
   forgotPassword as forgotPasswordService,
   getCurrentUser,
@@ -11,6 +12,7 @@ import {
   updatePassword as updatePasswordService,
   verifyOtp as verifyOtpService,
 } from '../services/auth.service';
+import { registerDevice as registerDeviceService } from '../services/device.service';
 import { TOKEN_STORAGE_KEY } from '../services/api';
 import { ROLES } from '../utils';
 
@@ -58,6 +60,30 @@ const pickAuthPayload = (payload) => {
   return { token, user, role };
 };
 
+const makeAuthResult = ({ ok, status, message }) => ({
+  ok: Boolean(ok),
+  status,
+  message: message || '',
+});
+
+const parseStoredUser = (rawUser) => {
+  if (!rawUser) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawUser);
+
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    return Object.keys(parsed).length ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -88,13 +114,36 @@ export const AuthProvider = ({ children }) => {
     await persistAuthState(nextToken || '', nextUser || null, nextRole || '');
   };
 
+  const registerCurrentDevice = async () => {
+    const fcmToken = String(MOCK_FCM_TOKEN || '').trim();
+
+    if (!fcmToken) {
+      return;
+    }
+
+    try {
+      await registerDeviceService({
+        fcm_token: fcmToken,
+        device_type: getMockDeviceType(),
+      });
+    } catch (deviceError) {
+      if (__DEV__) {
+        // Non-blocking registration: auth flow should continue even when this fails.
+        console.log('[AuthContext] Device registration failed:', deviceError?.message || deviceError);
+      }
+    }
+  };
+
   useEffect(() => {
     const bootstrapAuth = async () => {
       setIsLoading(true);
 
       try {
-        const [storedToken] = await AsyncStorage.multiGet([STORAGE_KEYS.token]);
-        const nextToken = storedToken?.[1] || null;
+        const entries = await AsyncStorage.multiGet([STORAGE_KEYS.token, STORAGE_KEYS.user, STORAGE_KEYS.role]);
+        const map = Object.fromEntries(entries);
+        const nextToken = map?.[STORAGE_KEYS.token] || null;
+        const storedUser = parseStoredUser(map?.[STORAGE_KEYS.user]);
+        const storedRole = normalizeRole(map?.[STORAGE_KEYS.role]);
 
         if (!nextToken) {
           setToken(null);
@@ -104,17 +153,29 @@ export const AuthProvider = ({ children }) => {
         }
 
         setToken(nextToken);
+        setUser(storedUser);
+        setRole(storedRole);
 
-        const me = await getCurrentUser();
-        const mePayload = pickAuthPayload(me);
+        try {
+          const me = await getCurrentUser();
+          const mePayload = pickAuthPayload(me);
 
-        const nextUser = mePayload.user || null;
-        const nextRole = mePayload.role || null;
+          const nextUser = mePayload.user || storedUser || null;
+          const nextRole = mePayload.role || storedRole || null;
 
-        setUser(nextUser);
-        setRole(nextRole);
+          setUser(nextUser);
+          setRole(nextRole);
+          await persistAuthState(nextToken, nextUser, nextRole || '');
+        } catch (meError) {
+          const isUnauthorized = Number(meError?.statusCode || 0) === 401;
 
-        await persistAuthState(nextToken, nextUser, nextRole || '');
+          if (isUnauthorized) {
+            throw meError;
+          }
+
+          // Preserve existing local session/user when profile refresh fails transiently.
+          await persistAuthState(nextToken, storedUser, storedRole || '');
+        }
       } catch (bootstrapError) {
         setError(bootstrapError?.message || 'Failed to restore your session.');
         await clearPersistedAuthState();
@@ -134,6 +195,13 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     clearError();
 
+    const pendingData = {
+      method: email ? 'email' : 'phone',
+      email: email || '',
+      phoneNumber: phoneNumber || '',
+      role: selectedRole || ROLES.CAR_OWNER,
+    };
+
     try {
       await signupService({
         fullName,
@@ -143,22 +211,39 @@ export const AuthProvider = ({ children }) => {
         role: selectedRole,
       });
 
-      setPendingVerification({
-        method: email ? 'email' : 'phone',
-        email: email || '',
-        phoneNumber: phoneNumber || '',
-        role: selectedRole || ROLES.CAR_OWNER,
-      });
+      setPendingVerification(pendingData);
 
-      return true;
+      return makeAuthResult({
+        ok: true,
+        status: 'success',
+        message: 'Sign up successful. OTP sent.',
+      });
     } catch (signUpError) {
-      setError(signUpError?.message || 'Sign up failed.');
-      return false;
-    } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
+      const normalizedMessage = signUpError?.message || 'Sign up failed.';
+      const isTransportFailure = Number(signUpError?.statusCode || 0) === 0;
+
+      if (isTransportFailure) {
+        // Backend may still create the account/send OTP even when client times out.
+        setPendingVerification(pendingData);
+        setError('Could not confirm sign up due to network issues. If you received OTP, continue verification.');
+        return makeAuthResult({
+          ok: false,
+          status: 'uncertain',
+          message: 'Could not confirm sign up. If OTP was sent, continue to verification.',
+        });
       }
-    };
+
+      setError(normalizedMessage);
+      return makeAuthResult({
+        ok: false,
+        status: 'error',
+        message: normalizedMessage,
+      });
+    } finally {
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const verifyOtp = async ({ otp }) => {
     setIsLoading(true);
@@ -187,6 +272,7 @@ export const AuthProvider = ({ children }) => {
         nextUser: authPayload.user,
         nextRole: authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
       });
+      registerCurrentDevice();
 
       setPendingVerification(null);
       return true;
@@ -250,6 +336,7 @@ export const AuthProvider = ({ children }) => {
         nextUser,
         nextRole: nextRole || ROLES.CAR_OWNER,
       });
+      registerCurrentDevice();
 
       return true;
     } catch (signInError) {
