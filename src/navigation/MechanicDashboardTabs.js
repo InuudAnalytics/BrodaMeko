@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { AppText, ScreenContainer } from '../components';
 import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
+import MechanicJobsScreen from '../screens/mech/jobs/MechanicJobsScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
 import { darkTheme } from '../theme';
 
@@ -20,11 +21,11 @@ const MechanicDashboardTabs = ({ navigation }) => {
 
   const renderTabScreen = () => {
     if (activeTab === 'home') {
-      return <MechanicDashboardScreen />;
+      return <MechanicDashboardScreen navigation={navigation} />;
     }
 
     if (activeTab === 'jobs') {
-      return <TabPlaceholder title="Jobs coming soon" subtitle="Job requests view will appear here." />;
+      return <MechanicJobsScreen navigation={navigation} />;
     }
 
     if (activeTab === 'wallet') {
