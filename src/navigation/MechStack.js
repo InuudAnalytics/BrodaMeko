@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MechanicDashboardTabs from './MechanicDashboardTabs';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import {
   BankDetailsScreen,
   KycUploadScreen,
@@ -58,6 +59,7 @@ const MechStack = () => {
         component={BankDetailsScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       {isComplete ? (
         <Stack.Screen
           name={ROUTES.MECH_DASHBOARD_TABS}

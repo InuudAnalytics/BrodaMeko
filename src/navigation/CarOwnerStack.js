@@ -15,6 +15,7 @@ import {
   CarOwnerWithdrawScreen,
 } from '../screens';
 import MechanicServicesApiTestScreen from '../screens/dev/MechanicServicesApiTestScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
@@ -93,6 +94,7 @@ const CarOwnerStack = () => {
         component={PlaceholderScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       {__DEV__ ? (
         <Stack.Screen
           name={ROUTES.DEV_API_TEST}
