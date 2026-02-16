@@ -28,5 +28,11 @@ export const ROUTES = {
   DEV_API_TEST: 'DevApiTest',
 
   MECH_DASHBOARD: 'MechDashboard',
+  MECH_DASHBOARD_TABS: 'MechanicDashboardTabs',
+  MECH_PROFILE_SETUP: 'MechanicProfileSetup',
+  MECH_UPLOAD_PROFILE_PHOTO: 'MechanicUploadProfilePhoto',
+  MECH_SERVICE_PRICING: 'MechanicServicePricing',
+  MECH_KYC_UPLOAD: 'MechanicKycUpload',
+  MECH_BANK_DETAILS: 'MechanicBankDetails',
   ADMIN_DASHBOARD: 'AdminDashboard',
 };
