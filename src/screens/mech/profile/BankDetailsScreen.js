@@ -15,23 +15,28 @@ const BankDetailsScreen = ({ navigation }) => {
   const [bankName, setBankName] = useState(existing.bankName || '');
 
   const isValid = useMemo(
-    () =>
-      String(accountName).trim().length > 0 &&
-      String(accountNumber).trim().length > 0 &&
-      String(bankName).trim().length > 0,
+    () => {
+      const normalizedNumber = String(accountNumber || '').replace(/\D/g, '');
+      const hasAllFields =
+        String(accountName).trim().length > 0 &&
+        String(bankName).trim().length > 0 &&
+        normalizedNumber.length >= 10;
+
+      return hasAllFields;
+    },
     [accountName, accountNumber, bankName]
   );
 
   const handleSave = () => {
     if (!isValid) {
-      Alert.alert('Incomplete details', 'Please provide account name, number and bank name.');
+      Alert.alert('Invalid details', 'Enter account name, bank name and a valid account number (10+ digits).');
       return;
     }
 
     setBankDetails({
-      accountName,
-      accountNumber,
-      bankName,
+      accountName: String(accountName).trim(),
+      accountNumber: String(accountNumber).replace(/\D/g, ''),
+      bankName: String(bankName).trim(),
     });
     navigation.goBack();
   };
@@ -72,7 +77,7 @@ const BankDetailsScreen = ({ navigation }) => {
           autoCapitalize="words"
         />
 
-        <AppButton label="Save and continue" onPress={handleSave} style={styles.saveBtn} />
+        <AppButton label="Save & continue" onPress={handleSave} style={styles.saveBtn} />
       </View>
     </ScreenContainer>
   );

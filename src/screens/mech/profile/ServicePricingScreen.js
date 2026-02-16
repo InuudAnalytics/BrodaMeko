@@ -1,18 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
 
 const ServicePricingScreen = ({ navigation }) => {
   const { mechanicProfile, setHasServicePricing } = useMechanicProfile();
-  const [notes, setNotes] = useState('');
-  const [hasPricing, setHasPricing] = useState(Boolean(mechanicProfile.hasServicePricing));
+  const added = Boolean(mechanicProfile.hasServicePricing);
+
+  const handleAddPricing = () => {
+    setHasServicePricing(true);
+  };
 
   const handleSave = () => {
-    setHasServicePricing(hasPricing);
     navigation.goBack();
   };
 
@@ -26,31 +28,20 @@ const ServicePricingScreen = ({ navigation }) => {
           <AppText style={styles.headerTitle}>Add service pricing</AppText>
         </View>
 
-        <AppText style={styles.caption}>Set your default service estimate so car owners can see your pricing.</AppText>
+        <AppText style={styles.note}>Youll set price ranges for services you can handle.</AppText>
 
-        <TouchableOpacity style={styles.toggleRow} activeOpacity={0.85} onPress={() => setHasPricing((prev) => !prev)}>
-          <View>
-            <AppText style={styles.toggleTitle}>Pricing configured</AppText>
-            <AppText style={styles.toggleSub}>Mark complete once your pricing is set.</AppText>
+        <TouchableOpacity style={styles.stateRow} activeOpacity={0.85} onPress={handleAddPricing}>
+          <View style={styles.stateLeft}>
+            <AppText style={styles.stateTitle}>{added ? 'Pricing added' : 'Pricing not added yet'}</AppText>
+            <AppText style={styles.stateSub}>Tap Add pricing to mark this step as complete.</AppText>
           </View>
-          <View style={[styles.check, hasPricing && styles.checkDone]}>
-            {hasPricing ? (
-              <HugeiconsIcon icon={Tick02Icon} size={14} color={darkTheme.colors.accent} strokeWidth={2.3} />
-            ) : null}
+          <View style={[styles.checkWrap, added && styles.checkWrapDone]}>
+            {added ? <HugeiconsIcon icon={Tick02Icon} size={14} color={darkTheme.colors.accent} strokeWidth={2.4} /> : null}
           </View>
         </TouchableOpacity>
 
-        <AppInput
-          label="Notes (optional)"
-          placeholder="e.g. Flat tire from 8,000 to 12,000"
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          textAlignVertical="top"
-          inputStyle={styles.notesInput}
-        />
-
-        <AppButton label="Save and continue" onPress={handleSave} style={styles.saveBtn} />
+        <AppButton label="Add pricing" onPress={handleAddPricing} style={styles.actionBtn} />
+        <AppButton label="Save & continue" onPress={handleSave} style={styles.saveBtn} />
       </View>
     </ScreenContainer>
   );
@@ -87,13 +78,13 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  caption: {
+  note: {
     marginTop: 16,
     color: darkTheme.colors.muted,
     fontSize: 14,
     lineHeight: 20,
   },
-  toggleRow: {
+  stateRow: {
     marginTop: 14,
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,
@@ -102,23 +93,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    columnGap: 10,
+    justifyContent: 'space-between',
+    columnGap: 12,
   },
-  toggleTitle: {
+  stateLeft: {
+    flex: 1,
+  },
+  stateTitle: {
     color: darkTheme.colors.text,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  toggleSub: {
+  stateSub: {
     marginTop: 2,
     color: darkTheme.colors.muted,
     fontSize: 12,
     lineHeight: 16,
   },
-  check: {
+  checkWrap: {
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -127,15 +121,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkDone: {
+  checkWrapDone: {
     borderColor: darkTheme.colors.accent,
   },
-  notesInput: {
-    minHeight: 96,
-    paddingTop: 10,
+  actionBtn: {
+    marginTop: 14,
   },
   saveBtn: {
-    marginTop: 'auto',
+    marginTop: 12,
   },
 });
 

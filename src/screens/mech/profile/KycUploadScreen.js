@@ -1,29 +1,41 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Add01Icon, ArrowLeft01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { pickSingleImageFromGallery } from '../../../utils';
 
-const ImagePickerRow = ({ title, images, onAdd, onRemove }) => {
+const MAX_IMAGES = 5;
+
+const UploadCard = ({ title, subtitle, images, onAddPress, onRemovePress, loading }) => {
+  const hasImages = images.length > 0;
+
   return (
-    <View style={styles.section}>
-      <AppText style={styles.sectionTitle}>{title}</AppText>
-      <View style={styles.imageGrid}>
-        {images.map((uri, index) => (
-          <View key={`${title}-${uri}-${index}`} style={styles.imageTile}>
-            <Image source={{ uri }} style={styles.image} />
-            <TouchableOpacity style={styles.removeBtn} activeOpacity={0.85} onPress={() => onRemove(index)}>
-              <HugeiconsIcon icon={Delete02Icon} size={12} color={darkTheme.colors.background} strokeWidth={2.4} />
-            </TouchableOpacity>
-          </View>
-        ))}
-        <TouchableOpacity style={styles.addTile} activeOpacity={0.85} onPress={onAdd}>
-          <HugeiconsIcon icon={Add01Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2.1} />
-        </TouchableOpacity>
+    <View style={styles.uploadCard}>
+      <View style={styles.uploadIconBadge}>
+        <HugeiconsIcon icon={Camera01Icon} size={24} color={darkTheme.colors.accent} strokeWidth={1.9} />
       </View>
+      <AppText style={styles.uploadCardTitle}>{title}</AppText>
+      <AppText style={styles.uploadCardSubtitle}>{subtitle}</AppText>
+
+      <TouchableOpacity style={styles.addPhotosBtn} activeOpacity={0.85} onPress={onAddPress}>
+        <AppText style={styles.addPhotosText}>{loading ? 'Opening...' : 'Add photos'}</AppText>
+      </TouchableOpacity>
+
+      {hasImages ? (
+        <View style={styles.grid}>
+          {images.map((uri, index) => (
+            <View key={`${title}-${uri}-${index}`} style={styles.tile}>
+              <Image source={{ uri }} style={styles.tileImage} />
+              <TouchableOpacity style={styles.removeBtn} activeOpacity={0.85} onPress={() => onRemovePress(index)}>
+                <AppText style={styles.removeText}>-</AppText>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -34,7 +46,16 @@ const KycUploadScreen = ({ navigation }) => {
   const [passportImages, setPassportImages] = useState(mechanicProfile.passportImages || []);
   const [loadingKey, setLoadingKey] = useState('');
 
+  const canUpload = useMemo(() => ninImages.length > 0 && passportImages.length > 0, [ninImages.length, passportImages.length]);
+
   const addImage = async (target) => {
+    const currentCount = target === 'nin' ? ninImages.length : passportImages.length;
+
+    if (currentCount >= MAX_IMAGES) {
+      Alert.alert('Upload limit', `Maximum of ${MAX_IMAGES} images allowed.`);
+      return;
+    }
+
     setLoadingKey(target);
 
     try {
@@ -54,9 +75,9 @@ const KycUploadScreen = ({ navigation }) => {
       }
 
       if (target === 'nin') {
-        setNinImages((prev) => [...prev, asset.uri]);
+        setNinImages((prev) => [...prev, asset.uri].slice(0, MAX_IMAGES));
       } else {
-        setPassportImages((prev) => [...prev, asset.uri]);
+        setPassportImages((prev) => [...prev, asset.uri].slice(0, MAX_IMAGES));
       }
     } finally {
       setLoadingKey('');
@@ -71,9 +92,8 @@ const KycUploadScreen = ({ navigation }) => {
     setPassportImages((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleSave = () => {
-    if (!ninImages.length || !passportImages.length) {
-      Alert.alert('KYC required', 'Please upload at least one NIN and one Passport image.');
+  const handleUpload = () => {
+    if (!canUpload) {
       return;
     }
 
@@ -88,29 +108,33 @@ const KycUploadScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.backBtn} activeOpacity={0.85} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
           </TouchableOpacity>
-          <AppText style={styles.headerTitle}>Upload ID verification</AppText>
+          <AppText style={styles.headerTitle}>Verification screen</AppText>
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <AppText style={styles.helper}>Upload clear images for your NIN and Passport documents.</AppText>
+          <AppText style={styles.subTitle}>Please upload a clear photo of your documents</AppText>
 
-          <ImagePickerRow
-            title={loadingKey === 'nin' ? 'NIN images (opening...)' : 'NIN images'}
+          <UploadCard
+            title="Upload NIN"
+            subtitle="Add photos of national identification number for identification"
             images={ninImages}
-            onAdd={() => addImage('nin')}
-            onRemove={(index) => removeImage('nin', index)}
+            loading={loadingKey === 'nin'}
+            onAddPress={() => addImage('nin')}
+            onRemovePress={(index) => removeImage('nin', index)}
           />
 
-          <ImagePickerRow
-            title={loadingKey === 'passport' ? 'Passport images (opening...)' : 'Passport images'}
+          <UploadCard
+            title="Upload passport"
+            subtitle="Add photos of your international passport"
             images={passportImages}
-            onAdd={() => addImage('passport')}
-            onRemove={(index) => removeImage('passport', index)}
+            loading={loadingKey === 'passport'}
+            onAddPress={() => addImage('passport')}
+            onRemovePress={(index) => removeImage('passport', index)}
           />
         </ScrollView>
 
         <View style={styles.footer}>
-          <AppButton label="Save and continue" onPress={handleSave} />
+          <AppButton label="Upload" onPress={handleUpload} disabled={!canUpload} style={styles.uploadBtn} />
         </View>
       </View>
     </ScreenContainer>
@@ -126,7 +150,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    minHeight: 48,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -149,66 +173,110 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
-  helper: {
-    color: darkTheme.colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  section: {
-    marginTop: 16,
-  },
-  sectionTitle: {
+  subTitle: {
     color: darkTheme.colors.text,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    marginBottom: 12,
+  },
+  uploadCard: {
+    borderWidth: 1.2,
+    borderColor: 'rgba(226,255,49,0.5)',
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    backgroundColor: '#727497',
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  uploadIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
-  imageGrid: {
+  uploadCardTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  uploadCardSubtitle: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: 13,
+    lineHeight: 16,
+    textAlign: 'center',
+    maxWidth: 260,
+  },
+  addPhotosBtn: {
+    marginTop: 12,
+    minWidth: 120,
+    minHeight: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  addPhotosText: {
+    color: '#333333',
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  grid: {
+    marginTop: 10,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    justifyContent: 'center',
   },
-  imageTile: {
-    width: 92,
-    height: 92,
-    borderRadius: 10,
+  tile: {
+    width: 62,
+    height: 62,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
-  image: {
+  tileImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  addTile: {
-    width: 92,
-    height: 92,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-  },
   removeBtn: {
     position: 'absolute',
-    top: 5,
-    right: 5,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    right: 3,
+    top: 3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: darkTheme.colors.accent,
+  },
+  removeText: {
+    color: '#1A1A1A',
+    fontSize: 12,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.bold,
   },
   footer: {
     paddingHorizontal: 16,
     paddingBottom: 20,
-    paddingTop: 10,
+    paddingTop: 8,
+  },
+  uploadBtn: {
+    borderRadius: 10,
   },
 });
 

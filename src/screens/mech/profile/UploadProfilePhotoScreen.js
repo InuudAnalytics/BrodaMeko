@@ -28,6 +28,7 @@ const UploadProfilePhotoScreen = ({ navigation }) => {
 
       if (asset?.uri) {
         setSelectedUri(asset.uri);
+        setProfilePhoto(asset.uri);
       }
     } finally {
       setLoading(false);
@@ -65,12 +66,12 @@ const UploadProfilePhotoScreen = ({ navigation }) => {
         <AppText style={styles.helperText}>Use a clear photo of your face for trust and visibility.</AppText>
 
         <AppButton
-          label={loading ? 'Opening gallery...' : 'Select photo'}
+          label={loading ? 'Opening gallery...' : 'Choose photo'}
           onPress={handlePickPhoto}
           style={styles.selectBtn}
           textStyle={styles.selectBtnText}
         />
-        <AppButton label="Save and continue" onPress={handleSave} style={styles.saveBtn} />
+        <AppButton label="Save & continue" onPress={handleSave} style={styles.saveBtn} />
       </View>
     </ScreenContainer>
   );
