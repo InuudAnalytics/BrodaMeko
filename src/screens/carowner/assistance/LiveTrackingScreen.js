@@ -151,7 +151,16 @@ const LiveTrackingScreen = ({ navigation, route }) => {
         {isDone ? (
           <View style={styles.doneWrap}>
             <AppText style={styles.doneText}>Job completed</AppText>
-            <TouchableOpacity style={styles.rateBtn} activeOpacity={0.88}>
+            <TouchableOpacity
+              style={styles.rateBtn}
+              activeOpacity={0.88}
+              onPress={() =>
+                navigation.navigate(ROUTES.CAR_OWNER_RATE_MECHANIC, {
+                  mechanicId: route?.params?.mechanic?.id || route?.params?.mechanicId || null,
+                  jobId: route?.params?.jobId || null,
+                })
+              }
+            >
               <AppText style={styles.rateBtnText}>Rate mechanic</AppText>
             </TouchableOpacity>
           </View>

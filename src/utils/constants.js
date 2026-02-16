@@ -25,6 +25,7 @@ export const ROUTES = {
   CAR_OWNER_REQUEST_DIAGNOSTICS: 'CarOwnerRequestDiagnostics',
   CAR_OWNER_MECHANIC_DISCOVERY: 'CarOwnerMechanicDiscovery',
   CAR_OWNER_LIVE_TRACKING: 'CarOwnerLiveTracking',
+  CAR_OWNER_RATE_MECHANIC: 'CarOwnerRateMechanic',
   DEV_API_TEST: 'DevApiTest',
 
   MECH_DASHBOARD: 'MechDashboard',
