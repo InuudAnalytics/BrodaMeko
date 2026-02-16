@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   Camera01Icon,
@@ -11,118 +11,128 @@ import {
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { useAuth, useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
 const CHECKLIST_ITEMS = [
-  { key: 'profilePhoto', label: 'Upload profile photo', icon: Camera01Icon },
-  { key: 'servicePricing', label: 'Add service pricing', icon: DollarCircleIcon },
-  { key: 'idVerification', label: 'Upload ID verification', icon: Shield01Icon },
-  { key: 'bankDetails', label: 'Add bank details', icon: Wallet01Icon },
+  {
+    key: 'photo',
+    label: 'Upload profile photo',
+    icon: Camera01Icon,
+    route: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
+  },
+  {
+    key: 'pricing',
+    label: 'Add service pricing',
+    icon: DollarCircleIcon,
+    route: ROUTES.MECH_SERVICE_PRICING,
+  },
+  {
+    key: 'kyc',
+    label: 'Upload ID verification',
+    icon: Shield01Icon,
+    route: ROUTES.MECH_KYC_UPLOAD,
+  },
+  {
+    key: 'bank',
+    label: 'Add bank details',
+    icon: Wallet01Icon,
+    route: ROUTES.MECH_BANK_DETAILS,
+  },
 ];
 
-const MechanicProfileSetupScreen = ({ navigation, onProceed }) => {
-  const [checks, setChecks] = useState({
-    profilePhoto: false,
-    servicePricing: false,
-    idVerification: false,
-    bankDetails: false,
-  });
+const getFirstName = (user) => {
+  const raw = user?.full_name || user?.fullName || user?.name || 'Michael';
+  const first = String(raw || 'Michael')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)[0];
 
-  const completedCount = useMemo(() => Object.values(checks).filter(Boolean).length, [checks]);
-  const percentage = completedCount * 25;
-  const isComplete = completedCount === CHECKLIST_ITEMS.length;
+  return first || 'Michael';
+};
 
-  const handleToggleItem = (key) => {
-    setChecks((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+const MechanicProfileSetupScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const { completedSteps, completionPercent, isComplete } = useMechanicProfile();
+
+  const firstName = getFirstName(user);
+  const title = isComplete ? 'Profile completed' : 'Complete your profile to receive jobs';
+  const cta = isComplete ? 'Proceed' : 'Complete profile';
+
+  const firstIncompleteRoute = useMemo(() => {
+    const item = CHECKLIST_ITEMS.find((step) => !completedSteps[step.key]);
+    return item?.route || ROUTES.MECH_PROFILE_SETUP;
+  }, [completedSteps]);
 
   const handlePrimaryAction = () => {
-    if (!isComplete) {
-      Alert.alert('Complete profile', 'Finish all checklist items to continue.');
+    if (isComplete) {
+      navigation.replace(ROUTES.MECH_DASHBOARD_TABS);
       return;
     }
 
-    // TODO: Replace local completion gate with backend profile completion endpoint.
-    if (typeof onProceed === 'function') {
-      onProceed();
-      return;
-    }
-    navigation.replace('MechanicDashboardTabs');
+    navigation.navigate(firstIncompleteRoute);
   };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
-          <View style={styles.profileMiniWrap}>
-            <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>M</AppText>
-            </View>
-            <View>
-              <AppText style={styles.welcomeText}>Welcome Michael</AppText>
-              <AppText style={styles.partnerText}>BrodaMeko partner</AppText>
-            </View>
+          <View>
+            <AppText style={styles.greeting}>Welcome {firstName}</AppText>
+            <AppText style={styles.subGreeting}>BrodaMeko partner</AppText>
           </View>
 
           <View style={styles.bellWrap}>
-            <HugeiconsIcon icon={Notification01Icon} size={20} color="#1A1A1A" strokeWidth={2.1} />
+            <HugeiconsIcon icon={Notification01Icon} size={18} color="#1A1A1A" strokeWidth={2.1} />
           </View>
         </View>
 
         <View style={styles.progressHead}>
           <AppText style={styles.progressLabel}>Profile completion</AppText>
-          <AppText style={styles.progressValue}>{percentage}%</AppText>
+          <AppText style={styles.progressPercent}>{completionPercent}%</AppText>
         </View>
+
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${percentage}%` }]} />
+          <View style={[styles.progressFill, { width: `${completionPercent}%` }]} />
         </View>
 
-        <View style={styles.heroWrap}>
-          <View style={styles.heroIconCircle}>
-            <HugeiconsIcon icon={Wrench01Icon} size={38} color="rgba(255,255,255,0.7)" strokeWidth={1.8} />
-          </View>
-          <AppText style={styles.heroTitle}>{isComplete ? 'Profile completed' : 'Complete your profile to receive jobs'}</AppText>
-          <AppText style={styles.heroSubtext}>
-            You need to complete your profile and upload required documents before you can start receiving service
-            requests.
-          </AppText>
-
-          <AppButton
-            label={isComplete ? 'Proceed' : 'Complete profile'}
-            onPress={handlePrimaryAction}
-            style={styles.cta}
-            textStyle={styles.ctaText}
-          />
+        <View style={styles.heroIconWrap}>
+          <HugeiconsIcon icon={Wrench01Icon} size={40} color="rgba(255,255,255,0.72)" strokeWidth={1.9} />
         </View>
+
+        <AppText style={styles.title}>{title}</AppText>
+        <AppText style={styles.subtitle}>
+          You need to complete your profile and upload required documents before you can start receiving service
+          requests.
+        </AppText>
+
+        <AppButton label={cta} onPress={handlePrimaryAction} style={styles.primaryBtn} textStyle={styles.primaryBtnText} />
 
         <AppText style={styles.checklistTitle}>Setup checklist</AppText>
         <View style={styles.list}>
           {CHECKLIST_ITEMS.map((item) => {
-            const done = checks[item.key];
+            const done = Boolean(completedSteps[item.key]);
             return (
               <TouchableOpacity
                 key={item.key}
                 activeOpacity={0.85}
                 style={styles.row}
-                onPress={() => handleToggleItem(item.key)}
+                onPress={() => navigation.navigate(item.route)}
               >
                 <View style={styles.rowLeft}>
-                  <View style={styles.rowIconWrap}>
-                    <HugeiconsIcon icon={item.icon} size={18} color="rgba(255,255,255,0.75)" strokeWidth={2} />
+                  <View style={styles.leftIconCircle}>
+                    <HugeiconsIcon icon={item.icon} size={18} color="rgba(255,255,255,0.8)" strokeWidth={2} />
                   </View>
                   <AppText style={styles.rowLabel}>{item.label}</AppText>
                 </View>
 
-                <View style={[styles.checkCircle, done ? styles.checkCircleDone : null]}>
+                <View style={[styles.checkWrap, done && styles.checkWrapDone]}>
                   <HugeiconsIcon
                     icon={Tick04Icon}
                     size={14}
                     color={done ? darkTheme.colors.accent : 'rgba(255,255,255,0.35)'}
-                    strokeWidth={2.4}
+                    strokeWidth={2.5}
                   />
                 </View>
               </TouchableOpacity>
@@ -141,49 +151,30 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 22,
+    paddingTop: 16,
+    paddingBottom: 28,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  profileMiniWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 10,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FF8A50',
-    backgroundColor: '#392425',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  welcomeText: {
-    fontSize: 22,
-    lineHeight: 26,
+  greeting: {
     color: darkTheme.colors.text,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  partnerText: {
-    marginTop: 3,
+  subGreeting: {
+    marginTop: 2,
     color: darkTheme.colors.muted,
     fontSize: 13,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   bellWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
@@ -196,18 +187,18 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: darkTheme.colors.muted,
-    fontSize: 14,
+    fontSize: 13,
   },
-  progressValue: {
+  progressPercent: {
     color: darkTheme.colors.accent,
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   progressTrack: {
     marginTop: 8,
-    height: 14,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     overflow: 'hidden',
   },
   progressFill: {
@@ -215,55 +206,51 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: darkTheme.colors.accent,
   },
-  heroWrap: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  heroIconCircle: {
-    width: 116,
-    height: 116,
-    borderRadius: 58,
+  heroIconWrap: {
+    marginTop: 22,
+    alignSelf: 'center',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     backgroundColor: '#2E3C3A',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroTitle: {
-    marginTop: 14,
+  title: {
+    marginTop: 16,
     color: darkTheme.colors.text,
-    fontSize: 30,
-    lineHeight: 40,
+    fontSize: 38,
+    lineHeight: 44,
     textAlign: 'center',
     fontWeight: darkTheme.typography.fontWeights.semibold,
-    maxWidth: 318,
   },
-  heroSubtext: {
+  subtitle: {
     marginTop: 10,
     color: darkTheme.colors.muted,
-    fontSize: 12,
-    fontWeight: darkTheme.typography.fontWeights.light,
-    lineHeight: 21,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    maxWidth: 330,
   },
-  cta: {
-    marginTop: 16,
-    width: '100%',
+  primaryBtn: {
+    marginTop: 18,
   },
-  ctaText: {
+  primaryBtnText: {
     color: '#1A1A1A',
   },
   checklistTitle: {
-    marginTop: 14,
+    marginTop: 22,
     color: darkTheme.colors.muted,
-    fontSize: 17,
+    fontSize: 20,
     lineHeight: 26,
-    fontWeight: darkTheme.typography.fontWeights.regular,
   },
   list: {
     marginTop: 12,
     rowGap: 10,
   },
   row: {
+    minHeight: 50,
+    borderRadius: 12,
+    paddingHorizontal: 4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -271,35 +258,33 @@ const styles = StyleSheet.create({
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: 12,
+    columnGap: 10,
     flex: 1,
-    paddingRight: 10,
+    paddingRight: 8,
   },
-  rowIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(226,255,49,0.28)',
+  leftIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   rowLabel: {
     color: darkTheme.colors.text,
     fontSize: 16,
-    lineHeight: 22,
-    fontWeight: darkTheme.typography.fontWeights.regular,
+    lineHeight: 20,
   },
-  checkCircle: {
+  checkWrap: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    borderWidth: 1.3,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
-  checkCircleDone: {
+  checkWrapDone: {
     borderColor: darkTheme.colors.accent,
   },
 });

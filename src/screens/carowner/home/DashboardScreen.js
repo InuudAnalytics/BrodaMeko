@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
@@ -79,7 +79,7 @@ const DashboardScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.bellButton}
             activeOpacity={0.85}
-            onPress={() => Alert.alert('Notifications', 'Notifications page coming soon.')}
+            onPress={() => navigation.navigate('Notifications')}
           >
             <HugeiconsIcon icon={Notification01Icon} size={22} color={darkTheme.colors.text} strokeWidth={1.8} />
           </TouchableOpacity>

@@ -119,8 +119,8 @@ export const buildFormData = (fields = {}) => {
   return form;
 };
 
-const buildCarOwnerJobsEndpoint = (limit = 5, page = 1) => {
-  const safeLimit = Number.isFinite(Number(limit)) ? Number(limit) : 5;
+const buildCarOwnerJobsEndpoint = (limit = 10, page = 1) => {
+  const safeLimit = Number.isFinite(Number(limit)) ? Number(limit) : 10;
   const safePage = Number.isFinite(Number(page)) ? Number(page) : 1;
   const basePath = ENDPOINTS.jobs.carOwnerList.split('?')[0];
 
@@ -162,7 +162,7 @@ export const createJob = async ({ issue_type, description, car_make, images }) =
   return normalizeResponse(response.data, 'Job created successfully.');
 };
 
-export const getCarOwnerJobs = async ({ limit = 5, page = 1 } = {}) => {
+export const getCarOwnerJobs = async ({ limit = 10, page = 1 } = {}) => {
   const endpoint = buildCarOwnerJobsEndpoint(limit, page);
   const response = await api.get(endpoint);
   return normalizeResponse(response.data, 'Jobs retrieved successfully.');

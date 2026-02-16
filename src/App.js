@@ -1,5 +1,12 @@
 import { StatusBar } from 'react-native';
-import { AuthProvider, ChatProvider, JobsProvider, MechanicServicesProvider, ThemeProvider } from './context';
+import {
+  AuthProvider,
+  ChatProvider,
+  JobsProvider,
+  MechanicProfileProvider,
+  MechanicServicesProvider,
+  ThemeProvider,
+} from './context';
 import { RootNavigator } from './navigation';
 
 export default function App() {
@@ -8,10 +15,12 @@ export default function App() {
       <AuthProvider>
         <ChatProvider>
           <JobsProvider>
-            <MechanicServicesProvider>
-              <StatusBar barStyle="light-content" backgroundColor="#000033" />
-              <RootNavigator />
-            </MechanicServicesProvider>
+            <MechanicProfileProvider>
+              <MechanicServicesProvider>
+                <StatusBar barStyle="light-content" backgroundColor="#000033" />
+                <RootNavigator />
+              </MechanicServicesProvider>
+            </MechanicProfileProvider>
           </JobsProvider>
         </ChatProvider>
       </AuthProvider>

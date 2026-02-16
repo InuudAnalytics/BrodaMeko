@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { FilterHorizontalIcon, Location01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
+import { FilterHorizontalIcon, Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText } from '../../../components';
 import { darkTheme } from '../../../theme';
 
@@ -47,7 +47,7 @@ const initialsFromName = (name) =>
     .map((part) => part[0].toUpperCase())
     .join('');
 
-const MechanicDashboardScreen = () => {
+const MechanicDashboardScreen = ({ navigation }) => {
   const [activeFilter, setActiveFilter] = useState('all');
 
   const visibleJobs = useMemo(() => {
@@ -72,6 +72,9 @@ const MechanicDashboardScreen = () => {
             <AppText style={styles.partner}>BrodaMeko partner</AppText>
           </View>
         </View>
+        <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
+          <HugeiconsIcon icon={Notification01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.earningsCard}>
@@ -180,6 +183,9 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -212,6 +218,16 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.muted,
     fontSize: 12,
     lineHeight: 16,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   earningsCard: {
     backgroundColor: 'rgba(255,255,255,0.04)',

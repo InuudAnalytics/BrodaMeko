@@ -1,19 +1,31 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MechanicDashboardTabs from './MechanicDashboardTabs';
-import MechanicProfileSetupScreen from '../screens/mech/profile/MechanicProfileSetupScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import {
+  BankDetailsScreen,
+  KycUploadScreen,
+  MechanicProfileSetupScreen,
+  ServicePricingScreen,
+  UploadProfilePhotoScreen,
+} from '../screens/mech/profile';
+import { useMechanicProfile } from '../context';
+import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
+import { ROUTES } from '../utils';
 
 const Stack = createNativeStackNavigator();
-const MECH_PROFILE_SETUP_ROUTE = 'MechanicProfileSetup';
-const MECH_DASHBOARD_TABS_ROUTE = 'MechanicDashboardTabs';
 
 const MechStack = () => {
-  const [profileCompleted, setProfileCompleted] = useState(false);
+  const { isComplete, isHydrated } = useMechanicProfile();
+
+  if (!isHydrated) {
+    return <ScreenContainer padded={false} />;
+  }
 
   return (
     <Stack.Navigator
-      initialRouteName={profileCompleted ? MECH_DASHBOARD_TABS_ROUTE : MECH_PROFILE_SETUP_ROUTE}
+      initialRouteName={isComplete ? ROUTES.MECH_DASHBOARD_TABS : ROUTES.MECH_PROFILE_SETUP}
       screenOptions={{
         animation: 'slide_from_right',
         headerStyle: { backgroundColor: darkTheme.colors.background },
@@ -22,25 +34,39 @@ const MechStack = () => {
         contentStyle: { backgroundColor: darkTheme.colors.background },
       }}
     >
-      {!profileCompleted ? (
-        <Stack.Screen name={MECH_PROFILE_SETUP_ROUTE} options={{ headerShown: false }}>
-          {(props) => (
-            <MechanicProfileSetupScreen
-              {...props}
-              onProceed={() => {
-                // TODO: replace local state with backend-backed profile completion flag.
-                setProfileCompleted(true);
-                props.navigation.replace(MECH_DASHBOARD_TABS_ROUTE);
-              }}
-            />
-          )}
-        </Stack.Screen>
-      ) : null}
       <Stack.Screen
-        name={MECH_DASHBOARD_TABS_ROUTE}
-        component={MechanicDashboardTabs}
+        name={ROUTES.MECH_PROFILE_SETUP}
+        component={MechanicProfileSetupScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name={ROUTES.MECH_UPLOAD_PROFILE_PHOTO}
+        component={UploadProfilePhotoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_SERVICE_PRICING}
+        component={ServicePricingScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_KYC_UPLOAD}
+        component={KycUploadScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_BANK_DETAILS}
+        component={BankDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+      {isComplete ? (
+        <Stack.Screen
+          name={ROUTES.MECH_DASHBOARD_TABS}
+          component={MechanicDashboardTabs}
+          options={{ headerShown: false }}
+        />
+      ) : null}
     </Stack.Navigator>
   );
 };
