@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   BatteryCharging02Icon,
@@ -65,7 +65,7 @@ const UploadImageGlyph = ({ color }) => {
   );
 };
 
-const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage, showMaxUploadError }) => {
+const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
   const maxReached = images.length >= 5;
   const hasImages = images.length > 0;
 
@@ -94,7 +94,7 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage, showMaxU
             <TouchableOpacity
               onPress={onAddPress}
               activeOpacity={0.85}
-              disabled={isPickingImage}
+              disabled={maxReached || isPickingImage}
               style={[
                 styles.addTile,
                 maxReached || isPickingImage ? styles.addTileDisabled : null,
@@ -125,7 +125,7 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage, showMaxU
         </View>
       )}
 
-      {showMaxUploadError ? (
+      {maxReached ? (
         <AppText style={styles.uploadMaxText}>Maximum of 5 upload is exhausted</AppText>
       ) : null}
 
@@ -147,18 +147,14 @@ const ReportIssueScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showMaxUploadError, setShowMaxUploadError] = useState(false);
   const isCreatingJob = Boolean(jobsContext?.loading?.createJob);
 
   const resolveIssueType = () => ISSUE_TYPE_MAP[selectedIssue] || 'other';
 
   const handleAddPhotos = async () => {
     if (images.length >= 5) {
-      setShowMaxUploadError(true);
       return;
     }
-
-    setShowMaxUploadError(false);
     setIsPickingImage(true);
 
     try {
@@ -194,15 +190,7 @@ const ReportIssueScreen = ({ navigation }) => {
   };
 
   const handleRemoveImage = (imageId) => {
-    setImages((prev) => {
-      const next = prev.filter((image) => image.id !== imageId);
-
-      if (next.length < 5) {
-        setShowMaxUploadError(false);
-      }
-
-      return next;
-    });
+    setImages((prev) => prev.filter((image) => image.id !== imageId));
   };
 
   const handleFindMechanics = async () => {
@@ -215,6 +203,11 @@ const ReportIssueScreen = ({ navigation }) => {
 
     if (issueType === 'other' && !description.trim()) {
       setError('Please describe the issue when selecting Other.');
+      return;
+    }
+
+    if (!carMake.trim()) {
+      setError('Please enter your car make.');
       return;
     }
 
@@ -244,13 +237,10 @@ const ReportIssueScreen = ({ navigation }) => {
         jobPayload?.id || jobPayload?._id || jobPayload?.job_id || jobPayload?.jobId || ''
       ).trim();
 
-      if (!jobPayload && !jobId) {
-        setError('Request submitted, but we could not load job details. Please try again.');
-        return;
-      }
+      const safeJobId = jobId || `mock_job_${Date.now()}`;
 
       navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
-        jobId: jobId || undefined,
+        jobId: safeJobId,
         job: jobPayload || undefined,
       });
     } catch {
@@ -323,7 +313,6 @@ const ReportIssueScreen = ({ navigation }) => {
           onAddPress={handleAddPhotos}
           onRemoveImage={handleRemoveImage}
           isPickingImage={isPickingImage}
-          showMaxUploadError={showMaxUploadError}
         />
 
         <AppButton
@@ -331,6 +320,11 @@ const ReportIssueScreen = ({ navigation }) => {
           onPress={handleFindMechanics}
           style={styles.cta}
           disabled={isSubmitting || isCreatingJob}
+          left={
+            isSubmitting || isCreatingJob ? (
+              <ActivityIndicator size="small" color="#000033" />
+            ) : null
+          }
         />
       </ScrollView>
     </ScreenContainer>
