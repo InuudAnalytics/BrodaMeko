@@ -4,6 +4,7 @@ import {
   CarOwnerDashboardScreen,
   CarOwnerFundWalletScreen,
   CarOwnerChatScreen,
+  CarOwnerDiagnosticExpertsScreen,
   CarOwnerHistoryScreen,
   CarOwnerLiveTrackingScreen,
   CarOwnerMechanicDiscoveryScreen,
@@ -73,6 +74,11 @@ const CarOwnerStack = () => {
         name={ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS}
         component={CarOwnerRequestDiagnosticsScreen}
         options={{ title: 'Book a diagnostic expert' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_DIAGNOSTIC_EXPERTS}
+        component={CarOwnerDiagnosticExpertsScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_MECHANIC_DISCOVERY}

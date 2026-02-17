@@ -65,7 +65,7 @@ const RequestDiagnosticsScreen = ({ navigation }) => {
 
     setTimeout(() => {
       setIsSubmitting(false);
-      navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
+      navigation.navigate(ROUTES.CAR_OWNER_DIAGNOSTIC_EXPERTS, {
         source: 'diagnostics',
       });
     }, 450);

@@ -23,6 +23,7 @@ export const ROUTES = {
   CAR_OWNER_PROFILE: 'CarOwnerProfile',
   CAR_OWNER_REPORT_ISSUE: 'CarOwnerReportIssue',
   CAR_OWNER_REQUEST_DIAGNOSTICS: 'CarOwnerRequestDiagnostics',
+  CAR_OWNER_DIAGNOSTIC_EXPERTS: 'CarOwnerDiagnosticExperts',
   CAR_OWNER_MECHANIC_DISCOVERY: 'CarOwnerMechanicDiscovery',
   CAR_OWNER_LIVE_TRACKING: 'CarOwnerLiveTracking',
   CAR_OWNER_RATE_MECHANIC: 'CarOwnerRateMechanic',
