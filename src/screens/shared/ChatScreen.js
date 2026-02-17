@@ -4,6 +4,7 @@ import {
     Alert,
     Animated,
     FlatList,
+    Modal,
     Pressable,
     StyleSheet,
     TextInput,
@@ -16,7 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../components';
 import { useChat } from '../../context/ChatContext';
 import { darkTheme } from '../../theme';
-import { pickSingleImageFromGallery, useKeyboardLift } from '../../utils';
+import { pickSingleImageFromGallery, ROLES, ROUTES, useKeyboardLift } from '../../utils';
 
 const BackIcon = ({ color }) => {
     return (
@@ -110,11 +111,37 @@ const getMessageText = (item) => {
     return item?.text || item?.message || '';
 };
 
-const MessageBubble = ({ item, currentUserRole }) => {
+const MessageBubble = ({ item, currentUserRole, onAcceptPrice, onDeclinePrice }) => {
     if (item?.type === 'system') {
         return (
             <View style={styles.systemWrap}>
                 <AppText style={styles.systemText}>{item.text}</AppText>
+            </View>
+        );
+    }
+
+    if (item?.type === 'price_quote') {
+        const amountText = `#${Number(item?.amount || 0).toLocaleString()}`;
+        const isMechanicView = currentUserRole === ROLES.MECH;
+        return (
+            <View style={styles.priceQuoteWrap}>
+                <View style={styles.priceQuoteBubble}>
+                    <AppText style={styles.priceQuoteTitle}>
+                        {isMechanicView ? 'Set price at' : 'Price quote'}
+                    </AppText>
+                    <AppText style={styles.priceQuoteAmount}>{amountText} NGN</AppText>
+                    <AppText style={styles.priceQuoteSub}>Price includes labour only</AppText>
+                </View>
+                {currentUserRole === ROLES.CAR_OWNER ? (
+                    <View style={styles.priceQuoteActions}>
+                        <TouchableOpacity style={styles.priceQuoteBtn} activeOpacity={0.85} onPress={onAcceptPrice}>
+                            <AppText style={styles.priceQuoteBtnText}>Accept</AppText>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.priceQuoteBtnAlt} activeOpacity={0.85} onPress={onDeclinePrice}>
+                            <AppText style={styles.priceQuoteBtnAltText}>Decline</AppText>
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
             </View>
         );
     }
@@ -152,6 +179,7 @@ const SharedChatScreen = ({
         fetchMessages,
         markConversationRead,
         addMockTextMessage,
+        addLocalMessage,
         uploadImages,
         uploadingImages,
     } = useChat();
@@ -161,12 +189,15 @@ const SharedChatScreen = ({
 
     const [inputValue, setInputValue] = useState('');
     const [hasInteracted, setHasInteracted] = useState(false); // Replaces 'accepted' state for generic interaction
+    const [isSettingPrice, setIsSettingPrice] = useState(false);
+    const [showPriceConfirm, setShowPriceConfirm] = useState(false);
 
     const messages = useMemo(
         () => messagesByConversationId[conversationId] || [],
         [conversationId, messagesByConversationId]
     );
     const isSendEnabled = inputValue.trim().length > 0;
+    const isMechanic = currentUserRole === ROLES.MECH || route?.params?.userRole === 'mechanic';
 
     useEffect(() => {
         let mounted = true;
@@ -199,6 +230,14 @@ const SharedChatScreen = ({
     }, [messages]);
 
     const handleSend = () => {
+        if (isSettingPrice) {
+            if (!inputValue.trim()) {
+                return;
+            }
+            setShowPriceConfirm(true);
+            return;
+        }
+
         const text = inputValue.trim();
         if (!text) {
             return;
@@ -207,6 +246,30 @@ const SharedChatScreen = ({
         addMockTextMessage(conversationId, text);
         setInputValue('');
         setHasInteracted(true);
+    };
+
+    const handleConfirmPrice = (confirmed) => {
+        if (!confirmed) {
+            setShowPriceConfirm(false);
+            return;
+        }
+
+        const amount = Number(String(inputValue || '').replace(/\D/g, '')) || 0;
+        if (!amount) {
+            setShowPriceConfirm(false);
+            return;
+        }
+
+        addLocalMessage(conversationId, {
+            type: 'price_quote',
+            amount,
+            text: `Set price at ${amount} NGN`,
+            sender: 'me',
+        });
+
+        setShowPriceConfirm(false);
+        setInputValue('');
+        setIsSettingPrice(false);
     };
 
     const handleAttach = async () => {
@@ -244,6 +307,26 @@ const SharedChatScreen = ({
         }
     };
 
+    const handleAcceptPrice = (message) => {
+        addLocalMessage(conversationId, {
+            type: 'system',
+            text: 'Price accepted',
+        });
+        navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
+            jobId: route?.params?.jobId,
+            mechanicId: route?.params?.mechanicId,
+            agreedPrice: message?.amount || null,
+            mechanic: route?.params?.mechanic,
+        });
+    };
+
+    const handleDeclinePrice = () => {
+        addLocalMessage(conversationId, {
+            type: 'system',
+            text: 'Price declined',
+        });
+    };
+
     return (
         <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
             <Animated.View ref={targetRef} style={[styles.chatArea, animatedStyle]}>
@@ -271,6 +354,16 @@ const SharedChatScreen = ({
                     </TouchableOpacity>
                 </View>
 
+                {isMechanic ? (
+                    <TouchableOpacity
+                        style={[styles.setPricePill, isSettingPrice ? styles.setPricePillActive : null]}
+                        activeOpacity={0.88}
+                        onPress={() => setIsSettingPrice((prev) => !prev)}
+                    >
+                        <AppText style={styles.setPricePillText}>{isSettingPrice ? 'Cancel' : 'Set price'}</AppText>
+                    </TouchableOpacity>
+                ) : null}
+
                 {renderExtraContent ? renderExtraContent(hasInteracted) : null}
 
                 {messages.length ? (
@@ -278,7 +371,14 @@ const SharedChatScreen = ({
                         ref={listRef}
                         data={messages}
                         keyExtractor={(item, index) => String(item?.id || `${conversationId}_${index}`)}
-                        renderItem={({ item }) => <MessageBubble item={item} currentUserRole={currentUserRole} />}
+                        renderItem={({ item }) => (
+                            <MessageBubble
+                                item={item}
+                                currentUserRole={currentUserRole}
+                                onAcceptPrice={() => handleAcceptPrice(item)}
+                                onDeclinePrice={handleDeclinePrice}
+                            />
+                        )}
                         ListHeaderComponent={<AppText style={styles.todayLabel}>Today</AppText>}
                         contentContainerStyle={styles.messagesContent}
                         showsVerticalScrollIndicator={false}
@@ -292,6 +392,12 @@ const SharedChatScreen = ({
                     </View>
                 )}
 
+                {isSettingPrice ? (
+                    <View style={styles.priceBanner}>
+                        <AppText style={styles.priceBannerText}>Setting price</AppText>
+                    </View>
+                ) : null}
+
                 <View style={styles.composerWrap}>
                     <Pressable style={styles.attachButton} onPress={handleAttach}>
                         {uploadingImages ? (
@@ -303,10 +409,18 @@ const SharedChatScreen = ({
 
                     <TextInput
                         value={inputValue}
-                        onChangeText={setInputValue}
-                        placeholder="Message"
+                        onChangeText={(value) => {
+                            if (isSettingPrice) {
+                                const digitsOnly = String(value || '').replace(/\D/g, '');
+                                setInputValue(digitsOnly);
+                                return;
+                            }
+                            setInputValue(value);
+                        }}
+                        placeholder={isSettingPrice ? 'Enter amount (NGN)' : 'Message'}
                         placeholderTextColor={darkTheme.colors.muted}
-                        style={styles.input}
+                        keyboardType={isSettingPrice ? 'number-pad' : 'default'}
+                        style={[styles.input, isSettingPrice ? styles.inputPrice : null]}
                     />
                     <Pressable
                         style={[
@@ -325,6 +439,22 @@ const SharedChatScreen = ({
                     </Pressable>
                 </View>
             </Animated.View>
+
+            <Modal visible={showPriceConfirm} transparent animationType="fade" onRequestClose={() => setShowPriceConfirm(false)}>
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalCard}>
+                        <AppText style={styles.modalTitle}>Set {inputValue || 0} price</AppText>
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity style={styles.modalBtnSecondary} activeOpacity={0.85} onPress={() => handleConfirmPrice(false)}>
+                                <AppText style={styles.modalBtnSecondaryText}>No</AppText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalBtnPrimary} activeOpacity={0.85} onPress={() => handleConfirmPrice(true)}>
+                                <AppText style={styles.modalBtnPrimaryText}>Yes</AppText>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </ScreenContainer>
     );
 };
@@ -424,6 +554,31 @@ const styles = StyleSheet.create({
         color: darkTheme.colors.muted,
         textAlign: 'center',
     },
+    setPricePill: {
+        alignSelf: 'center',
+        borderWidth: 1,
+        borderColor: darkTheme.colors.accent,
+        paddingHorizontal: darkTheme.spacing.lg,
+        paddingVertical: darkTheme.spacing.xs,
+        borderRadius: 999,
+        marginBottom: darkTheme.spacing.sm,
+        shadowColor: darkTheme.colors.accent,
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 3,
+        backgroundColor: 'rgba(226,255,49,0.08)',
+    },
+    setPricePillActive: {
+        backgroundColor: 'rgba(255,90,0,0.15)',
+        borderColor: '#FF8A3D',
+        shadowColor: '#FF8A3D',
+    },
+    setPricePillText: {
+        color: darkTheme.colors.accent,
+        fontSize: 12,
+        fontWeight: darkTheme.typography.fontWeights.medium,
+    },
     messageRow: {
         marginBottom: darkTheme.spacing.sm,
         maxWidth: '88%',
@@ -476,6 +631,84 @@ const styles = StyleSheet.create({
         fontSize: darkTheme.typography.fontSizes.xs,
         lineHeight: 16,
     },
+    priceQuoteWrap: {
+        alignSelf: 'center',
+        width: '82%',
+        marginBottom: darkTheme.spacing.sm,
+    },
+    priceQuoteBubble: {
+        borderRadius: 18,
+        paddingHorizontal: darkTheme.spacing.lg,
+        paddingVertical: darkTheme.spacing.md,
+        backgroundColor: 'rgba(226,255,49,0.16)',
+        borderWidth: 1,
+        borderColor: 'rgba(226,255,49,0.45)',
+        alignItems: 'center',
+    },
+    priceQuoteTitle: {
+        color: darkTheme.colors.muted,
+        fontSize: 12,
+        marginBottom: 4,
+    },
+    priceQuoteAmount: {
+        color: darkTheme.colors.accent,
+        fontSize: 18,
+        fontWeight: darkTheme.typography.fontWeights.semibold,
+    },
+    priceQuoteSub: {
+        color: darkTheme.colors.muted,
+        fontSize: 11,
+        marginTop: 6,
+    },
+    priceQuoteActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: darkTheme.spacing.sm,
+        borderRadius: 14,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.16)',
+    },
+    priceQuoteBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: darkTheme.colors.accent,
+    },
+    priceQuoteBtnText: {
+        color: '#1A1A1A',
+        fontSize: 12,
+        fontWeight: darkTheme.typography.fontWeights.semibold,
+    },
+    priceQuoteBtnAlt: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    priceQuoteBtnAltText: {
+        color: darkTheme.colors.text,
+        fontSize: 12,
+        fontWeight: darkTheme.typography.fontWeights.medium,
+    },
+    priceBanner: {
+        marginHorizontal: darkTheme.spacing.md,
+        marginBottom: darkTheme.spacing.xs,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(226,255,49,0.5)',
+        paddingVertical: 6,
+        alignItems: 'center',
+        backgroundColor: 'rgba(226,255,49,0.12)',
+    },
+    priceBannerText: {
+        color: darkTheme.colors.accent,
+        fontSize: 12,
+        fontWeight: darkTheme.typography.fontWeights.medium,
+    },
     composerWrap: {
         paddingHorizontal: darkTheme.spacing.md,
         paddingTop: darkTheme.spacing.sm,
@@ -503,6 +736,10 @@ const styles = StyleSheet.create({
         color: darkTheme.colors.text,
         fontSize: darkTheme.typography.fontSizes.sm,
     },
+    inputPrice: {
+        borderColor: 'rgba(255,138,61,0.75)',
+        backgroundColor: 'rgba(255,138,61,0.12)',
+    },
     sendButton: {
         width: 46,
         height: 46,
@@ -518,6 +755,56 @@ const styles = StyleSheet.create({
     sendButtonInactive: {
         borderColor: darkTheme.colors.muted,
         backgroundColor: 'transparent',
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: darkTheme.spacing.lg,
+    },
+    modalCard: {
+        width: '100%',
+        borderRadius: 16,
+        padding: darkTheme.spacing.lg,
+        backgroundColor: '#11113A',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+    modalTitle: {
+        color: darkTheme.colors.text,
+        fontSize: 16,
+        textAlign: 'center',
+        marginBottom: darkTheme.spacing.md,
+        fontWeight: darkTheme.typography.fontWeights.semibold,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        columnGap: darkTheme.spacing.sm,
+    },
+    modalBtnPrimary: {
+        flex: 1,
+        minHeight: 44,
+        borderRadius: 12,
+        backgroundColor: darkTheme.colors.accent,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalBtnPrimaryText: {
+        color: '#1A1A1A',
+        fontWeight: darkTheme.typography.fontWeights.semibold,
+    },
+    modalBtnSecondary: {
+        flex: 1,
+        minHeight: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalBtnSecondaryText: {
+        color: darkTheme.colors.text,
+        fontWeight: darkTheme.typography.fontWeights.medium,
     },
 });
 

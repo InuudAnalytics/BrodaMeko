@@ -235,6 +235,27 @@ export const ChatProvider = ({ children }) => {
     setSendingMessage(false);
   }, [clearError]);
 
+  const addLocalMessage = useCallback((conversationId, message) => {
+    const safeConversationId = String(conversationId || '').trim();
+
+    if (!safeConversationId || !message) {
+      return;
+    }
+
+    const nextMessage = {
+      id: message.id || `local-${Date.now()}`,
+      conversation_id: safeConversationId,
+      created_at: message.created_at || new Date().toISOString(),
+      ...message,
+      status: message.status || 'local-only',
+    };
+
+    setMessagesByConversationId((prev) => ({
+      ...prev,
+      [safeConversationId]: [...(prev[safeConversationId] || []), nextMessage],
+    }));
+  }, []);
+
   const uploadImages = useCallback(async (conversationId, images) => {
     const safeConversationId = String(conversationId || '').trim();
     const files = Array.isArray(images) ? images.slice(0, 5) : [];
@@ -323,6 +344,7 @@ export const ChatProvider = ({ children }) => {
       startConversation: startNewConversation,
       uploadImages,
       addMockTextMessage,
+      addLocalMessage,
     }),
     [
       conversations,
@@ -343,6 +365,7 @@ export const ChatProvider = ({ children }) => {
       startNewConversation,
       uploadImages,
       addMockTextMessage,
+      addLocalMessage,
     ]
   );
 
