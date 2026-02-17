@@ -34,6 +34,7 @@ const formatNaira = (value) => {
 
 const EscrowFundingScreen = ({ navigation, route }) => {
   const [isPaying, setIsPaying] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('card');
 
   const job = route?.params?.job || MOCK_JOB;
   const breakdown = route?.params?.breakdown || MOCK_BREAKDOWN;
@@ -156,6 +157,39 @@ const EscrowFundingScreen = ({ navigation, route }) => {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.paymentOption}
+          activeOpacity={0.85}
+          onPress={() => setPaymentMethod('card')}
+        >
+          <View style={styles.radioOuter}>
+            {paymentMethod === 'card' ? <View style={styles.radioInner} /> : null}
+          </View>
+          <AppText style={styles.paymentLabel}>Pay with your ATM card</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.paymentOption}
+          activeOpacity={0.85}
+          onPress={() => setPaymentMethod('transfer')}
+        >
+          <View style={styles.radioOuter}>
+            {paymentMethod === 'transfer' ? <View style={styles.radioInner} /> : null}
+          </View>
+          <AppText style={styles.paymentLabel}>Pay with transfer</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.paymentOption}
+          activeOpacity={0.85}
+          onPress={() => setPaymentMethod('cash')}
+        >
+          <View style={styles.radioOuter}>
+            {paymentMethod === 'cash' ? <View style={styles.radioInner} /> : null}
+          </View>
+          <AppText style={styles.paymentLabel}>Pay with cash on arrival</AppText>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.ctaWrap}>
         <AppButton
           label={isPaying ? 'Processing...' : 'Confirm and pay'}
@@ -224,6 +258,31 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.lg,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     marginTop: darkTheme.spacing.xs,
+  },
+  paymentOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: darkTheme.spacing.sm,
+    marginBottom: darkTheme.spacing.sm,
+  },
+  radioOuter: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.6,
+    borderColor: 'rgba(255,255,255,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: darkTheme.colors.accent,
+  },
+  paymentLabel: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.sm,
   },
   ctaWrap: {
     marginTop: 'auto',
