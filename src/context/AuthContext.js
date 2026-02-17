@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { GOOGLE_CONFIG } from '../config/google';
 import { MOCK_FCM_TOKEN, getMockDeviceType } from '../config/mockDevice';
 import {
   forgotPassword as forgotPasswordService,
   getCurrentUser,
   login as loginService,
+  googleLogin as googleLoginService,
   logout as logoutService,
   resendOtp as resendOtpService,
   resetPassword as resetPasswordService,
@@ -23,6 +26,13 @@ const STORAGE_KEYS = {
   user: '@brodameko/user',
   role: '@brodameko/role',
 };
+
+// Initialize Google Sign-In
+GoogleSignin.configure({
+  webClientId: GOOGLE_CONFIG.webClientId,
+  offlineAccess: GOOGLE_CONFIG.offlineAccess,
+  forceCodeForRefreshToken: GOOGLE_CONFIG.forceCodeForRefreshToken,
+});
 
 const normalizeRole = (value) => {
   const role = String(value || '').toLowerCase();
@@ -280,10 +290,10 @@ export const AuthProvider = ({ children }) => {
       setError(verifyError?.message || 'OTP verification failed.');
       return false;
     } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
-      }
-    };
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const resendOtp = async () => {
     setIsLoading(true);
@@ -304,10 +314,10 @@ export const AuthProvider = ({ children }) => {
       setError(resendError?.message || 'Failed to resend OTP.');
       return false;
     } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
-      }
-    };
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const signIn = async ({ email, phoneNumber, password }) => {
     setIsLoading(true);
@@ -347,10 +357,64 @@ export const AuthProvider = ({ children }) => {
       setRole(null);
       return false;
     } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
+
+  const signInWithGoogle = async ({ role: selectedRole }) => {
+    setIsLoading(true);
+    clearError();
+
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+
+      const { idToken } = await GoogleSignin.getTokens();
+
+      if (!idToken) {
+        throw new Error('Failed to get Google ID token.');
       }
-    };
+
+      const response = await googleLoginService({
+        idToken,
+        role: selectedRole || ROLES.CAR_OWNER
+      });
+
+      const authPayload = pickAuthPayload(response);
+
+      if (!authPayload.token) {
+        throw new Error('Google login succeeded but no app token was returned.');
+      }
+
+      await setAuthedState({
+        nextToken: authPayload.token,
+        nextUser: authPayload.user,
+        nextRole: authPayload.role || selectedRole || ROLES.CAR_OWNER,
+      });
+      registerCurrentDevice();
+
+      return true;
+    } catch (googleError) {
+      let errorMessage = 'Google Sign-In failed.';
+
+      if (googleError.code === statusCodes.SIGN_IN_CANCELLED) {
+        errorMessage = 'Sign in cancelled.';
+      } else if (googleError.code === statusCodes.IN_PROGRESS) {
+        errorMessage = 'Sign in is in progress.';
+      } else if (googleError.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        errorMessage = 'Play services not available.';
+      } else {
+        errorMessage = googleError.message || errorMessage;
+      }
+
+      setError(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const requestPasswordReset = async ({ email, phoneNumber }) => {
     setIsLoading(true);
@@ -363,10 +427,10 @@ export const AuthProvider = ({ children }) => {
       setError(forgotError?.message || 'Failed to send reset OTP.');
       return false;
     } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
-      }
-    };
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const resetPasswordWithOtp = async ({ email, phoneNumber, otp, newPassword, confirmPassword }) => {
     setIsLoading(true);
@@ -386,10 +450,10 @@ export const AuthProvider = ({ children }) => {
       setError(resetError?.message || 'Password reset failed.');
       return false;
     } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
-      }
-    };
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const updatePassword = async ({ currentPassword, newPassword }) => {
     setIsLoading(true);
@@ -402,10 +466,10 @@ export const AuthProvider = ({ children }) => {
       setError(updateError?.message || 'Failed to update password.');
       return false;
     } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
-      }
-    };
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
 
   const signOut = async () => {
     setIsLoading(true);

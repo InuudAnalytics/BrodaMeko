@@ -32,7 +32,7 @@ const METHODS = { PHONE: 'phone', EMAIL: 'email' };
 
 const LoginScreen = ({ navigation, route }) => {
   const roleParam = route?.params?.role;
-  const { signIn, isLoading, error, clearError } = useAuth();
+  const { signIn, signInWithGoogle, isLoading, error, clearError } = useAuth();
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
   const [method, setMethod] = useState(METHODS.PHONE);
@@ -175,7 +175,11 @@ const LoginScreen = ({ navigation, route }) => {
 
                 <DividerOr />
 
-                <GoogleButton label="Sign in with Google" onPress={() => {}} disabled={isLoading} />
+                <GoogleButton
+                  label="Sign in with Google"
+                  onPress={() => signInWithGoogle({ role: roleParam })}
+                  disabled={isLoading}
+                />
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Dont have an account? </AppText>

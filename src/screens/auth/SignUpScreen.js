@@ -51,7 +51,7 @@ const maskEmail = (value) => {
 
 const SignUpScreen = ({ navigation, route }) => {
   const selectedRole = route?.params?.role || ROLES.CAR_OWNER;
-  const { signUp, isLoading, error, clearError } = useAuth();
+  const { signUp, signInWithGoogle: signUpWithGoogle, isLoading, error, clearError } = useAuth();
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
   const [method, setMethod] = useState(METHODS.PHONE);
@@ -230,7 +230,11 @@ const SignUpScreen = ({ navigation, route }) => {
                 </View>
 
                 <DividerOr />
-                <GoogleButton label="Sign up with Google" onPress={() => {}} disabled={isLoading} />
+                <GoogleButton
+                  label="Sign up with Google"
+                  onPress={() => signUpWithGoogle({ role: selectedRole })}
+                  disabled={isLoading}
+                />
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Have an account? </AppText>

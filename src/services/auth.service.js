@@ -108,6 +108,10 @@ export const resetPassword = async ({ email, phoneNumber, otp, newPassword, conf
   return response.data;
 };
 
+const response = await api.post('/api/v1/auth/google', payload);
+return response.data;
+};
+
 export const getCurrentUser = async () => {
   const response = await api.get(ENDPOINTS.auth.me);
   return response.data;
@@ -122,11 +126,25 @@ export const updatePassword = async ({ currentPassword, newPassword }) => {
   return response.data;
 };
 
+export const googleLogin = async ({ idToken, role }) => {
+  const payload = {
+    id_token: idToken,
+    role: mapRoleToBackend(role),
+  };
+
+  // Assuming the backend has this endpoint. 
+  // If not, it needs to be created on the backend.
+  // Using a likely path based on other endpoints.
+  const response = await api.post('/api/v1/auth/google', payload);
+  return response.data;
+};
+
 export default {
   signup,
   verifyOtp,
   resendOtp,
   login,
+  googleLogin,
   logout,
   forgotPassword,
   resetPassword,
