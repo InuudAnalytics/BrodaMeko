@@ -4,6 +4,7 @@ import {
   CarOwnerDashboardScreen,
   CarOwnerFundWalletScreen,
   CarOwnerChatScreen,
+  CarOwnerEditProfileScreen,
   CarOwnerDiagnosticExpertsScreen,
   CarOwnerHistoryScreen,
   CarOwnerLiveTrackingScreen,
@@ -63,6 +64,11 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_PROFILE}
         component={CarOwnerProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_EDIT_PROFILE}
+        component={CarOwnerEditProfileScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

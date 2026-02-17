@@ -133,7 +133,7 @@ const UserProfileScreen = ({ navigation }) => {
 
           <AppButton
             label="Edit profile"
-            onPress={() => navigation.navigate('EditProfilePlaceholder')}
+            onPress={() => navigation.navigate(ROUTES.CAR_OWNER_EDIT_PROFILE)}
             style={styles.editButton}
             textStyle={styles.editButtonText}
             icon={Edit01Icon}

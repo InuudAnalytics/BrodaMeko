@@ -7,6 +7,7 @@ export { default as CarOwnerFundWalletScreen } from './carowner/wallet/FundWalle
 export { default as CarOwnerWithdrawScreen } from './carowner/wallet/WithdrawScreen';
 export { default as CarOwnerChatScreen } from './carowner/chat/ChatScreen';
 export { default as CarOwnerProfileScreen } from './carowner/profile/ProfileScreen';
+export { default as CarOwnerEditProfileScreen } from './carowner/profile/EditProfileScreen';
 export { default as CarOwnerReportIssueScreen } from './carowner/assistance/ReportIssueScreen';
 export { default as CarOwnerRequestDiagnosticsScreen } from './carowner/assistance/RequestDiagnosticsScreen';
 export { default as CarOwnerDiagnosticExpertsScreen } from './carowner/diagnostics/DiagnosticExpertsListScreen';

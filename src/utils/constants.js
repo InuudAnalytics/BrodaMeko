@@ -21,6 +21,7 @@ export const ROUTES = {
   CAR_OWNER_SETTINGS: 'CarOwnerSettings',
   CAR_OWNER_CHAT: 'CarOwnerChat',
   CAR_OWNER_PROFILE: 'CarOwnerProfile',
+  CAR_OWNER_EDIT_PROFILE: 'CarOwnerEditProfile',
   CAR_OWNER_REPORT_ISSUE: 'CarOwnerReportIssue',
   CAR_OWNER_REQUEST_DIAGNOSTICS: 'CarOwnerRequestDiagnostics',
   CAR_OWNER_DIAGNOSTIC_EXPERTS: 'CarOwnerDiagnosticExperts',
