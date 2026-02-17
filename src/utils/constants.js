@@ -35,5 +35,6 @@ export const ROUTES = {
   MECH_SERVICE_PRICING: 'MechanicServicePricing',
   MECH_KYC_UPLOAD: 'MechanicKycUpload',
   MECH_BANK_DETAILS: 'MechanicBankDetails',
+  MECH_CHAT: 'MechanicChat', // Added new route
   ADMIN_DASHBOARD: 'AdminDashboard',
 };

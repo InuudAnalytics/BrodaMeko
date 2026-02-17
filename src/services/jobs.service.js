@@ -168,6 +168,8 @@ export const getCarOwnerJobs = async ({ limit = 10, page = 1 } = {}) => {
   return normalizeResponse(response.data, 'Jobs retrieved successfully.');
 };
 
+export const getAvailableJobs = getCarOwnerJobs;
+
 export const getCarOwnerJob = async (jobId) => {
   const safeJobId = assertJobId(jobId);
   const response = await api.get(ENDPOINTS.jobs.carOwnerDetails(safeJobId));
@@ -225,4 +227,5 @@ export default {
   getCarOwnerJob,
   updateCarOwnerJob,
   deleteJob,
+  getAvailableJobs,
 };

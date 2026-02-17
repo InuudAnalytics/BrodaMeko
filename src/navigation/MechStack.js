@@ -10,6 +10,8 @@ import {
   ServicePricingScreen,
   UploadProfilePhotoScreen,
 } from '../screens/mech/profile';
+import MechanicChatScreen from '../screens/mech/chat/MechanicChatScreen';
+import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import { useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -60,8 +62,18 @@ const MechStack = () => {
         component={BankDetailsScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name={ROUTES.MECH_CHAT}
+        component={MechanicChatScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.USER_PROFILE}
+        component={UserProfileScreen}
+        options={{ headerShown: false }}
+      />
       {isComplete ? (
         <Stack.Screen
           name={ROUTES.MECH_DASHBOARD_TABS}

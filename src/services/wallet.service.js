@@ -43,8 +43,14 @@ export const verifyWalletPayment = async (reference, trxref) => {
   return normalizeResponse(response.data, 'Wallet payment verification completed.');
 };
 
+export const getWalletBalance = async () => {
+  const response = await api.get(ENDPOINTS.wallet.balance);
+  return normalizeResponse(response.data, 'Wallet balance retrieved.');
+};
+
 export default {
   topUpWallet,
   verifyWalletPayment,
   validateTopUpAmount,
+  getWalletBalance,
 };

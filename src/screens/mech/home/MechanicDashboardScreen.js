@@ -1,42 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText } from '../../../components';
+import { getAvailableJobs } from '../../../services/jobs.service';
+import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
 const FILTERS = [
   { key: 'all', label: 'All jobs' },
   { key: 'urgent', label: 'Urgent' },
   { key: 'high_paying', label: 'High paying' },
   { key: 'filters', label: 'Filters', icon: FilterHorizontalIcon },
-];
-
-const JOBS = [
-  {
-    id: 'job_1',
-    name: 'Tunde Adebayo',
-    issue: 'Flat tire - Toyota Camry',
-    distance: '1.3km away',
-    eta: '2 minutes',
-    urgent: true,
-  },
-  {
-    id: 'job_2',
-    name: 'Joy Okafor',
-    issue: 'Battery problem - Honda Accord',
-    distance: '2.7km away',
-    eta: '8 minutes',
-    urgent: false,
-  },
-  {
-    id: 'job_3',
-    name: 'Femi Williams',
-    issue: 'Engine trouble - Lexus RX350',
-    distance: '3.1km away',
-    eta: '12 minutes',
-    urgent: false,
-  },
 ];
 
 const initialsFromName = (name) =>
@@ -47,26 +24,83 @@ const initialsFromName = (name) =>
     .map((part) => part[0].toUpperCase())
     .join('');
 
+const formatCurrency = (amount) => {
+  const value = Number(amount || 0);
+  return `#${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const normalizeJob = (job) => {
+  return {
+    id: job.id || job._id,
+    name: job.car_owner?.name || job.user?.name || 'Customer',
+    issue: job.title || job.issue_type || job.description || 'Car Issue',
+    distance: job.distance || '1.2km away', // Mock if missing
+    eta: job.eta || '10 mins', // Mock if missing
+    urgent: job.priority === 'urgent' || false,
+  };
+};
+
 const MechanicDashboardScreen = ({ navigation }) => {
   const [activeFilter, setActiveFilter] = useState('all');
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const visibleJobs = useMemo(() => {
+    let filtered = jobs;
     if (activeFilter === 'urgent') {
-      return JOBS.filter((job) => job.urgent);
+      filtered = jobs.filter((job) => job.urgent);
     }
-    if (activeFilter === 'high_paying') {
-      return JOBS.slice(0, 2);
-    }
-    return JOBS;
-  }, [activeFilter]);
+    // High paying logic would go here if we had amounts
+    return filtered;
+  }, [activeFilter, jobs]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      const fetchData = async () => {
+        try {
+          const [walletRes, jobsRes] = await Promise.all([
+            getWalletBalance().catch(() => ({ success: false })),
+            getAvailableJobs({ limit: 10 }).catch(() => ({ success: false }))
+          ]);
+
+          if (active) {
+            if (walletRes.success) {
+              setWalletBalance(walletRes.data?.balance || 0);
+            }
+            if (jobsRes.success) {
+              const rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
+              setJobs(rawJobs.map(normalizeJob));
+            }
+          }
+        } catch (error) {
+          // ignore
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+
+      fetchData();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatar}>
+          <TouchableOpacity
+            style={styles.avatar}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate(ROUTES.USER_PROFILE)}
+          >
             <AppText style={styles.avatarText}>M</AppText>
-          </View>
+          </TouchableOpacity>
           <View>
             <AppText style={styles.welcome}>Welcome Michael</AppText>
             <AppText style={styles.partner}>BrodaMeko partner</AppText>
@@ -97,7 +131,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
         </View>
         <View style={styles.statCard}>
           <AppText style={styles.statLabel}>Wallet</AppText>
-          <AppText style={styles.statValue}>#1,250</AppText>
+          <AppText style={styles.statValue}>{formatCurrency(walletBalance)}</AppText>
         </View>
       </View>
 
@@ -128,44 +162,50 @@ const MechanicDashboardScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.jobsList}>
-        {visibleJobs.map((job) => (
-          <View key={job.id} style={styles.jobCard}>
-            <View style={styles.jobTop}>
-              <View style={styles.jobTopLeft}>
-                <View style={styles.jobAvatar}>
-                  <AppText style={styles.jobAvatarText}>{initialsFromName(job.name)}</AppText>
+        {loading ? (
+          <AppText style={{ color: darkTheme.colors.muted, textAlign: 'center', marginTop: 20 }}>Loading jobs...</AppText>
+        ) : visibleJobs.length === 0 ? (
+          <AppText style={{ color: darkTheme.colors.muted, textAlign: 'center', marginTop: 20 }}>No jobs available at the moment.</AppText>
+        ) : (
+          visibleJobs.map((job) => (
+            <View key={job.id} style={styles.jobCard}>
+              <View style={styles.jobTop}>
+                <View style={styles.jobTopLeft}>
+                  <View style={styles.jobAvatar}>
+                    <AppText style={styles.jobAvatarText}>{initialsFromName(job.name)}</AppText>
+                  </View>
+                  <View style={styles.jobMain}>
+                    <AppText style={styles.jobName}>{job.name}</AppText>
+                    <AppText style={styles.jobIssue}>{job.issue}</AppText>
+                  </View>
                 </View>
-                <View style={styles.jobMain}>
-                  <AppText style={styles.jobName}>{job.name}</AppText>
-                  <AppText style={styles.jobIssue}>{job.issue}</AppText>
-                </View>
+                {job.urgent ? (
+                  <View style={styles.urgentPill}>
+                    <AppText style={styles.urgentText}>Urgent</AppText>
+                  </View>
+                ) : null}
               </View>
-              {job.urgent ? (
-                <View style={styles.urgentPill}>
-                  <AppText style={styles.urgentText}>Urgent</AppText>
-                </View>
-              ) : null}
-            </View>
 
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-                <AppText style={styles.metaText}>{job.distance}</AppText>
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
+                  <AppText style={styles.metaText}>{job.distance}</AppText>
+                </View>
+                <View style={styles.metaItem}>
+                  <HugeiconsIcon icon={Time04Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
+                  <AppText style={styles.metaText}>{job.eta}</AppText>
+                </View>
               </View>
-              <View style={styles.metaItem}>
-                <HugeiconsIcon icon={Time04Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-                <AppText style={styles.metaText}>{job.eta}</AppText>
-              </View>
-            </View>
 
-            <AppButton
-              label="Accept job"
-              onPress={() => console.log('Accept job:', job.id)}
-              style={styles.acceptBtn}
-              textStyle={styles.acceptBtnText}
-            />
-          </View>
-        ))}
+              <AppButton
+                label="Accept job"
+                onPress={() => console.log('Accept job:', job.id)}
+                style={styles.acceptBtn}
+                textStyle={styles.acceptBtnText}
+              />
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );

@@ -5,6 +5,7 @@ import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
 import MechanicJobsScreen from '../screens/mech/jobs/MechanicJobsScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
+import MechanicConversationsScreen from '../screens/mech/chat/MechanicConversationsScreen';
 import { darkTheme } from '../theme';
 
 const TabPlaceholder = ({ title, subtitle }) => {
@@ -32,7 +33,11 @@ const MechanicDashboardTabs = ({ navigation }) => {
       return <MechanicWalletScreen navigation={navigation} onTabPress={setActiveTab} showTabBar={false} />;
     }
 
-    return <TabPlaceholder title="Chat coming soon" subtitle="Mechanic chat list will appear here." />;
+    if (activeTab === 'chat') {
+      return <MechanicConversationsScreen navigation={navigation} />;
+    }
+
+    return null;
   };
 
   return (

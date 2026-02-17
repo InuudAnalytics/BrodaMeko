@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -16,6 +17,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
+import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -45,6 +47,11 @@ const readUser = (user) => {
   };
 };
 
+const formatCurrency = (amount) => {
+  const value = Number(amount || 0);
+  return `#${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 const SettingRow = ({ label, icon, onPress, isLast }) => {
   return (
     <TouchableOpacity
@@ -63,6 +70,8 @@ const SettingRow = ({ label, icon, onPress, isLast }) => {
 
 const UserProfileScreen = ({ navigation }) => {
   const { user, signOut } = useAuth();
+  const [walletBalance, setWalletBalance] = useState(0);
+
   const profile = readUser(user);
   const initials = profile.fullName
     .split(/\s+/)
@@ -70,6 +79,29 @@ const UserProfileScreen = ({ navigation }) => {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join('') || 'U';
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      const fetchBalance = async () => {
+        try {
+          const response = await getWalletBalance();
+          if (active && response.success) {
+            setWalletBalance(response.data?.balance || 0);
+          }
+        } catch (error) {
+          // refined error handling can go here
+        }
+      };
+
+      fetchBalance();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -116,7 +148,7 @@ const UserProfileScreen = ({ navigation }) => {
               <AppText variant="muted" style={styles.walletLabel}>
                 Wallet balance
               </AppText>
-              <AppText style={styles.walletAmount}>#25,000.00</AppText>
+              <AppText style={styles.walletAmount}>{formatCurrency(walletBalance)}</AppText>
             </View>
 
             <AppButton
