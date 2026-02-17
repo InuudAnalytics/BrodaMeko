@@ -5,7 +5,6 @@ import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
 import MechanicJobsScreen from '../screens/mech/jobs/MechanicJobsScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
-import MechanicConversationsScreen from '../screens/mech/chat/MechanicConversationsScreen';
 import { darkTheme } from '../theme';
 
 const TabPlaceholder = ({ title, subtitle }) => {
@@ -34,7 +33,12 @@ const MechanicDashboardTabs = ({ navigation }) => {
     }
 
     if (activeTab === 'chat') {
-      return <MechanicConversationsScreen navigation={navigation} />;
+      return (
+        <TabPlaceholder
+          title="Chat opens with an active job"
+          subtitle="You can message a customer after accepting a job."
+        />
+      );
     }
 
     return null;

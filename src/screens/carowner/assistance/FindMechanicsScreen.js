@@ -138,7 +138,7 @@ const FindMechanicsScreen = ({ navigation, route }) => {
     setTimeout(() => {
       const jobId = `job_${Date.now()}`;
       setLoadingMechanicId(null);
-      navigation.navigate(ROUTES.CAR_OWNER_SETTINGS, { mechanic, jobId });
+      navigation.navigate(ROUTES.CAR_OWNER_CHAT, { mechanic, jobId, mechanicId: mechanic.id });
     }, 1200);
   };
 

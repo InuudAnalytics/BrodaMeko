@@ -81,14 +81,27 @@ export const ChatProvider = ({ children }) => {
     setError(null);
   }, []);
 
+  const clearActiveConversation = useCallback(() => {
+    setActiveConversation(null);
+    setMessagesByConversationId({});
+    setConversations([]);
+  }, []);
+
+  const handleJobStatusChange = useCallback((status) => {
+    const normalized = String(status || '').trim().toLowerCase();
+
+    if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'canceled') {
+      clearActiveConversation();
+    }
+  }, [clearActiveConversation]);
+
   const fetchConversations = useCallback(async () => {
     setLoadingConversations(true);
     setError(null);
 
     try {
       const response = await getConversations();
-      const nextConversations = extractConversations(response?.data);
-      setConversations(nextConversations);
+      setConversations([]);
       return response;
     } catch (fetchError) {
       setError(fetchError?.message || 'Failed to load conversations.');
@@ -113,11 +126,11 @@ export const ChatProvider = ({ children }) => {
       const response = await getMessages(safeConversationId, { limit, offset });
       const incomingMessages = extractMessages(response?.data);
 
-      setMessagesByConversationId((prev) => {
-        const existing = prev[safeConversationId] || [];
-        const next =
-          Number(offset) > 0
-            ? [...existing, ...incomingMessages]
+    setMessagesByConversationId((prev) => {
+      const existing = prev[safeConversationId] || [];
+      const next =
+        Number(offset) > 0
+          ? [...existing, ...incomingMessages]
             : incomingMessages;
 
         return {
@@ -144,6 +157,8 @@ export const ChatProvider = ({ children }) => {
     }
 
     setActiveConversation(conversation);
+    setConversations([]);
+    setMessagesByConversationId({});
     return fetchMessages(conversationId, { limit: 50, offset: 0 });
   }, [fetchMessages]);
 
@@ -176,18 +191,11 @@ export const ChatProvider = ({ children }) => {
 
       if (conversation && conversationId) {
         setActiveConversation(conversation);
-        setConversations((prev) => {
-          const exists = prev.some((item) => getConversationId(item) === conversationId);
-          if (exists) {
-            return prev.map((item) => (getConversationId(item) === conversationId ? { ...item, ...conversation } : item));
-          }
-
-          return [conversation, ...prev];
-        });
-
+        setConversations([]);
+        setMessagesByConversationId({});
         await fetchMessages(conversationId, { limit: 50, offset: 0 });
       } else {
-        await fetchConversations();
+        clearActiveConversation();
       }
 
       return response;
@@ -306,6 +314,8 @@ export const ChatProvider = ({ children }) => {
       uploadingImages,
       error,
       clearError,
+      clearActiveConversation,
+      handleJobStatusChange,
       fetchConversations,
       openConversation,
       fetchMessages,
@@ -324,6 +334,8 @@ export const ChatProvider = ({ children }) => {
       uploadingImages,
       error,
       clearError,
+      clearActiveConversation,
+      handleJobStatusChange,
       fetchConversations,
       openConversation,
       fetchMessages,

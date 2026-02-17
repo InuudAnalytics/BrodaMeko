@@ -11,7 +11,6 @@ import {
   CarOwnerReportIssueScreen,
   CarOwnerRequestDiagnosticsScreen,
   CarOwnerRewardsScreen,
-  CarOwnerSettingsScreen,
   CarOwnerWithdrawScreen,
 } from '../screens';
 import MechanicServicesApiTestScreen from '../screens/dev/MechanicServicesApiTestScreen';
@@ -54,11 +53,6 @@ const CarOwnerStack = () => {
         name={ROUTES.CAR_OWNER_WITHDRAW}
         component={CarOwnerWithdrawScreen}
         options={{ title: 'Withdraw' }}
-      />
-      <Stack.Screen
-        name={ROUTES.CAR_OWNER_SETTINGS}
-        component={CarOwnerSettingsScreen}
-        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_CHAT}

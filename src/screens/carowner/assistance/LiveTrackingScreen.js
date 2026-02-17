@@ -141,7 +141,13 @@ const LiveTrackingScreen = ({ navigation, route }) => {
         <MechanicCard
           mechanic={mechanic}
           onCallPress={() => Alert.alert('Call', `Calling ${mechanic.name}`)}
-          onMessagePress={() => navigation.navigate(ROUTES.CAR_OWNER_SETTINGS, { mechanic, jobId: route?.params?.jobId })}
+          onMessagePress={() =>
+            navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+              mechanic,
+              jobId: route?.params?.jobId,
+              mechanicId: route?.params?.mechanic?.id || route?.params?.mechanicId || mechanic?.id,
+            })
+          }
         />
 
         <Pressable style={styles.nextBtn} onPress={() => setCurrentStep((s) => Math.min(s + 1, STATUS_STEPS.length - 1))}>

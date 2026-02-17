@@ -1,8 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import SharedChatScreen from '../../shared/ChatScreen';
-import { ROLES } from '../../../utils';
+import { ROLES, ROUTES } from '../../../utils';
 
 const MechanicChatScreen = ({ navigation, route }) => {
+    const jobId = route?.params?.jobId;
+    const mechanicId = route?.params?.mechanicId;
+    const hasValidParams = Boolean(jobId && mechanicId);
+
+    useEffect(() => {
+        if (hasValidParams) {
+            return;
+        }
+
+        if (navigation?.canGoBack?.()) {
+            navigation.goBack();
+        } else {
+            navigation.navigate(ROUTES.MECH_DASHBOARD_TABS);
+        }
+    }, [hasValidParams, navigation]);
+
+    if (!hasValidParams) {
+        return null;
+    }
+
     const { conversation, interaction } = route.params || {};
 
     // Resolve recipient from conversation participants or interaction details
