@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   Camera01Icon,
@@ -17,28 +17,28 @@ import { ROUTES } from '../../../utils';
 
 const CHECKLIST_ITEMS = [
   {
-    key: 'photo',
-    label: 'Upload profile photo',
-    icon: Camera01Icon,
-    route: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
-  },
-  {
-    key: 'pricing',
-    label: 'Add service pricing',
-    icon: DollarCircleIcon,
-    route: ROUTES.MECH_SERVICE_PRICING,
-  },
-  {
     key: 'kyc',
-    label: 'Upload ID verification',
+    label: 'Upload NIN document',
     icon: Shield01Icon,
     route: ROUTES.MECH_KYC_UPLOAD,
+  },
+  {
+    key: 'photo',
+    label: 'Upload passport photo',
+    icon: Camera01Icon,
+    route: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
   },
   {
     key: 'bank',
     label: 'Add bank details',
     icon: Wallet01Icon,
     route: ROUTES.MECH_BANK_DETAILS,
+  },
+  {
+    key: 'pricing',
+    label: 'Set service charges',
+    icon: DollarCircleIcon,
+    route: ROUTES.MECH_SERVICE_PRICING,
   },
 ];
 
@@ -71,7 +71,7 @@ const MechanicProfileSetupScreen = ({ navigation }) => {
       return;
     }
 
-    navigation.navigate(firstIncompleteRoute);
+    navigation.navigate(firstIncompleteRoute, { onboarding: true, skippedSteps: [] });
   };
 
   return (
@@ -114,12 +114,7 @@ const MechanicProfileSetupScreen = ({ navigation }) => {
           {CHECKLIST_ITEMS.map((item) => {
             const done = Boolean(completedSteps[item.key]);
             return (
-              <TouchableOpacity
-                key={item.key}
-                activeOpacity={0.85}
-                style={styles.row}
-                onPress={() => navigation.navigate(item.route)}
-              >
+              <View key={item.key} style={styles.row}>
                 <View style={styles.rowLeft}>
                   <View style={styles.leftIconCircle}>
                     <HugeiconsIcon icon={item.icon} size={18} color="rgba(255,255,255,0.8)" strokeWidth={2} />
@@ -135,7 +130,7 @@ const MechanicProfileSetupScreen = ({ navigation }) => {
                     strokeWidth={2.5}
                   />
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })}
         </View>

@@ -6,6 +6,7 @@ const STORAGE_KEY = '@brodameko/mechanic_profile';
 const INITIAL_PROFILE = {
   profilePhotoUri: null,
   hasServicePricing: false,
+  servicePricing: {},
   ninImages: [],
   passportImages: [],
   bankDetails: null,
@@ -20,6 +21,7 @@ const sanitizeProfile = (value) => {
   return {
     profilePhotoUri: typeof next.profilePhotoUri === 'string' ? next.profilePhotoUri : null,
     hasServicePricing: Boolean(next.hasServicePricing),
+    servicePricing: next.servicePricing && typeof next.servicePricing === 'object' ? next.servicePricing : {},
     ninImages: Array.isArray(next.ninImages) ? next.ninImages.filter(Boolean) : [],
     passportImages: Array.isArray(next.passportImages) ? next.passportImages.filter(Boolean) : [],
     bankDetails: bank
@@ -76,6 +78,16 @@ export const MechanicProfileProvider = ({ children }) => {
     }));
   }, []);
 
+  const setServicePricing = useCallback((pricing) => {
+    const normalized = pricing && typeof pricing === 'object' ? pricing : {};
+
+    setMechanicProfile((prev) => ({
+      ...prev,
+      servicePricing: normalized,
+      hasServicePricing: true,
+    }));
+  }, []);
+
   const setKyc = useCallback(({ ninImages = [], passportImages = [] }) => {
     setMechanicProfile((prev) => ({
       ...prev,
@@ -109,8 +121,11 @@ export const MechanicProfileProvider = ({ children }) => {
 
     return {
       photo: Boolean(mechanicProfile.profilePhotoUri),
-      pricing: Boolean(mechanicProfile.hasServicePricing),
-      kyc: mechanicProfile.ninImages.length > 0 && mechanicProfile.passportImages.length > 0,
+      pricing: Boolean(
+        mechanicProfile.hasServicePricing ||
+        Object.keys(mechanicProfile.servicePricing || {}).length > 0
+      ),
+      kyc: mechanicProfile.ninImages.length > 0,
       bank: hasBank,
     };
   }, [mechanicProfile]);
@@ -131,6 +146,7 @@ export const MechanicProfileProvider = ({ children }) => {
       isHydrated,
       setProfilePhoto,
       setHasServicePricing,
+      setServicePricing,
       setKyc,
       setBankDetails,
       resetMechanicProfile,
@@ -143,6 +159,7 @@ export const MechanicProfileProvider = ({ children }) => {
       isHydrated,
       setProfilePhoto,
       setHasServicePricing,
+      setServicePricing,
       setKyc,
       setBankDetails,
       resetMechanicProfile,

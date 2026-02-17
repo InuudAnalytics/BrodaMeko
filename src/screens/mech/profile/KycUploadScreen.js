@@ -5,7 +5,7 @@ import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
-import { pickSingleImageFromGallery } from '../../../utils';
+import { getNextOnboardingRoute, getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const MAX_IMAGES = 5;
 
@@ -40,16 +40,19 @@ const UploadCard = ({ title, subtitle, images, onAddPress, onRemovePress, loadin
   );
 };
 
-const KycUploadScreen = ({ navigation }) => {
-  const { mechanicProfile, setKyc } = useMechanicProfile();
+const KycUploadScreen = ({ navigation, route }) => {
+  const { mechanicProfile, setKyc, completedSteps } = useMechanicProfile();
   const [ninImages, setNinImages] = useState(mechanicProfile.ninImages || []);
-  const [passportImages, setPassportImages] = useState(mechanicProfile.passportImages || []);
   const [loadingKey, setLoadingKey] = useState('');
+  const isOnboarding = Boolean(route?.params?.onboarding);
+  const skippedSteps = route?.params?.skippedSteps || [];
+  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_KYC_UPLOAD);
+  const progressPercent = useMemo(() => (stepIndex / 4) * 100, [stepIndex]);
 
-  const canUpload = useMemo(() => ninImages.length > 0 && passportImages.length > 0, [ninImages.length, passportImages.length]);
+  const canUpload = useMemo(() => ninImages.length > 0, [ninImages.length]);
 
   const addImage = async (target) => {
-    const currentCount = target === 'nin' ? ninImages.length : passportImages.length;
+    const currentCount = ninImages.length;
 
     if (currentCount >= MAX_IMAGES) {
       Alert.alert('Upload limit', `Maximum of ${MAX_IMAGES} images allowed.`);
@@ -74,22 +77,14 @@ const KycUploadScreen = ({ navigation }) => {
         return;
       }
 
-      if (target === 'nin') {
-        setNinImages((prev) => [...prev, asset.uri].slice(0, MAX_IMAGES));
-      } else {
-        setPassportImages((prev) => [...prev, asset.uri].slice(0, MAX_IMAGES));
-      }
+      setNinImages((prev) => [...prev, asset.uri].slice(0, MAX_IMAGES));
     } finally {
       setLoadingKey('');
     }
   };
 
   const removeImage = (target, index) => {
-    if (target === 'nin') {
-      setNinImages((prev) => prev.filter((_, idx) => idx !== index));
-      return;
-    }
-    setPassportImages((prev) => prev.filter((_, idx) => idx !== index));
+    setNinImages((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleUpload = () => {
@@ -97,8 +92,41 @@ const KycUploadScreen = ({ navigation }) => {
       return;
     }
 
-    setKyc({ ninImages, passportImages });
+    setKyc({ ninImages });
+
+    if (isOnboarding) {
+      const { nextRoute, nextSkipped } = getNextOnboardingRoute({
+        currentRoute: ROUTES.MECH_KYC_UPLOAD,
+        completedSteps: { ...completedSteps, kyc: true },
+        skippedSteps,
+      });
+      if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
+        navigation.navigate(nextRoute);
+        return;
+      }
+      navigation.replace(nextRoute, { onboarding: true, skippedSteps: nextSkipped });
+      return;
+    }
+
     navigation.goBack();
+  };
+
+  const handleSkipNext = () => {
+    const nextSkipped = Array.from(new Set([...skippedSteps, ROUTES.MECH_KYC_UPLOAD]));
+    const { nextRoute, nextSkipped: resolvedSkipped } = getNextOnboardingRoute({
+      currentRoute: ROUTES.MECH_KYC_UPLOAD,
+      completedSteps,
+      skippedSteps: nextSkipped,
+    });
+    if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
+      navigation.navigate(nextRoute);
+      return;
+    }
+    navigation.replace(nextRoute, { onboarding: true, skippedSteps: resolvedSkipped });
+  };
+
+  const handleSkipAll = () => {
+    navigation.navigate(ROUTES.MECH_PROFILE_SETUP);
   };
 
   return (
@@ -113,6 +141,10 @@ const KycUploadScreen = ({ navigation }) => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <AppText style={styles.subTitle}>Please upload a clear photo of your documents</AppText>
+          <AppText style={styles.stepLabel}>Step {stepIndex} of 4</AppText>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+          </View>
 
           <UploadCard
             title="Upload NIN"
@@ -122,19 +154,20 @@ const KycUploadScreen = ({ navigation }) => {
             onAddPress={() => addImage('nin')}
             onRemovePress={(index) => removeImage('nin', index)}
           />
-
-          <UploadCard
-            title="Upload passport"
-            subtitle="Add photos of your international passport"
-            images={passportImages}
-            loading={loadingKey === 'passport'}
-            onAddPress={() => addImage('passport')}
-            onRemovePress={(index) => removeImage('passport', index)}
-          />
         </ScrollView>
 
         <View style={styles.footer}>
           <AppButton label="Upload" onPress={handleUpload} disabled={!canUpload} style={styles.uploadBtn} />
+          {isOnboarding ? (
+            <View style={styles.skipRow}>
+              <TouchableOpacity activeOpacity={0.85} onPress={handleSkipNext}>
+                <AppText style={styles.skipText}>Skip next</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.85} onPress={handleSkipAll}>
+                <AppText style={styles.skipText}>Skip all</AppText>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
       </View>
     </ScreenContainer>
@@ -182,6 +215,23 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     marginBottom: 12,
+  },
+  stepLabel: {
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  progressTrack: {
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: darkTheme.colors.accent,
   },
   uploadCard: {
     borderWidth: 1.2,
@@ -277,6 +327,16 @@ const styles = StyleSheet.create({
   },
   uploadBtn: {
     borderRadius: 10,
+  },
+  skipRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+  },
+  skipText: {
+    color: darkTheme.colors.muted,
+    fontSize: 13,
   },
 });
 

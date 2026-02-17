@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
-import { pickSingleImageFromGallery } from '../../../utils';
+import { getNextOnboardingRoute, getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
-const UploadProfilePhotoScreen = ({ navigation }) => {
-  const { mechanicProfile, setProfilePhoto } = useMechanicProfile();
+const UploadProfilePhotoScreen = ({ navigation, route }) => {
+  const { mechanicProfile, setProfilePhoto, completedSteps } = useMechanicProfile();
   const [selectedUri, setSelectedUri] = useState(mechanicProfile.profilePhotoUri || null);
   const [loading, setLoading] = useState(false);
+  const isOnboarding = Boolean(route?.params?.onboarding);
+  const skippedSteps = route?.params?.skippedSteps || [];
+  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_UPLOAD_PROFILE_PHOTO);
+  const progressPercent = useMemo(() => (stepIndex / 4) * 100, [stepIndex]);
 
   const handlePickPhoto = async () => {
     setLoading(true);
@@ -42,7 +46,40 @@ const UploadProfilePhotoScreen = ({ navigation }) => {
     }
 
     setProfilePhoto(selectedUri);
+
+    if (isOnboarding) {
+      const { nextRoute, nextSkipped } = getNextOnboardingRoute({
+        currentRoute: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
+        completedSteps: { ...completedSteps, photo: true },
+        skippedSteps,
+      });
+      if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
+        navigation.navigate(nextRoute);
+        return;
+      }
+      navigation.replace(nextRoute, { onboarding: true, skippedSteps: nextSkipped });
+      return;
+    }
+
     navigation.goBack();
+  };
+
+  const handleSkipNext = () => {
+    const nextSkipped = Array.from(new Set([...skippedSteps, ROUTES.MECH_UPLOAD_PROFILE_PHOTO]));
+    const { nextRoute, nextSkipped: resolvedSkipped } = getNextOnboardingRoute({
+      currentRoute: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
+      completedSteps,
+      skippedSteps: nextSkipped,
+    });
+    if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
+      navigation.navigate(nextRoute);
+      return;
+    }
+    navigation.replace(nextRoute, { onboarding: true, skippedSteps: resolvedSkipped });
+  };
+
+  const handleSkipAll = () => {
+    navigation.navigate(ROUTES.MECH_PROFILE_SETUP);
   };
 
   return (
@@ -52,7 +89,13 @@ const UploadProfilePhotoScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.backBtn} activeOpacity={0.85} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
           </TouchableOpacity>
-          <AppText style={styles.headerTitle}>Upload profile photo</AppText>
+          <AppText style={styles.headerTitle}>Verification screen</AppText>
+        </View>
+
+        <AppText style={styles.subtitle}>Please upload a clear photo of your documents</AppText>
+        <AppText style={styles.stepLabel}>Step {stepIndex} of 4</AppText>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
         </View>
 
         <View style={styles.avatarWrap}>
@@ -63,7 +106,7 @@ const UploadProfilePhotoScreen = ({ navigation }) => {
           )}
         </View>
 
-        <AppText style={styles.helperText}>Use a clear photo of your face for trust and visibility.</AppText>
+        <AppText style={styles.helperText}>Upload passport photo</AppText>
 
         <AppButton
           label={loading ? 'Opening gallery...' : 'Choose photo'}
@@ -72,6 +115,17 @@ const UploadProfilePhotoScreen = ({ navigation }) => {
           textStyle={styles.selectBtnText}
         />
         <AppButton label="Save & continue" onPress={handleSave} style={styles.saveBtn} />
+
+        {isOnboarding ? (
+          <View style={styles.skipRow}>
+            <TouchableOpacity activeOpacity={0.85} onPress={handleSkipNext}>
+              <AppText style={styles.skipText}>Skip next</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.85} onPress={handleSkipAll}>
+              <AppText style={styles.skipText}>Skip all</AppText>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
     </ScreenContainer>
   );
@@ -108,8 +162,32 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
+  subtitle: {
+    marginTop: 12,
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  stepLabel: {
+    marginTop: 10,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+  },
+  progressTrack: {
+    marginTop: 6,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: darkTheme.colors.accent,
+  },
   avatarWrap: {
-    marginTop: 34,
+    marginTop: 24,
     alignSelf: 'center',
     width: 154,
     height: 154,
@@ -145,6 +223,17 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     marginTop: 12,
+  },
+  skipRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+  },
+  skipText: {
+    color: darkTheme.colors.muted,
+    fontSize: 13,
   },
 });
 
