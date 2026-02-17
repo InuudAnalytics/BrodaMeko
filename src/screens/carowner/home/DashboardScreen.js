@@ -58,11 +58,7 @@ const DashboardScreen = ({ navigation }) => {
         <View style={styles.pin} />
 
         <View style={styles.topBar}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={styles.avatarWrap}
-            onPress={() => navigation.navigate(ROUTES.CAR_OWNER_PROFILE)}
-          >
+          <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
               <AppText style={styles.avatarText}>{avatarInitial}</AppText>
             </View>
@@ -74,7 +70,7 @@ const DashboardScreen = ({ navigation }) => {
                 Ready for the road?
               </AppText>
             </View>
-          </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={styles.bellButton}

@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Mail01Icon, RepeatIcon, Wallet01Icon } from '@hugeicons/core-free-icons';
+import { RepeatIcon, User02Icon, Wallet01Icon } from '@hugeicons/core-free-icons';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 import AppText from './AppText';
@@ -11,7 +11,7 @@ const TABS = [
   { key: ROUTES.CAR_OWNER_DASHBOARD, label: 'Home', icon: 'home' },
   { key: ROUTES.CAR_OWNER_HISTORY, label: 'History', icon: RepeatIcon },
   { key: ROUTES.CAR_OWNER_REWARDS, label: 'Wallet', icon: Wallet01Icon },
-  { key: ROUTES.CAR_OWNER_SETTINGS, label: 'Chat', icon: Mail01Icon },
+  { key: ROUTES.CAR_OWNER_PROFILE, label: 'Profile', icon: User02Icon },
 ];
 
 const HomeIcon = ({ color }) => {

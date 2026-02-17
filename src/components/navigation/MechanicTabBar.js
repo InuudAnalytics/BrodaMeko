@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Briefcase01Icon, Mail01Icon, Wallet01Icon } from '@hugeicons/core-free-icons';
+import { Briefcase01Icon, User02Icon, Wallet01Icon } from '@hugeicons/core-free-icons';
 import { AppText } from '..';
 import { darkTheme } from '../../theme';
 
@@ -19,7 +19,7 @@ const TABS = [
   { key: 'home', label: 'Home', iconType: 'home' },
   { key: 'jobs', label: 'Jobs', icon: Briefcase01Icon },
   { key: 'wallet', label: 'Wallet', icon: Wallet01Icon },
-  { key: 'chat', label: 'Chat', icon: Mail01Icon },
+  { key: 'chat', label: 'Chat', icon: User02Icon },
 ];
 
 const MechanicTabBar = ({ activeTab, onTabPress }) => {
