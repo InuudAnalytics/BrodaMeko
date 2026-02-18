@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import {
   createJob as createJobService,
   deleteJob as deleteJobService,
@@ -15,6 +15,27 @@ const getJobId = (job) => {
   }
 
   return String(job.id || job._id || job.job_id || job.jobId || '').trim();
+};
+
+const extractCreatedJob = (response) => {
+  const root = response?.data || response || {};
+
+  if (!root || typeof root !== 'object') {
+    return null;
+  }
+
+  if (root.job && typeof root.job === 'object') {
+    return root.job;
+  }
+
+  if (root.data && typeof root.data === 'object') {
+    if (root.data.job && typeof root.data.job === 'object') {
+      return root.data.job;
+    }
+    return root.data;
+  }
+
+  return root;
 };
 
 const extractJobs = (payload) => {
@@ -67,7 +88,7 @@ export const JobsProvider = ({ children }) => {
 
     try {
       const response = await createJobService(payload);
-      const created = response?.data;
+      const created = extractCreatedJob(response);
       const createdId = getJobId(created);
 
       if (created && typeof created === 'object') {
@@ -204,21 +225,18 @@ export const JobsProvider = ({ children }) => {
     }
   };
 
-  const value = useMemo(
-    () => ({
-      myJobs,
-      selectedJob,
-      loading,
-      error,
-      clearError,
-      createJob,
-      fetchMyJobs,
-      fetchJob,
-      updateJob,
-      deleteJob,
-    }),
-    [myJobs, selectedJob, loading, error]
-  );
+  const value = {
+    myJobs,
+    selectedJob,
+    loading,
+    error,
+    clearError,
+    createJob,
+    fetchMyJobs,
+    fetchJob,
+    updateJob,
+    deleteJob,
+  };
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;
 };

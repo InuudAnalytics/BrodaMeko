@@ -2,13 +2,16 @@ import React, { useEffect, useRef } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import AnimatedLogo from '../../components/AnimatedLogo';
 import { AppText, ScreenContainer } from '../../components';
+import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
 
 const SPLASH_DURATION_MS = 3000;
 
 const SplashScreen = ({ navigation }) => {
+  const { selectedRole, hasSeenRoleSelection, skipRoleSelectionOnNextLaunch } = useAuth();
   const hasNavigated = useRef(false);
+  const shouldSkipRoleSelection = Boolean(skipRoleSelectionOnNextLaunch || selectedRole || hasSeenRoleSelection);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -17,13 +20,18 @@ const SplashScreen = ({ navigation }) => {
       }
 
       hasNavigated.current = true;
+      if (shouldSkipRoleSelection) {
+        navigation.replace(ROUTES.LOGIN, selectedRole ? { role: selectedRole } : undefined);
+        return;
+      }
+
       navigation.replace(ROUTES.ROLE_SELECTION, { animateIntro: true });
-    }, SPLASH_DURATION_MS);
+    }, shouldSkipRoleSelection ? 300 : SPLASH_DURATION_MS);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [navigation]);
+  }, [navigation, selectedRole, shouldSkipRoleSelection]);
 
   return (
     <ScreenContainer padded={false} style={styles.container}>

@@ -23,6 +23,7 @@ import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
 import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
+import SupportScreen from '../screens/shared/SupportScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -130,6 +131,7 @@ const CarOwnerStack = () => {
         component={PlaceholderScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       {__DEV__ ? (
         <Stack.Screen

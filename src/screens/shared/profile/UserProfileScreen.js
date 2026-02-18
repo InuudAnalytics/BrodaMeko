@@ -304,7 +304,11 @@ const UserProfileScreen = ({ navigation }) => {
               label={row.label}
               icon={row.icon}
               isLast={index === SETTINGS_ROWS.length - 1}
-              onPress={() => navigation.navigate('Placeholder', { title: row.label })}
+              onPress={() =>
+                row.key === 'help'
+                  ? navigation.navigate(ROUTES.SUPPORT)
+                  : navigation.navigate('Placeholder', { title: row.label })
+              }
             />
           ))}
         </View>

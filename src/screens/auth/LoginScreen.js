@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -26,13 +26,18 @@ import {
 } from '../../components';
 import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
-import { isValidNigerianPhoneDigits, ROUTES, useKeyboardLift, withNigerianCountryCode } from '../../utils';
+import { isValidNigerianPhoneDigits, ROLES, ROUTES, useKeyboardLift, withNigerianCountryCode } from '../../utils';
 
 const METHODS = { PHONE: 'phone', EMAIL: 'email' };
+const ROLE_LABELS = {
+  [ROLES.CAR_OWNER]: 'Car Owner',
+  [ROLES.MECH]: 'Mechanic',
+  [ROLES.ADMIN]: 'Admin',
+};
 
 const LoginScreen = ({ navigation, route }) => {
   const roleParam = route?.params?.role;
-  const { signIn, signInWithGoogle, isLoading, error, clearError } = useAuth();
+  const { token, selectedRole, setSelectedRole, signIn, signInWithGoogle, isLoading, error, clearError } = useAuth();
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
   const [method, setMethod] = useState(METHODS.PHONE);
@@ -42,7 +47,18 @@ const LoginScreen = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
 
+  const effectiveRole = useMemo(
+    () => roleParam || selectedRole || ROLES.CAR_OWNER,
+    [roleParam, selectedRole]
+  );
+  const effectiveRoleLabel = ROLE_LABELS[effectiveRole] || 'Car Owner';
   const mergedError = localError || error;
+
+  useEffect(() => {
+    if (roleParam && roleParam !== selectedRole) {
+      setSelectedRole(roleParam);
+    }
+  }, [roleParam, selectedRole, setSelectedRole]);
 
   const resetError = () => {
     if (localError) setLocalError('');
@@ -62,7 +78,7 @@ const LoginScreen = ({ navigation, route }) => {
       }
 
       setLocalError('');
-      await signIn({ email: email.trim(), phoneNumber: '', password });
+      await signIn({ email: email.trim(), phoneNumber: '', password, role: effectiveRole });
       return;
     }
 
@@ -76,6 +92,7 @@ const LoginScreen = ({ navigation, route }) => {
       email: '',
       phoneNumber: withNigerianCountryCode(phone),
       password,
+      role: effectiveRole,
     });
   };
 
@@ -99,6 +116,18 @@ const LoginScreen = ({ navigation, route }) => {
               <AppText variant="muted" style={styles.subtitle}>
                 Are you ready for the road?
               </AppText>
+              <View style={styles.roleRow}>
+                <AppText variant="muted" style={styles.roleText}>
+                  Signing in as {effectiveRoleLabel}
+                </AppText>
+                {!token ? (
+                  <TouchableOpacity onPress={() => navigation.navigate(ROUTES.ROLE_SELECTION, { returnToLogin: true })}>
+                    <AppText variant="muted" color={darkTheme.colors.accent}>
+                      Change role
+                    </AppText>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
               <View style={styles.form}>
                 <AuthMethodToggle
@@ -177,13 +206,13 @@ const LoginScreen = ({ navigation, route }) => {
 
                 <GoogleButton
                   label="Sign in with Google"
-                  onPress={() => signInWithGoogle({ role: roleParam })}
+                  onPress={() => signInWithGoogle({ role: effectiveRole })}
                   disabled={isLoading}
                 />
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Dont have an account? </AppText>
-                  <TouchableOpacity onPress={() => navigation.navigate(ROUTES.SIGN_UP, roleParam ? { role: roleParam } : undefined)}>
+                  <TouchableOpacity onPress={() => navigation.navigate(ROUTES.SIGN_UP, { role: effectiveRole })}>
                     <AppText variant="muted" color={darkTheme.colors.accent}>
                       Sign Up
                     </AppText>
@@ -204,7 +233,16 @@ const styles = StyleSheet.create({
   logoWrap: { alignItems: 'center', marginTop: darkTheme.spacing.md, marginBottom: darkTheme.spacing.xl },
   logoScale: { transform: [{ scale: 1.4 }] },
   heading: { color: darkTheme.colors.text, marginBottom: darkTheme.spacing.xs },
-  subtitle: { color: darkTheme.colors.muted, marginBottom: darkTheme.spacing.xl },
+  subtitle: { color: darkTheme.colors.muted, marginBottom: darkTheme.spacing.sm },
+  roleRow: {
+    marginBottom: darkTheme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  roleText: {
+    color: darkTheme.colors.muted,
+  },
   form: { marginTop: darkTheme.spacing.xs },
   passwordLabelRow: {
     marginBottom: darkTheme.spacing.xs,

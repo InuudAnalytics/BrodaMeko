@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -17,25 +17,134 @@ import JobsContext from '../../../context/JobsContext';
 import { darkTheme } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
-const ISSUES = [
-  { label: 'Flat tires', icon: TireIcon },
-  { label: 'Battery problem', icon: BatteryCharging02Icon },
-  { label: 'Brake failure', icon: StopCircleIcon },
-  { label: 'Engine overheating', icon: TemperatureIcon },
-  { label: 'Oil leak', icon: OilBarrelIcon },
-  { label: 'Electrical fault', icon: ZapIcon },
-  { label: 'Other', icon: HelpCircleIcon },
+const ISSUE_GROUPS = [
+  {
+    key: 'tyres_wheels',
+    label: 'Tyres & Wheels',
+    icon: TireIcon,
+    issues: [
+      { label: 'Flat tyres', value: 'flat_tyres' },
+      { label: 'Tyre burst', value: 'tyre_burst' },
+      { label: 'Wheel alignment issue', value: 'wheel_alignment_issue' },
+    ],
+  },
+  {
+    key: 'battery_starting',
+    label: 'Battery & Starting',
+    icon: BatteryCharging02Icon,
+    issues: [
+      { label: 'Battery problem', value: 'battery_problem' },
+      { label: 'Dead battery', value: 'dead_battery' },
+      { label: 'Alternator failure', value: 'alternator_failure' },
+      { label: 'Starter motor fault', value: 'starter_motor_fault' },
+    ],
+  },
+  {
+    key: 'engine',
+    label: 'Engine Issues',
+    icon: TemperatureIcon,
+    issues: [
+      { label: 'Engine overheating', value: 'engine_overheating' },
+      { label: 'Engine knocking', value: 'engine_knocking' },
+      { label: 'Engine misfire', value: 'engine_misfire' },
+      { label: 'Engine stalling', value: 'engine_stalling' },
+    ],
+  },
+  {
+    key: 'braking',
+    label: 'Braking System',
+    icon: StopCircleIcon,
+    issues: [
+      { label: 'Brake failure', value: 'brake_failure' },
+      { label: 'Brake pad worn', value: 'brake_pad_worn' },
+      { label: 'Brake fluid leak', value: 'brake_fluid_leak' },
+      { label: 'ABS fault', value: 'abs_fault' },
+    ],
+  },
+  {
+    key: 'electrical',
+    label: 'Electrical',
+    icon: ZapIcon,
+    issues: [
+      { label: 'Electrical fault', value: 'electrical_fault' },
+      { label: 'Headlight issue', value: 'headlight_issue' },
+      { label: 'Dashboard warning light', value: 'dashboard_warning_light' },
+      { label: 'Wiring problem', value: 'wiring_problem' },
+      { label: 'Fuse problem', value: 'fuse_problem' },
+    ],
+  },
+  {
+    key: 'fluids',
+    label: 'Fluids & Leakage',
+    icon: OilBarrelIcon,
+    issues: [
+      { label: 'Oil leak', value: 'oil_leak' },
+      { label: 'Coolant leak', value: 'coolant_leak' },
+      { label: 'Fuel leak', value: 'fuel_leak' },
+      { label: 'Power steering leak', value: 'power_steering_leak' },
+    ],
+  },
+  {
+    key: 'steering',
+    label: 'Steering',
+    icon: HelpCircleIcon,
+    issues: [
+      { label: 'Steering problem', value: 'steering_problem' },
+      { label: 'Suspension noise', value: 'suspension_noise' },
+      { label: 'Shock absorber issue', value: 'shock_absorber_issue' },
+    ],
+  },
+  {
+    key: 'fuel',
+    label: 'Fuel',
+    icon: HelpCircleIcon,
+    issues: [
+      { label: 'Fuel pump failure', value: 'fuel_pump_failure' },
+      { label: 'Injector problem', value: 'injector_problem' },
+      { label: 'Car not accelerating', value: 'car_not_accelerating' },
+    ],
+  },
+  {
+    key: 'cooling',
+    label: 'Cooling',
+    icon: TemperatureIcon,
+    issues: [
+      { label: 'Engine overheating', value: 'engine_overheating' },
+      { label: 'Coolant leak', value: 'coolant_leak' },
+      { label: 'AC not cooling', value: 'ac_not_cooling' },
+    ],
+  },
+  {
+    key: 'transmission',
+    label: 'Transmission',
+    icon: HelpCircleIcon,
+    issues: [
+      { label: 'Gear not shifting', value: 'gear_not_shifting' },
+      { label: 'Clutch problem', value: 'clutch_problem' },
+      { label: 'Transmission leak', value: 'transmission_leak' },
+    ],
+  },
+  {
+    key: 'lock_key',
+    label: 'Lock & Key',
+    icon: HelpCircleIcon,
+    issues: [
+      { label: 'Key locked inside', value: 'key_locked_inside' },
+      { label: 'Ignition problem', value: 'ignition_problem' },
+    ],
+  },
+  {
+    key: 'emergency',
+    label: 'Emergency',
+    icon: HelpCircleIcon,
+    issues: [
+      { label: 'Car accident damage', value: 'car_accident_damage' },
+      { label: 'Towing needed', value: 'towing_needed' },
+      { label: 'General inspection', value: 'general_inspection' },
+      { label: 'Other', value: 'other' },
+    ],
+  },
 ];
-
-const ISSUE_TYPE_MAP = {
-  'Flat tires': 'flat_tires',
-  'Battery problem': 'battery_problem',
-  'Brake failure': 'brake_failure',
-  'Engine overheating': 'engine_trouble',
-  'Oil leak': 'engine_trouble',
-  'Electrical fault': 'engine_trouble',
-  Other: 'other',
-};
 
 const IssueCard = ({ label, icon, selected, onPress }) => {
   const iconColor = selected ? darkTheme.colors.accent : darkTheme.colors.text;
@@ -140,16 +249,65 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
 
 const ReportIssueScreen = ({ navigation }) => {
   const jobsContext = useContext(JobsContext);
-  const [selectedIssue, setSelectedIssue] = useState('');
+  const [activeGroupKey, setActiveGroupKey] = useState(ISSUE_GROUPS[0].key);
+  const [selectedIssueType, setSelectedIssueType] = useState('');
   const [description, setDescription] = useState('');
   const [carMake, setCarMake] = useState('');
   const [images, setImages] = useState([]);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({
+    issue: '',
+    description: '',
+    carMake: '',
+    submit: '',
+  });
+  const [successMessage, setSuccessMessage] = useState('');
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isCreatingJob = Boolean(jobsContext?.loading?.createJob);
 
-  const resolveIssueType = () => ISSUE_TYPE_MAP[selectedIssue] || 'other';
+  const activeGroup = useMemo(
+    () => ISSUE_GROUPS.find((group) => group.key === activeGroupKey) || ISSUE_GROUPS[0],
+    [activeGroupKey]
+  );
+  const selectedIssueLabel = useMemo(() => {
+    for (let groupIndex = 0; groupIndex < ISSUE_GROUPS.length; groupIndex += 1) {
+      const group = ISSUE_GROUPS[groupIndex];
+      const match = group.issues.find((issue) => issue.value === selectedIssueType);
+      if (match) {
+        return match.label;
+      }
+    }
+    return '';
+  }, [selectedIssueType]);
+
+  const resolveCreatedJobPayload = (response) => {
+    const root = response || {};
+    const candidates = [
+      root?.job,
+      root?.data?.job,
+      root?.data?.data?.job,
+      root?.data?.data,
+      root?.data,
+      root,
+    ];
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        continue;
+      }
+
+      const possibleId = String(
+        candidate?.id || candidate?._id || candidate?.job_id || candidate?.jobId || ''
+      ).trim();
+
+      if (possibleId) {
+        return candidate;
+      }
+    }
+
+    return null;
+  };
 
   const handleAddPhotos = async () => {
     if (images.length >= 5) {
@@ -194,57 +352,76 @@ const ReportIssueScreen = ({ navigation }) => {
   };
 
   const handleFindMechanics = async () => {
-    if (!selectedIssue) {
-      setError('Please select at least one issue.');
+    setErrors({ issue: '', description: '', carMake: '', submit: '' });
+    setSuccessMessage('');
+
+    if (!selectedIssueType) {
+      setErrors((prev) => ({ ...prev, issue: 'Please select at least one issue.' }));
       return;
     }
 
-    const issueType = resolveIssueType();
-
-    if (issueType === 'other' && !description.trim()) {
-      setError('Please describe the issue when selecting Other.');
+    if (selectedIssueType === 'other' && !description.trim()) {
+      setErrors((prev) => ({ ...prev, description: 'Please describe the issue when selecting Other.' }));
       return;
     }
 
     if (!carMake.trim()) {
-      setError('Please enter your car make.');
+      setErrors((prev) => ({ ...prev, carMake: 'Please enter your car make.' }));
       return;
     }
 
     if (!jobsContext?.createJob) {
-      setError('Could not submit issue right now. Please try again.');
+      setErrors((prev) => ({ ...prev, submit: 'Could not submit issue right now. Please try again.' }));
       return;
     }
 
     setIsSubmitting(true);
-    setError('');
 
     try {
       const response = await jobsContext.createJob({
-        issue_type: issueType,
+        issue_type: selectedIssueType,
         description: description.trim(),
         car_make: carMake.trim(),
         images,
       });
 
-      if (!response?.success) {
-        setError(response?.message || 'We could not submit your request. Please try again.');
+      const responseJob = resolveCreatedJobPayload(response);
+      const inferredJobId = String(
+        responseJob?.id || responseJob?._id || responseJob?.job_id || responseJob?.jobId || ''
+      ).trim();
+      const isSuccessResponse =
+        response?.success === true ||
+        Boolean(inferredJobId) ||
+        /created successfully/i.test(String(response?.message || ''));
+
+      if (!isSuccessResponse) {
+        setErrors((prev) => ({
+          ...prev,
+          submit: response?.message || 'We could not submit your request. Please try again.',
+        }));
         return;
       }
 
-      const jobPayload = response?.data?.job || response?.data || null;
+      setSuccessMessage('Job created successfully');
+
+      const jobPayload = responseJob;
       const jobId = String(
         jobPayload?.id || jobPayload?._id || jobPayload?.job_id || jobPayload?.jobId || ''
       ).trim();
-
-      const safeJobId = jobId || `mock_job_${Date.now()}`;
+      if (!jobId) {
+        setErrors((prev) => ({
+          ...prev,
+          submit: 'Job was created but no job ID was returned. Please try again.',
+        }));
+        return;
+      }
 
       navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
-        jobId: safeJobId,
+        jobId,
         job: jobPayload || undefined,
       });
     } catch {
-      setError('We could not submit your request. Please try again.');
+      setErrors((prev) => ({ ...prev, submit: 'We could not submit your request. Please try again.' }));
     } finally {
       setIsSubmitting(false);
     }
@@ -257,43 +434,57 @@ const ReportIssueScreen = ({ navigation }) => {
           Select an issue
         </AppText>
 
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabsRow}>
+          {ISSUE_GROUPS.map((group) => (
+            <TouchableOpacity
+              key={group.key}
+              activeOpacity={0.85}
+              style={[styles.groupTab, activeGroupKey === group.key ? styles.groupTabActive : null]}
+              onPress={() => setActiveGroupKey(group.key)}
+            >
+              <AppText style={[styles.groupTabText, activeGroupKey === group.key ? styles.groupTabTextActive : null]}>
+                {group.label}
+              </AppText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <View style={styles.issueGrid}>
-          {ISSUES.map((issue) => (
+          {activeGroup.issues.map((issue) => (
             <IssueCard
-              key={issue.label}
+              key={issue.value}
               label={issue.label}
-              icon={issue.icon}
-              selected={selectedIssue === issue.label}
+              icon={activeGroup.icon}
+              selected={selectedIssueType === issue.value}
               onPress={() => {
-                setSelectedIssue(issue.label);
-                if (error) {
-                  setError('');
-                }
+                setSelectedIssueType(issue.value);
+                setErrors((prev) => ({ ...prev, issue: '', submit: '' }));
               }}
             />
           ))}
         </View>
 
-        {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
+        {errors.issue ? <AppText style={styles.errorText}>{errors.issue}</AppText> : null}
 
         <AppInput
-          label={selectedIssue === 'Other' ? 'Description (required)' : 'Description (optional)'}
+          label={selectedIssueType === 'other' ? 'Description (required)' : 'Description (optional)'}
           placeholder={
-            selectedIssue === 'Other'
+            selectedIssueType === 'other'
               ? 'Please describe your issue'
-              : 'Describe your problem here'
+              : selectedIssueLabel
+                ? `Describe your ${selectedIssueLabel.toLowerCase()} issue`
+                : 'Describe your problem here'
           }
           value={description}
           onChangeText={(text) => {
             setDescription(text);
-            if (error) {
-              setError('');
-            }
+            setErrors((prev) => ({ ...prev, description: '', submit: '' }));
           }}
           multiline
           textAlignVertical="top"
           inputStyle={styles.descriptionInput}
         />
+        {errors.description ? <AppText style={styles.errorText}>{errors.description}</AppText> : null}
 
         <AppInput
           label="Car make"
@@ -301,12 +492,11 @@ const ReportIssueScreen = ({ navigation }) => {
           value={carMake}
           onChangeText={(text) => {
             setCarMake(text);
-            if (error) {
-              setError('');
-            }
+            setErrors((prev) => ({ ...prev, carMake: '', submit: '' }));
           }}
           autoCapitalize="words"
         />
+        {errors.carMake ? <AppText style={styles.errorText}>{errors.carMake}</AppText> : null}
 
         <UploadBox
           images={images}
@@ -326,6 +516,9 @@ const ReportIssueScreen = ({ navigation }) => {
             ) : null
           }
         />
+
+        {errors.submit ? <AppText style={styles.errorText}>{errors.submit}</AppText> : null}
+        {successMessage ? <AppText style={styles.successText}>{successMessage}</AppText> : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -346,6 +539,31 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: darkTheme.spacing.sm,
     marginBottom: darkTheme.spacing.md,
+  },
+  groupTabsRow: {
+    paddingBottom: darkTheme.spacing.sm,
+    columnGap: darkTheme.spacing.xs,
+  },
+  groupTab: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  groupTabActive: {
+    borderColor: darkTheme.colors.accent,
+    backgroundColor: 'rgba(226,255,49,0.16)',
+  },
+  groupTabText: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    lineHeight: 16,
+  },
+  groupTabTextActive: {
+    color: darkTheme.colors.accent,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   issueCard: {
     minWidth: '47%',
@@ -390,6 +608,13 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.xs,
     lineHeight: 16,
     marginBottom: darkTheme.spacing.md,
+  },
+  successText: {
+    color: '#22C55E',
+    fontSize: darkTheme.typography.fontSizes.xs,
+    lineHeight: 16,
+    marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
   },
   descriptionInput: {
     minHeight: 112,

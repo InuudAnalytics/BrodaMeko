@@ -50,8 +50,9 @@ const maskEmail = (value) => {
 };
 
 const SignUpScreen = ({ navigation, route }) => {
-  const selectedRole = route?.params?.role || ROLES.CAR_OWNER;
-  const { signUp, signInWithGoogle: signUpWithGoogle, isLoading, error, clearError } = useAuth();
+  const roleParam = route?.params?.role;
+  const { selectedRole: persistedSelectedRole, signUp, signInWithGoogle: signUpWithGoogle, isLoading, error, clearError } = useAuth();
+  const selectedRole = roleParam || persistedSelectedRole || ROLES.CAR_OWNER;
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
   const [method, setMethod] = useState(METHODS.PHONE);

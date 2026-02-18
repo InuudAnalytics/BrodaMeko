@@ -25,6 +25,9 @@ const STORAGE_KEYS = {
   token: TOKEN_STORAGE_KEY,
   user: '@brodameko/user',
   role: '@brodameko/role',
+  selectedRole: '@brodameko:selectedRole',
+  hasSeenRoleSelection: '@brodameko:hasSeenRoleSelection',
+  skipRoleSelectionOnNextLaunch: '@brodameko:skipRoleSelectionOnNextLaunch',
 };
 
 const GOOGLE_STATUS = {
@@ -111,6 +114,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
+  const [selectedRole, setSelectedRoleState] = useState(null);
+  const [hasSeenRoleSelection, setHasSeenRoleSelection] = useState(false);
+  const [skipRoleSelectionOnNextLaunch, setSkipRoleSelectionOnNextLaunch] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [error, setError] = useState(null);
@@ -140,6 +146,14 @@ export const AuthProvider = ({ children }) => {
     ]);
   };
 
+  const persistRoleSelection = async (nextSelectedRole, { skip = false } = {}) => {
+    await AsyncStorage.multiSet([
+      [STORAGE_KEYS.selectedRole, nextSelectedRole || ''],
+      [STORAGE_KEYS.hasSeenRoleSelection, nextSelectedRole ? 'true' : 'false'],
+      [STORAGE_KEYS.skipRoleSelectionOnNextLaunch, skip ? 'true' : 'false'],
+    ]);
+  };
+
   const clearPersistedAuthState = async () => {
     await AsyncStorage.multiRemove([STORAGE_KEYS.token, STORAGE_KEYS.user, STORAGE_KEYS.role]);
   };
@@ -149,6 +163,14 @@ export const AuthProvider = ({ children }) => {
     setUser(nextUser || null);
     setRole(nextRole || null);
     await persistAuthState(nextToken || '', nextUser || null, nextRole || '');
+
+    const normalizedNextRole = normalizeRole(nextRole);
+    if (normalizedNextRole) {
+      setSelectedRoleState(normalizedNextRole);
+      setHasSeenRoleSelection(true);
+      setSkipRoleSelectionOnNextLaunch(false);
+      await persistRoleSelection(normalizedNextRole, { skip: false });
+    }
   };
 
   const updateUserData = async (updates = {}) => {
@@ -173,6 +195,13 @@ export const AuthProvider = ({ children }) => {
     setUser(nextUser);
     setRole(nextRole);
     await persistAuthState(token || '', nextUser, nextRole || '');
+
+    const normalizedNextRole = normalizeRole(nextRole);
+    if (normalizedNextRole) {
+      setSelectedRoleState(normalizedNextRole);
+      setHasSeenRoleSelection(true);
+      await persistRoleSelection(normalizedNextRole, { skip: skipRoleSelectionOnNextLaunch });
+    }
     return nextUser;
   };
 
@@ -196,72 +225,121 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    const bootstrapAuth = async () => {
-      setIsLoading(true);
+  const bootstrapAuth = async () => {
+    setIsLoading(true);
 
-      try {
-        const entries = await AsyncStorage.multiGet([STORAGE_KEYS.token, STORAGE_KEYS.user, STORAGE_KEYS.role]);
-        const map = Object.fromEntries(entries);
-        const nextToken = map?.[STORAGE_KEYS.token] || null;
-        const storedUser = parseStoredUser(map?.[STORAGE_KEYS.user]);
-        const storedRole = normalizeRole(map?.[STORAGE_KEYS.role]);
+    try {
+      const entries = await AsyncStorage.multiGet([
+        STORAGE_KEYS.token,
+        STORAGE_KEYS.user,
+        STORAGE_KEYS.role,
+        STORAGE_KEYS.selectedRole,
+        STORAGE_KEYS.hasSeenRoleSelection,
+        STORAGE_KEYS.skipRoleSelectionOnNextLaunch,
+      ]);
+      const map = Object.fromEntries(entries);
+      const nextToken = map?.[STORAGE_KEYS.token] || null;
+      const storedUser = parseStoredUser(map?.[STORAGE_KEYS.user]);
+      const storedRole = normalizeRole(map?.[STORAGE_KEYS.role]);
+      const storedSelectedRole = normalizeRole(map?.[STORAGE_KEYS.selectedRole]);
+      const seenRoleSelection =
+        String(map?.[STORAGE_KEYS.hasSeenRoleSelection] || '').toLowerCase() === 'true' || Boolean(storedSelectedRole);
+      const skipRoleSelection =
+        String(map?.[STORAGE_KEYS.skipRoleSelectionOnNextLaunch] || '').toLowerCase() === 'true';
 
-        if (!nextToken) {
-          setToken(null);
-          setUser(null);
-          setRole(null);
-          return;
-        }
+      setSelectedRoleState(storedSelectedRole);
+      setHasSeenRoleSelection(seenRoleSelection);
+      setSkipRoleSelectionOnNextLaunch(skipRoleSelection);
 
-        setToken(nextToken);
-        setUser(storedUser);
-        setRole(storedRole);
-
-        try {
-          const me = await getCurrentUser();
-          const mePayload = pickAuthPayload(me);
-
-          const nextUser = mePayload.user || storedUser || null;
-          const nextRole = mePayload.role || storedRole || null;
-
-          setUser(nextUser);
-          setRole(nextRole);
-          await persistAuthState(nextToken, nextUser, nextRole || '');
-        } catch (meError) {
-          const isUnauthorized = Number(meError?.statusCode || 0) === 401;
-
-          if (isUnauthorized) {
-            throw meError;
-          }
-
-          // Preserve existing local session/user when profile refresh fails transiently.
-          await persistAuthState(nextToken, storedUser, storedRole || '');
-        }
-      } catch (bootstrapError) {
-        setError(bootstrapError?.message || 'Failed to restore your session.');
-        await clearPersistedAuthState();
+      if (!nextToken) {
         setToken(null);
         setUser(null);
         setRole(null);
-      } finally {
-        setIsLoading(false);
-        setIsBootstrapped(true);
+        return;
       }
+
+      setToken(nextToken);
+      setUser(storedUser);
+      setRole(storedRole);
+
+      try {
+        const me = await getCurrentUser();
+        const mePayload = pickAuthPayload(me);
+
+        const nextUser = mePayload.user || storedUser || null;
+        const nextRole = mePayload.role || storedRole || null;
+
+        setUser(nextUser);
+        setRole(nextRole);
+        await persistAuthState(nextToken, nextUser, nextRole || '');
+
+        const normalizedNextRole = normalizeRole(nextRole);
+        if (normalizedNextRole) {
+          setSelectedRoleState(normalizedNextRole);
+          setHasSeenRoleSelection(true);
+          setSkipRoleSelectionOnNextLaunch(false);
+          await persistRoleSelection(normalizedNextRole, { skip: false });
+        }
+      } catch (meError) {
+        const isUnauthorized = Number(meError?.statusCode || 0) === 401;
+
+        if (isUnauthorized) {
+          throw meError;
+        }
+
+        await persistAuthState(nextToken, storedUser, storedRole || '');
+      }
+    } catch (bootstrapError) {
+      setError(bootstrapError?.message || 'Failed to restore your session.');
+      await clearPersistedAuthState();
+      setToken(null);
+      setUser(null);
+      setRole(null);
+    } finally {
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
+
+  useEffect(() => {
+    const runBootstrap = async () => {
+      await bootstrapAuth();
     };
 
-    bootstrapAuth();
+    runBootstrap();
+    // Bootstrap should run once on provider mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signUp = async ({ fullName, email, phoneNumber, password, role: selectedRole }) => {
+  const setSelectedRole = async (nextRoleValue) => {
+    const normalized = normalizeRole(nextRoleValue);
+
+    if (!normalized) {
+      return false;
+    }
+
+    setSelectedRoleState(normalized);
+    setHasSeenRoleSelection(true);
+    setSkipRoleSelectionOnNextLaunch(false);
+    await persistRoleSelection(normalized, { skip: false });
+    return true;
+  };
+
+  const clearSkipRoleSelection = async () => {
+    setSkipRoleSelectionOnNextLaunch(false);
+    await AsyncStorage.setItem(STORAGE_KEYS.skipRoleSelectionOnNextLaunch, 'false');
+  };
+
+  const signUp = async ({ fullName, email, phoneNumber, password, role: selectedRoleInput }) => {
     setIsLoading(true);
     clearError();
 
+    const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) || ROLES.CAR_OWNER;
     const pendingData = {
       method: email ? 'email' : 'phone',
       email: email || '',
       phoneNumber: phoneNumber || '',
-      role: selectedRole || ROLES.CAR_OWNER,
+      role: normalizedSelectedRole,
     };
 
     try {
@@ -270,9 +348,10 @@ export const AuthProvider = ({ children }) => {
         email,
         phoneNumber,
         password,
-        role: selectedRole,
+        role: normalizedSelectedRole,
       });
 
+      await setSelectedRole(normalizedSelectedRole);
       setPendingVerification(pendingData);
 
       return makeAuthResult({
@@ -285,7 +364,6 @@ export const AuthProvider = ({ children }) => {
       const isTransportFailure = Number(signUpError?.statusCode || 0) === 0;
 
       if (isTransportFailure) {
-        // Backend may still create the account/send OTP even when client times out.
         setPendingVerification(pendingData);
         setError('Could not confirm sign up due to network issues. If you received OTP, continue verification.');
         return makeAuthResult({
@@ -371,7 +449,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signIn = async ({ email, phoneNumber, password }) => {
+  const signIn = async ({ email, phoneNumber, password, role: selectedRoleInput }) => {
     setIsLoading(true);
     clearError();
 
@@ -385,6 +463,7 @@ export const AuthProvider = ({ children }) => {
 
       let nextUser = authPayload.user;
       let nextRole = authPayload.role;
+      const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole);
 
       if (!nextUser || !nextRole) {
         const me = await getCurrentUser();
@@ -396,7 +475,7 @@ export const AuthProvider = ({ children }) => {
       await setAuthedState({
         nextToken: authPayload.token,
         nextUser,
-        nextRole: nextRole || ROLES.CAR_OWNER,
+        nextRole: nextRole || normalizedSelectedRole || ROLES.CAR_OWNER,
       });
       registerCurrentDevice();
 
@@ -414,7 +493,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signInWithGoogle = async ({ role: selectedRole }) => {
+  const signInWithGoogle = async ({ role: selectedRoleInput }) => {
     setIsLoading(true);
     clearError();
 
@@ -436,9 +515,10 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Failed to get Google ID token.');
       }
 
+      const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) || ROLES.CAR_OWNER;
       const response = await googleLoginService({
         idToken,
-        role: selectedRole || ROLES.CAR_OWNER
+        role: normalizedSelectedRole
       });
 
       const authPayload = pickAuthPayload(response);
@@ -450,7 +530,7 @@ export const AuthProvider = ({ children }) => {
       await setAuthedState({
         nextToken: authPayload.token,
         nextUser: authPayload.user,
-        nextRole: authPayload.role || selectedRole || ROLES.CAR_OWNER,
+        nextRole: authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER,
       });
       registerCurrentDevice();
 
@@ -541,10 +621,21 @@ export const AuthProvider = ({ children }) => {
     } catch (logoutError) {
       // Even when API logout fails, clear local auth state.
     } finally {
+      const currentSelectedRole = normalizeRole(selectedRole) || null;
+      const hasSelectedRole = Boolean(currentSelectedRole);
+
       await clearPersistedAuthState();
+      await AsyncStorage.multiSet([
+        [STORAGE_KEYS.skipRoleSelectionOnNextLaunch, 'true'],
+        [STORAGE_KEYS.selectedRole, currentSelectedRole || ''],
+        [STORAGE_KEYS.hasSeenRoleSelection, hasSelectedRole ? 'true' : 'false'],
+      ]);
       setToken(null);
       setUser(null);
       setRole(null);
+      setSelectedRoleState(currentSelectedRole);
+      setHasSeenRoleSelection(hasSelectedRole);
+      setSkipRoleSelectionOnNextLaunch(true);
       setPendingVerification(null);
       setIsLoading(false);
     }
@@ -556,6 +647,9 @@ export const AuthProvider = ({ children }) => {
         user,
         token,
         role,
+        selectedRole,
+        hasSeenRoleSelection,
+        skipRoleSelectionOnNextLaunch,
         isLoading,
         isBootstrapped,
         error,
@@ -569,6 +663,9 @@ export const AuthProvider = ({ children }) => {
         resetPasswordWithOtp,
         updatePassword,
         signOut,
+        setSelectedRole,
+        clearSkipRoleSelection,
+        bootstrapAuth,
         updateUserData,
         refreshUserProfile,
         clearError,

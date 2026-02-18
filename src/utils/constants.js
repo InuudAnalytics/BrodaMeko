@@ -32,6 +32,7 @@ export const ROUTES = {
   CAR_OWNER_RATE_MECHANIC: 'CarOwnerRateMechanic',
   CAR_OWNER_JOB_DETAILS: 'CarOwnerJobDetails',
   CAR_OWNER_EDIT_JOB: 'CarOwnerEditJob',
+  SUPPORT: 'Support',
   DEV_API_TEST: 'DevApiTest',
 
   MECH_DASHBOARD: 'MechDashboard',

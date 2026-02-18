@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet } from 'react-native';
 import { AppButton, AppText, AnimatedLogo, ScreenContainer } from '../../components';
+import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
 import { ROLES, ROUTES } from '../../utils';
 
@@ -8,7 +9,9 @@ const LOGO_ENTRY_OFFSET = 120;
 const BUTTONS_ENTRY_OFFSET = 34;
 
 const RoleSelectionScreen = ({ navigation, route }) => {
+  const { token, setSelectedRole } = useAuth();
   const shouldAnimateIntro = route?.params?.animateIntro === true;
+  const returnToLogin = route?.params?.returnToLogin === true;
   const logoTranslateY = useRef(new Animated.Value(shouldAnimateIntro ? LOGO_ENTRY_OFFSET : 0)).current;
   const actionsTranslateY = useRef(new Animated.Value(shouldAnimateIntro ? BUTTONS_ENTRY_OFFSET : 0)).current;
   const actionsOpacity = useRef(new Animated.Value(shouldAnimateIntro ? 0 : 1)).current;
@@ -54,12 +57,15 @@ const RoleSelectionScreen = ({ navigation, route }) => {
     };
   }, [actionsOpacity, actionsTranslateY, logoTranslateY, shouldAnimateIntro]);
 
-  const handleUserStart = () => {
-    navigation.navigate(ROUTES.SIGN_UP, { role: ROLES.CAR_OWNER });
-  };
+  const handleSelectRole = async (nextRole) => {
+    await setSelectedRole(nextRole);
 
-  const handleMechanicStart = () => {
-    navigation.navigate(ROUTES.SIGN_UP, { role: ROLES.MECH });
+    if (!token && returnToLogin) {
+      navigation.replace(ROUTES.LOGIN, { role: nextRole });
+      return;
+    }
+
+    navigation.navigate(ROUTES.SIGN_UP, { role: nextRole });
   };
 
   return (
@@ -83,8 +89,8 @@ const RoleSelectionScreen = ({ navigation, route }) => {
           },
         ]}
       >
-        <AppButton label="Get started as user" onPress={handleUserStart} style={styles.cta} />
-        <AppButton label="Get started as mechanic" onPress={handleMechanicStart} />
+        <AppButton label="Get started as user" onPress={() => handleSelectRole(ROLES.CAR_OWNER)} style={styles.cta} />
+        <AppButton label="Get started as mechanic" onPress={() => handleSelectRole(ROLES.MECH)} />
       </Animated.View>
     </ScreenContainer>
   );

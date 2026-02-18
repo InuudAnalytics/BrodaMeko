@@ -2,19 +2,35 @@ import { CHAT_WS_URL } from '../config/endpoints';
 
 let socketRef = null;
 
-const withToken = (baseUrl, token) => {
+const buildUrl = (token) => {
   const safeToken = String(token || '').trim();
   if (!safeToken) {
-    return baseUrl;
+    return CHAT_WS_URL;
   }
 
-  const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}token=${encodeURIComponent(safeToken)}`;
+  const separator = CHAT_WS_URL.includes('?') ? '&' : '?';
+  return `${CHAT_WS_URL}${separator}token=${encodeURIComponent(safeToken)}`;
 };
 
-export const connectChatWebSocket = ({ token, onMessage, onOpen, onClose, onError } = {}) => {
-  const url = withToken(CHAT_WS_URL, token);
-  const socket = new WebSocket(url);
+export const connect = (token, onMessage, onOpen, onClose, onError) => {
+  const safeToken = String(token || '').trim();
+  const url = buildUrl(safeToken);
+
+  if (socketRef) {
+    try {
+      socketRef.close();
+    } catch (error) {
+      // no-op
+    }
+    socketRef = null;
+  }
+
+  const socket = new WebSocket(url, [], {
+    headers: {
+      Authorization: `Bearer ${safeToken}`,
+    },
+  });
+
   socketRef = socket;
 
   socket.onopen = (event) => {
@@ -44,29 +60,45 @@ export const connectChatWebSocket = ({ token, onMessage, onOpen, onClose, onErro
   return socket;
 };
 
-export const sendMessage = ({ type = 'message', conversation_id, content }) => {
+export const send = (payload) => {
   if (!socketRef || socketRef.readyState !== WebSocket.OPEN) {
     return false;
   }
-
-  const payload = {
-    type,
-    conversation_id: String(conversation_id || '').trim(),
-    content: String(content || ''),
-  };
 
   socketRef.send(JSON.stringify(payload));
   return true;
 };
 
-export const closeChatWebSocket = () => {
-  if (socketRef) {
+export const close = () => {
+  if (!socketRef) {
+    return;
+  }
+
+  try {
+    socketRef.onopen = null;
+    socketRef.onmessage = null;
+    socketRef.onclose = null;
+    socketRef.onerror = null;
     socketRef.close();
+  } catch (error) {
+    // no-op
+  } finally {
     socketRef = null;
   }
 };
 
+// Backward-compatible aliases
+export const connectChatWebSocket = ({ token, onMessage, onOpen, onClose, onError } = {}) =>
+  connect(token, onMessage, onOpen, onClose, onError);
+
+export const sendMessage = (payload) => send(payload);
+
+export const closeChatWebSocket = () => close();
+
 export default {
+  connect,
+  send,
+  close,
   connectChatWebSocket,
   sendMessage,
   closeChatWebSocket,

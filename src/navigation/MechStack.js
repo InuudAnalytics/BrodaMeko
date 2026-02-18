@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MechanicDashboardTabs from './MechanicDashboardTabs';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
+import SupportScreen from '../screens/shared/SupportScreen';
 import {
   BankDetailsScreen,
   KycUploadScreen,
@@ -74,6 +75,7 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.USER_PROFILE}
