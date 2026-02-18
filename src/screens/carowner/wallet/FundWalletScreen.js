@@ -114,6 +114,18 @@ const FundWalletScreen = ({ navigation }) => {
           style={styles.secondaryBtn}
         />
 
+        <AppButton
+          label="I have a reference"
+          onPress={() =>
+            navigation.navigate(ROUTES.CAR_OWNER_VERIFY_TOP_UP, {
+              reference: reference.trim(),
+              trxref: trxref.trim(),
+            })
+          }
+          style={styles.manualBtn}
+          textStyle={styles.manualBtnText}
+        />
+
         {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
       </View>
     </ScreenContainer>
@@ -144,6 +156,15 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     marginTop: 8,
+  },
+  manualBtn: {
+    marginTop: 8,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+  },
+  manualBtnText: {
+    color: darkTheme.colors.accent,
   },
   errorText: {
     marginTop: 12,

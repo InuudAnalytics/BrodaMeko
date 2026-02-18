@@ -1,0 +1,241 @@
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { useJobs } from '../../../context';
+import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
+
+const readImages = (job) => {
+  const images = job?.images || job?.photos || job?.attachments || [];
+  return Array.isArray(images) ? images : [];
+};
+
+const toImageUri = (image) => {
+  if (!image) {
+    return '';
+  }
+  if (typeof image === 'string') {
+    return image;
+  }
+  return String(image?.url || image?.uri || image?.path || '').trim();
+};
+
+const JobDetailsScreen = ({ navigation, route }) => {
+  const jobId = String(route?.params?.jobId || '').trim();
+  const { fetchJob, deleteJob, loading } = useJobs();
+  const [job, setJob] = useState(null);
+  const [error, setError] = useState('');
+
+  const loadJob = useCallback(async () => {
+    if (!jobId) {
+      setError('Job ID is missing.');
+      return;
+    }
+
+    setError('');
+    const response = await fetchJob(jobId);
+    if (!response) {
+      setError('Could not load this job.');
+      return;
+    }
+
+    const payload = response?.data || response?.job || response || null;
+    setJob(payload);
+  }, [fetchJob, jobId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadJob();
+    }, [loadJob])
+  );
+
+  const images = useMemo(() => readImages(job), [job]);
+
+  const handleDelete = () => {
+    Alert.alert('Delete job', 'Are you sure you want to delete this job?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const response = await deleteJob(jobId);
+          if (!response) {
+            Alert.alert('Error', 'Could not delete this job.');
+            return;
+          }
+          Alert.alert('Deleted', 'Job deleted successfully.');
+          navigation.navigate(ROUTES.CAR_OWNER_HISTORY, { refresh: Date.now() });
+        },
+      },
+    ]);
+  };
+
+  return (
+    <ScreenContainer style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.goBack()}>
+            <AppText style={styles.backText}>Back</AppText>
+          </TouchableOpacity>
+          <AppText style={styles.title}>Job details</AppText>
+        </View>
+
+        {(loading.fetchJob || !job) && !error ? (
+          <View style={styles.stateWrap}>
+            <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+          </View>
+        ) : null}
+
+        {error ? (
+          <View style={styles.stateWrap}>
+            <AppText style={styles.errorText}>{error}</AppText>
+            <AppButton label="Retry" onPress={loadJob} style={styles.retryBtn} />
+          </View>
+        ) : null}
+
+        {job && !error ? (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <AppText style={styles.label}>Issue</AppText>
+              <AppText style={styles.value}>{String(job?.issue_type || 'N/A')}</AppText>
+            </View>
+            <View style={styles.row}>
+              <AppText style={styles.label}>Car make</AppText>
+              <AppText style={styles.value}>{String(job?.car_make || 'N/A')}</AppText>
+            </View>
+            <View style={styles.row}>
+              <AppText style={styles.label}>Description</AppText>
+              <AppText style={styles.value}>{String(job?.description || 'N/A')}</AppText>
+            </View>
+            <View style={styles.row}>
+              <AppText style={styles.label}>Status</AppText>
+              <AppText style={styles.value}>{String(job?.status || 'N/A')}</AppText>
+            </View>
+
+            <AppText style={styles.imagesTitle}>Images</AppText>
+            {images.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imagesRow}>
+                {images.map((image, index) => {
+                  const uri = toImageUri(image);
+                  return uri ? <Image key={`${uri}-${index}`} source={{ uri }} style={styles.image} /> : null;
+                })}
+              </ScrollView>
+            ) : (
+              <AppText style={styles.emptyText}>No images uploaded.</AppText>
+            )}
+
+            <AppButton
+              label="Edit"
+              onPress={() => navigation.navigate(ROUTES.CAR_OWNER_EDIT_JOB, { jobId, job })}
+              style={styles.editBtn}
+            />
+            <AppButton
+              label={loading.deleteJob ? 'Deleting...' : 'Delete'}
+              onPress={handleDelete}
+              disabled={loading.deleteJob}
+              style={styles.deleteBtn}
+              textStyle={styles.deleteBtnText}
+            />
+          </View>
+        ) : null}
+      </ScrollView>
+    </ScreenContainer>
+  );
+};
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#000033',
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 12,
+    marginBottom: 12,
+  },
+  backText: {
+    color: darkTheme.colors.accent,
+  },
+  title: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    columnGap: 10,
+    marginBottom: 8,
+  },
+  label: {
+    color: darkTheme.colors.muted,
+    fontSize: 13,
+  },
+  value: {
+    color: darkTheme.colors.text,
+    fontSize: 13,
+    flex: 1,
+    textAlign: 'right',
+  },
+  imagesTitle: {
+    marginTop: 8,
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  imagesRow: {
+    paddingTop: 8,
+    columnGap: 8,
+  },
+  image: {
+    width: 84,
+    height: 84,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+  },
+  emptyText: {
+    marginTop: 6,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+  },
+  editBtn: {
+    marginTop: 14,
+  },
+  deleteBtn: {
+    marginTop: 8,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#FF7B8A',
+  },
+  deleteBtnText: {
+    color: '#FF7B8A',
+  },
+  stateWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    rowGap: 10,
+  },
+  errorText: {
+    color: '#FF7F7F',
+  },
+  retryBtn: {
+    minWidth: 120,
+  },
+});
+
+export default JobDetailsScreen;

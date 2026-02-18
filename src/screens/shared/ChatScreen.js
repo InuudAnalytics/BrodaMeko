@@ -194,6 +194,9 @@ const SharedChatScreen = ({
     const [hasInteracted, setHasInteracted] = useState(false); // Replaces 'accepted' state for generic interaction
     const [isSettingPrice, setIsSettingPrice] = useState(false);
     const [showPriceConfirm, setShowPriceConfirm] = useState(false);
+    const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+    const [selectedQuoteMessage, setSelectedQuoteMessage] = useState(null);
+    const [paying, setPaying] = useState(false);
 
     const messages = useMemo(
         () => messagesByConversationId[conversationId] || [],
@@ -327,6 +330,12 @@ const SharedChatScreen = ({
     };
 
     const handleAcceptPrice = async (message) => {
+        setSelectedQuoteMessage(message);
+        setShowPaymentMethodModal(true);
+    };
+
+    const handleConfirmPaymentMethod = async (paymentMethod) => {
+        const message = selectedQuoteMessage;
         const quotationId = String(
             message?.quotation_id || message?.id || message?._id || ''
         ).trim();
@@ -336,34 +345,41 @@ const SharedChatScreen = ({
             return;
         }
 
-        const quotationResponse = await respondQuotation(conversationId, {
-            quotation_id: quotationId,
-            action: 'accept',
-        });
+        setPaying(true);
+        try {
+            const quotationResponse = await respondQuotation(conversationId, {
+                quotation_id: quotationId,
+                action: 'accept',
+            });
 
-        if (!quotationResponse) {
-            Alert.alert('Error', 'Could not accept quotation.');
-            return;
+            if (!quotationResponse) {
+                Alert.alert('Error', 'Could not accept quotation.');
+                return;
+            }
+
+            const jobId = route?.params?.jobId;
+            const paymentResponse = await initiatePaymentForJob(jobId, paymentMethod);
+
+            if (!paymentResponse) {
+                Alert.alert('Error', 'Payment could not be initiated.');
+                return;
+            }
+
+            setShowPaymentMethodModal(false);
+            setSelectedQuoteMessage(null);
+            addLocalMessage(conversationId, {
+                type: 'system',
+                text: 'Price accepted',
+            });
+            navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
+                jobId: route?.params?.jobId,
+                mechanicId: route?.params?.mechanicId,
+                agreedPrice: message?.amount || null,
+                mechanic: route?.params?.mechanic,
+            });
+        } finally {
+            setPaying(false);
         }
-
-        const jobId = route?.params?.jobId;
-        const paymentResponse = await initiatePaymentForJob(jobId, route?.params?.paymentMethod || 'wallet');
-
-        if (!paymentResponse) {
-            Alert.alert('Error', 'Payment could not be initiated.');
-            return;
-        }
-
-        addLocalMessage(conversationId, {
-            type: 'system',
-            text: 'Price accepted',
-        });
-        navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
-            jobId: route?.params?.jobId,
-            mechanicId: route?.params?.mechanicId,
-            agreedPrice: message?.amount || null,
-            mechanic: route?.params?.mechanic,
-        });
     };
 
     const handleDeclinePrice = async (message) => {
@@ -509,6 +525,58 @@ const SharedChatScreen = ({
                                 <AppText style={styles.modalBtnPrimaryText}>Yes</AppText>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={showPaymentMethodModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowPaymentMethodModal(false)}
+            >
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalCard}>
+                        <AppText style={styles.modalTitle}>Choose payment method</AppText>
+                        <View style={styles.paymentMethodList}>
+                            <TouchableOpacity
+                                style={styles.paymentMethodBtn}
+                                activeOpacity={0.85}
+                                onPress={() => handleConfirmPaymentMethod('wallet')}
+                                disabled={paying}
+                            >
+                                <AppText style={styles.paymentMethodText}>Wallet</AppText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.paymentMethodBtn}
+                                activeOpacity={0.85}
+                                onPress={() => handleConfirmPaymentMethod('paystack')}
+                                disabled={paying}
+                            >
+                                <AppText style={styles.paymentMethodText}>Paystack</AppText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.paymentMethodBtn}
+                                activeOpacity={0.85}
+                                onPress={() => handleConfirmPaymentMethod('cash')}
+                                disabled={paying}
+                            >
+                                <AppText style={styles.paymentMethodText}>Cash</AppText>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.modalBtnSecondary}
+                            activeOpacity={0.85}
+                            onPress={() => {
+                                if (!paying) {
+                                    setShowPaymentMethodModal(false);
+                                    setSelectedQuoteMessage(null);
+                                }
+                            }}
+                            disabled={paying}
+                        >
+                            <AppText style={styles.modalBtnSecondaryText}>{paying ? 'Processing...' : 'Cancel'}</AppText>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -861,6 +929,24 @@ const styles = StyleSheet.create({
     },
     modalBtnSecondaryText: {
         color: darkTheme.colors.text,
+        fontWeight: darkTheme.typography.fontWeights.medium,
+    },
+    paymentMethodList: {
+        rowGap: darkTheme.spacing.xs,
+        marginBottom: darkTheme.spacing.sm,
+    },
+    paymentMethodBtn: {
+        minHeight: 44,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: darkTheme.colors.inputBorder,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    paymentMethodText: {
+        color: darkTheme.colors.text,
+        fontSize: 14,
         fontWeight: darkTheme.typography.fontWeights.medium,
     },
 });

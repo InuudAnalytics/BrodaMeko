@@ -24,11 +24,20 @@ export const topUpWallet = async (amount) => {
   return response.data;
 };
 
-export const verifyWalletPayment = async (reference, trxref) => {
+export const verifyWalletPayment = async (referenceInput, trxrefInput) => {
+  const reference =
+    typeof referenceInput === 'object'
+      ? String(referenceInput?.reference || '').trim()
+      : String(referenceInput || '').trim();
+  const trxref =
+    typeof referenceInput === 'object'
+      ? String(referenceInput?.trxref || '').trim()
+      : String(trxrefInput || '').trim();
+
   const response = await api.get(ENDPOINTS.wallet.verifyPayment, {
     params: {
-      reference: String(reference || '').trim(),
-      trxref: String(trxref || '').trim(),
+      reference,
+      trxref,
     },
   });
   return response.data;

@@ -4,8 +4,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Clock01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
-import { getMechanicAssignedJob, getMechanicAssignedJobs, updateJobStatus } from '../../../services/jobs.service';
+import { getMechanicAssignedJobs, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
 const TABS = [
   { key: 'available', label: 'Available jobs' },
@@ -78,7 +79,7 @@ const JobCard = ({ item, tab, loadingAction, onAccept, onViewDetails }) => {
   const isBusy = loadingAction === item.id;
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => onViewDetails(item)}>
       <View style={styles.topRow}>
         <View style={styles.leftBlock}>
           <View style={styles.avatar}>
@@ -139,11 +140,11 @@ const JobCard = ({ item, tab, loadingAction, onAccept, onViewDetails }) => {
           <AppText style={styles.completedChipText}>Completed</AppText>
         </View>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 };
 
-const MechanicJobsScreen = () => {
+const MechanicJobsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -200,14 +201,8 @@ const MechanicJobsScreen = () => {
     }
   };
 
-  const handleViewDetails = async (job) => {
-    try {
-      const response = await getMechanicAssignedJob(job.id);
-      const payload = response?.data || response || {};
-      Alert.alert('Job details', JSON.stringify(payload, null, 2));
-    } catch (detailsError) {
-      Alert.alert('Error', detailsError?.message || 'Could not load job details.');
-    }
+  const handleViewDetails = (job) => {
+    navigation.navigate(ROUTES.MECH_JOB_DETAILS, { jobId: job.id });
   };
 
   return (
@@ -238,7 +233,7 @@ const MechanicJobsScreen = () => {
         {!loading && error ? (
           <View style={styles.centerState}>
             <AppText style={styles.errorText}>{error}</AppText>
-            <TouchableOpacity activeOpacity={0.85} onPress={() => fetchTabJobs(activeTab)}>
+            <TouchableOpacity activeOpacity={0.85} onPress={fetchTabJobs}>
               <AppText style={styles.retryText}>Retry</AppText>
             </TouchableOpacity>
           </View>

@@ -11,6 +11,7 @@ import {
   UploadProfilePhotoScreen,
 } from '../screens/mech/profile';
 import MechanicChatScreen from '../screens/mech/chat/MechanicChatScreen';
+import MechanicJobDetailsScreen from '../screens/mech/jobs/MechanicJobDetailsScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import { useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
@@ -65,6 +66,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.MECH_CHAT}
         component={MechanicChatScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_JOB_DETAILS}
+        component={MechanicJobDetailsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />

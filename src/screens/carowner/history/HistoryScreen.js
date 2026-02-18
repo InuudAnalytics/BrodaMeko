@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, StarIcon } from '@hugeicons/core-free-icons';
@@ -10,6 +11,7 @@ import { ROUTES } from '../../../utils';
 const MOCK_COMPLETED_JOBS = [
   {
     id: 'mock_1',
+    jobId: 'mock_1',
     mechanicName: 'Shittu Hassan',
     issueSummary: 'Engine misfire - Toyota Camry',
     rating: 4.9,
@@ -17,6 +19,7 @@ const MOCK_COMPLETED_JOBS = [
   },
   {
     id: 'mock_2',
+    jobId: 'mock_2',
     mechanicName: 'Emeka Okafor',
     issueSummary: 'Battery problem - Honda Accord',
     rating: 4.7,
@@ -24,6 +27,7 @@ const MOCK_COMPLETED_JOBS = [
   },
   {
     id: 'mock_3',
+    jobId: 'mock_3',
     mechanicName: 'Chidi Nwosu',
     issueSummary: 'Brake service - Nissan Altima',
     rating: 4.8,
@@ -64,8 +68,11 @@ const normalizeJob = (job, index) => {
   const rating =
     Number(job?.rating || job?.mechanic?.rating || job?.provider?.rating || 4.8);
 
+  const jobId = String(job?.id || job?._id || job?.job_id || `job-${index}`);
+
   return {
-    id: String(job?.id || job?._id || job?.job_id || `job-${index}`),
+    id: jobId,
+    jobId,
     mechanicName,
     issueSummary: vehicle ? `${issue} - ${vehicle}` : issue,
     rating: Number.isFinite(rating) ? rating : 4.8,
@@ -114,7 +121,7 @@ const HistorySkeleton = () => {
   );
 };
 
-const JobHistoryCard = ({ item }) => {
+const JobHistoryCard = ({ item, onViewDetails }) => {
   return (
     <View style={styles.card}>
       <View style={styles.cardTopRow}>
@@ -131,7 +138,11 @@ const JobHistoryCard = ({ item }) => {
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity activeOpacity={0.85} style={[styles.actionBtn, styles.actionBtnOutline]} disabled>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.actionBtn, styles.actionBtnOutline]}
+          onPress={onViewDetails}
+        >
           <AppText style={styles.actionBtnOutlineText}>View details</AppText>
         </TouchableOpacity>
 
@@ -183,9 +194,11 @@ const HistoryScreen = ({ navigation }) => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchHistory();
+    }, [fetchHistory])
+  );
 
   const content = useMemo(() => {
     if (loading) {
@@ -217,11 +230,15 @@ const HistoryScreen = ({ navigation }) => {
           <AppText style={styles.fallbackHint}>Showing recent mock history while connection is unavailable.</AppText>
         ) : null}
         {jobs.map((item) => (
-          <JobHistoryCard key={item.id} item={item} />
+          <JobHistoryCard
+            key={item.id}
+            item={item}
+            onViewDetails={() => navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, { jobId: item.jobId })}
+          />
         ))}
       </View>
     );
-  }, [loading, error, jobs, usingFallback, fetchHistory]);
+  }, [loading, error, jobs, usingFallback, fetchHistory, navigation]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>

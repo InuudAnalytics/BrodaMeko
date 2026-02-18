@@ -18,6 +18,9 @@ import {
 } from '../screens';
 import MechanicServicesApiTestScreen from '../screens/dev/MechanicServicesApiTestScreen';
 import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
+import EditJobScreen from '../screens/carowner/history/EditJobScreen';
+import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
+import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import { darkTheme } from '../theme';
@@ -53,9 +56,24 @@ const CarOwnerStack = () => {
         options={{ title: 'Fund Wallet' }}
       />
       <Stack.Screen
+        name={ROUTES.CAR_OWNER_VERIFY_TOP_UP}
+        component={VerifyTopUpScreen}
+        options={{ title: 'Verify top-up' }}
+      />
+      <Stack.Screen
         name={ROUTES.CAR_OWNER_TRANSACTION_DETAILS}
         component={CarOwnerTransactionDetailsScreen}
         options={{ title: 'Transaction details' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_JOB_DETAILS}
+        component={JobDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_EDIT_JOB}
+        component={EditJobScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_WITHDRAW}

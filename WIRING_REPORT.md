@@ -17,7 +17,7 @@
 
 ### Wallet + Transactions
 - POST `/api/v1/wallets/top-up` -> `src/screens/carowner/wallet/FundWalletScreen.js`
-- GET `/api/v1/wallets/verify/payment` -> `src/screens/carowner/wallet/FundWalletScreen.js`
+- GET `/api/v1/wallets/verify/payment` -> `src/screens/carowner/wallet/FundWalletScreen.js`, `src/screens/carowner/wallet/VerifyTopUpScreen.js`
 - GET `/api/v1/transactions/list` -> `src/screens/carowner/wallet/WalletScreen.js`
 - GET `/api/v1/transactions/:reference` -> `src/screens/carowner/wallet/TransactionDetailsScreen.js`
 
@@ -35,13 +35,13 @@
 ### Jobs
 - POST `/api/v1/jobs/create` -> `src/screens/carowner/assistance/ReportIssueScreen.js`, `src/context/JobsContext.js`
 - GET `/api/v1/jobs/car-owner` -> `src/screens/carowner/history/HistoryScreen.js`, `src/context/JobsContext.js`
-- GET `/api/v1/jobs/car-owner/:jobId` -> `src/context/JobsContext.js`
-- POST `/api/v1/jobs/car-owner/:jobId/update` -> `src/context/JobsContext.js`
-- DELETE `/api/v1/jobs/:jobId` -> `src/context/JobsContext.js`
+- GET `/api/v1/jobs/car-owner/:jobId` -> `src/context/JobsContext.js`, `src/screens/carowner/history/JobDetailsScreen.js`
+- POST `/api/v1/jobs/car-owner/:jobId/update` -> `src/context/JobsContext.js`, `src/screens/carowner/history/EditJobScreen.js`
+- DELETE `/api/v1/jobs/:jobId` -> `src/context/JobsContext.js`, `src/screens/carowner/history/JobDetailsScreen.js`
 - GET `/api/v1/jobs/:jobId/mechanics/for-job` -> `src/screens/carowner/assistance/FindMechanicsScreen.js`
 - GET `/api/v1/jobs/mechanic/assigned` -> `src/screens/mech/home/MechanicDashboardScreen.js`, `src/screens/mech/jobs/MechanicJobsScreen.js`
-- GET `/api/v1/jobs/mechanic/assigned/:jobId` -> `src/screens/mech/jobs/MechanicJobsScreen.js`
-- POST `/api/v1/jobs/:jobId/status` -> `src/screens/mech/jobs/MechanicJobsScreen.js`
+- GET `/api/v1/jobs/mechanic/assigned/:jobId` -> `src/screens/mech/jobs/MechanicJobDetailsScreen.js`
+- POST `/api/v1/jobs/:jobId/status` -> `src/screens/mech/jobs/MechanicJobsScreen.js`, `src/screens/mech/jobs/MechanicJobDetailsScreen.js`
 - POST `/api/v1/jobs/:jobId/confirm` -> `src/screens/carowner/assistance/LiveTrackingScreen.js`
 
 ### Chat
@@ -61,15 +61,8 @@
   - `GET /api/v1/jobs/mechanic/assigned` is used for total jobs done on dashboard (using `total` or list length).
   - `GET /api/v1/wallet/balance` is used for wallet balance.
   - Earnings still has no dedicated mechanic earnings summary endpoint in current spec, so dashboard earnings remain placeholder.
-
-- GET `/api/v1/jobs/car-owner/:jobId`, POST `/api/v1/jobs/car-owner/:jobId/update`, DELETE `/api/v1/jobs/:jobId`
-  - service + context wiring exist, but no dedicated production job detail/edit/delete screen yet.
-- GET `/api/v1/jobs/mechanic/assigned/:jobId`
-  - currently shown via alert payload in `src/screens/mech/jobs/MechanicJobsScreen.js` instead of a dedicated detail page.
-- POST `/api/v1/chat/jobs/:jobId/payment/initiate`
-  - called after quotation accept, but payment-method UX is still simple/defaulted in chat flow.
-- Wallet verify callback
-  - manual verify flow exists in `FundWalletScreen`; no dedicated callback/deeplink verification screen.
+- Wallet verify callback/deeplink
+  - Manual verification is wired via `VerifyTopUpScreen`, but automatic callback/deeplink handler route remains unimplemented.
 
 ## Not wired
 
@@ -79,13 +72,5 @@
 
 ## 🧱 Missing screens
 
-- `src/screens/carowner/history/JobDetailsScreen.js`
-  - needed to fully use `GET /api/v1/jobs/car-owner/:jobId`.
-- `src/screens/carowner/history/EditJobScreen.js`
-  - needed to fully use `POST /api/v1/jobs/car-owner/:jobId/update` + image removals.
-- Job delete confirmation UI in production history/detail flow
-  - needed to expose `DELETE /api/v1/jobs/:jobId`.
-- `src/screens/mech/jobs/MechanicJobDetailsScreen.js`
-  - needed to replace alert-based use of `GET /api/v1/jobs/mechanic/assigned/:jobId`.
-- `src/screens/carowner/wallet/VerifyTopUpScreen.js` (optional but recommended)
-  - needed for callback/deeplink-based verification flow.
+- Callback/deeplink verification route for wallet top-up (optional)
+  - `VerifyTopUpScreen` is manual fallback; automatic callback handler screen/route remains unimplemented.
