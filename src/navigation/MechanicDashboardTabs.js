@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { AppText, ScreenContainer } from '../components';
+import { ScreenContainer } from '../components';
 import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
 import MechanicJobsScreen from '../screens/mech/jobs/MechanicJobsScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
-import { darkTheme } from '../theme';
+import { ROUTES } from '../utils';
 
-const TabPlaceholder = ({ title, subtitle }) => {
-  return (
-    <View style={styles.placeholderWrap}>
-      <AppText style={styles.placeholderTitle}>{title}</AppText>
-      <AppText style={styles.placeholderSubtitle}>{subtitle}</AppText>
-    </View>
-  );
-};
-
-const MechanicDashboardTabs = ({ navigation }) => {
+const MechanicDashboardTabs = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('home');
+
+  useEffect(() => {
+    const requestedTab = route?.params?.tab;
+
+    if (!requestedTab || requestedTab === 'profile') {
+      return;
+    }
+
+    setActiveTab(requestedTab);
+    navigation.setParams?.({ tab: undefined });
+  }, [navigation, route?.params?.tab]);
 
   const renderTabScreen = () => {
     if (activeTab === 'home') {
@@ -32,22 +34,22 @@ const MechanicDashboardTabs = ({ navigation }) => {
       return <MechanicWalletScreen navigation={navigation} onTabPress={setActiveTab} showTabBar={false} />;
     }
 
-    if (activeTab === 'chat') {
-      return (
-        <TabPlaceholder
-          title="Chat opens with an active job"
-          subtitle="You can message a customer after accepting a job."
-        />
-      );
+    return null;
+  };
+
+  const handleTabPress = (tabKey) => {
+    if (tabKey === 'profile') {
+      navigation.navigate(ROUTES.USER_PROFILE);
+      return;
     }
 
-    return null;
+    setActiveTab(tabKey);
   };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.content}>{renderTabScreen()}</View>
-      <MechanicTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+      <MechanicTabBar activeTab={activeTab} onTabPress={handleTabPress} />
     </ScreenContainer>
   );
 };
@@ -59,27 +61,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  placeholderWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    backgroundColor: '#000033',
-  },
-  placeholderTitle: {
-    color: darkTheme.colors.text,
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-    textAlign: 'center',
-  },
-  placeholderSubtitle: {
-    marginTop: 8,
-    color: darkTheme.colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
   },
 });
 

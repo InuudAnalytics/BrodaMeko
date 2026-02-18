@@ -1,8 +1,11 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import {
+  createQuotation,
   getConversations,
   getMessages,
+  initiateJobPayment,
   markAsRead,
+  respondToQuotation,
   startConversation,
   uploadConversationImages,
 } from '../services/chat.service';
@@ -101,7 +104,7 @@ export const ChatProvider = ({ children }) => {
 
     try {
       const response = await getConversations();
-      setConversations([]);
+      setConversations(extractConversations(response?.data || response));
       return response;
     } catch (fetchError) {
       setError(fetchError?.message || 'Failed to load conversations.');
@@ -157,8 +160,6 @@ export const ChatProvider = ({ children }) => {
     }
 
     setActiveConversation(conversation);
-    setConversations([]);
-    setMessagesByConversationId({});
     return fetchMessages(conversationId, { limit: 50, offset: 0 });
   }, [fetchMessages]);
 
@@ -191,8 +192,6 @@ export const ChatProvider = ({ children }) => {
 
       if (conversation && conversationId) {
         setActiveConversation(conversation);
-        setConversations([]);
-        setMessagesByConversationId({});
         await fetchMessages(conversationId, { limit: 50, offset: 0 });
       } else {
         clearActiveConversation();
@@ -203,7 +202,64 @@ export const ChatProvider = ({ children }) => {
       setError(startError?.message || 'Failed to start conversation.');
       return null;
     }
-  }, [fetchConversations, fetchMessages]);
+  }, [clearActiveConversation, fetchMessages]);
+
+  const sendQuotation = useCallback(async (conversationId, { amount, job_id }) => {
+    const safeConversationId = String(conversationId || '').trim();
+
+    if (!safeConversationId) {
+      setError('Conversation ID is required.');
+      return null;
+    }
+
+    clearError();
+
+    try {
+      const response = await createQuotation(safeConversationId, { amount, job_id });
+      return response;
+    } catch (quotationError) {
+      setError(quotationError?.message || 'Failed to send quotation.');
+      return null;
+    }
+  }, [clearError]);
+
+  const respondQuotation = useCallback(async (conversationId, { quotation_id, action }) => {
+    const safeConversationId = String(conversationId || '').trim();
+
+    if (!safeConversationId) {
+      setError('Conversation ID is required.');
+      return null;
+    }
+
+    clearError();
+
+    try {
+      const response = await respondToQuotation(safeConversationId, { quotation_id, action });
+      return response;
+    } catch (responseError) {
+      setError(responseError?.message || 'Failed to respond to quotation.');
+      return null;
+    }
+  }, [clearError]);
+
+  const initiatePaymentForJob = useCallback(async (jobId, paymentMethod) => {
+    const safeJobId = String(jobId || '').trim();
+
+    if (!safeJobId) {
+      setError('Job ID is required.');
+      return null;
+    }
+
+    clearError();
+
+    try {
+      const response = await initiateJobPayment(safeJobId, { payment_method: paymentMethod || 'wallet' });
+      return response;
+    } catch (paymentError) {
+      setError(paymentError?.message || 'Failed to initiate payment.');
+      return null;
+    }
+  }, [clearError]);
 
   const addMockTextMessage = useCallback((conversationId, text) => {
     const safeConversationId = String(conversationId || '').trim();
@@ -342,6 +398,9 @@ export const ChatProvider = ({ children }) => {
       fetchMessages,
       markConversationRead,
       startConversation: startNewConversation,
+      sendQuotation,
+      respondQuotation,
+      initiatePaymentForJob,
       uploadImages,
       addMockTextMessage,
       addLocalMessage,
@@ -363,6 +422,9 @@ export const ChatProvider = ({ children }) => {
       fetchMessages,
       markConversationRead,
       startNewConversation,
+      sendQuotation,
+      respondQuotation,
+      initiatePaymentForJob,
       uploadImages,
       addMockTextMessage,
       addLocalMessage,

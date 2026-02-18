@@ -1,17 +1,6 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
-const normalizeResponse = (payload, fallbackMessage) => {
-  const root = payload?.data || payload || {};
-  const nestedData = root?.data !== undefined ? root.data : root;
-
-  return {
-    success: Boolean(root?.success ?? true),
-    message: root?.message || fallbackMessage,
-    data: nestedData,
-  };
-};
-
 const buildServiceError = (message) => {
   const error = new Error(message);
   error.statusCode = 400;
@@ -67,8 +56,7 @@ const toFilePart = (file, index = 0) => {
 
 const buildMessagesEndpoint = (conversationId, { limit = 50, offset = 0 } = {}) => {
   const safeConversationId = assertConversationId(conversationId);
-  const rawBase = ENDPOINTS.chat.conversationMessages(safeConversationId);
-  const basePath = rawBase.split('?')[0];
+  const basePath = ENDPOINTS.chat.conversationMessages(safeConversationId);
   const safeLimit = Number.isFinite(Number(limit)) ? Number(limit) : 50;
   const safeOffset = Number.isFinite(Number(offset)) ? Number(offset) : 0;
 
@@ -91,24 +79,24 @@ export const startConversation = async ({ mechanic_id, job_id }) => {
   }
 
   const response = await api.post(ENDPOINTS.chat.createConversation, payload);
-  return normalizeResponse(response.data, 'Conversation started successfully.');
+  return response.data;
 };
 
 export const getConversations = async () => {
   const response = await api.get(ENDPOINTS.chat.conversations);
-  return normalizeResponse(response.data, 'Conversations retrieved successfully.');
+  return response.data;
 };
 
 export const getMessages = async (conversationId, { limit = 50, offset = 0 } = {}) => {
   const endpoint = buildMessagesEndpoint(conversationId, { limit, offset });
   const response = await api.get(endpoint);
-  return normalizeResponse(response.data, 'Messages retrieved successfully.');
+  return response.data;
 };
 
 export const markAsRead = async (conversationId) => {
   const safeConversationId = assertConversationId(conversationId);
   const response = await api.post(ENDPOINTS.chat.markConversationRead(safeConversationId), {});
-  return normalizeResponse(response.data, 'Conversation marked as read.');
+  return response.data;
 };
 
 export const uploadConversationImages = async (conversationId, images) => {
@@ -133,7 +121,65 @@ export const uploadConversationImages = async (conversationId, images) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
-  return normalizeResponse(response.data, 'Images uploaded successfully.');
+  return response.data;
+};
+
+export const createQuotation = async (conversationId, { amount, job_id }) => {
+  const safeConversationId = assertConversationId(conversationId);
+  const numericAmount = Number(amount);
+
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    buildServiceError('amount must be a positive number.');
+  }
+
+  const safeJobId = String(job_id || '').trim();
+  if (!safeJobId) {
+    buildServiceError('job_id is required.');
+  }
+
+  const response = await api.post(ENDPOINTS.chat.createQuotation(safeConversationId), {
+    amount: numericAmount,
+    job_id: safeJobId,
+  });
+  return response.data;
+};
+
+export const respondToQuotation = async (conversationId, { quotation_id, action }) => {
+  const safeConversationId = assertConversationId(conversationId);
+  const safeQuotationId = String(quotation_id || '').trim();
+  const safeAction = String(action || '').trim().toLowerCase();
+
+  if (!safeQuotationId) {
+    buildServiceError('quotation_id is required.');
+  }
+
+  if (safeAction !== 'accept' && safeAction !== 'reject') {
+    buildServiceError('action must be accept or reject.');
+  }
+
+  const response = await api.post(ENDPOINTS.chat.respondToQuotation(safeConversationId), {
+    quotation_id: safeQuotationId,
+    action: safeAction,
+  });
+  return response.data;
+};
+
+export const initiateJobPayment = async (jobId, { payment_method }) => {
+  const safeJobId = String(jobId || '').trim();
+  const safePaymentMethod = String(payment_method || '').trim().toLowerCase();
+
+  if (!safeJobId) {
+    buildServiceError('jobId is required.');
+  }
+
+  if (!['wallet', 'paystack', 'cash'].includes(safePaymentMethod)) {
+    buildServiceError('payment_method must be wallet, paystack, or cash.');
+  }
+
+  const response = await api.post(ENDPOINTS.chat.jobPaymentInitiate(safeJobId), {
+    payment_method: safePaymentMethod,
+  });
+  return response.data;
 };
 
 export default {
@@ -142,4 +188,7 @@ export default {
   getMessages,
   markAsRead,
   uploadConversationImages,
+  createQuotation,
+  respondToQuotation,
+  initiateJobPayment,
 };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -7,8 +7,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
+import { useChat } from '../../../context';
+import { getMechanicsForJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -37,6 +40,56 @@ const StarIcon = ({ color }) => {
   );
 };
 
+const readMechanics = (payload) => {
+  const root = payload?.data || payload || {};
+
+  if (Array.isArray(root)) {
+    return root;
+  }
+
+  if (Array.isArray(root.mechanics)) {
+    return root.mechanics;
+  }
+
+  if (Array.isArray(root.items)) {
+    return root.items;
+  }
+
+  if (Array.isArray(root.results)) {
+    return root.results;
+  }
+
+  return [];
+};
+
+const normalizeMechanic = (item, index) => {
+  const fullName = item?.name || item?.full_name || item?.mechanic_name || `Mechanic ${index + 1}`;
+  const initials = String(fullName)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('') || 'M';
+
+  const minPrice = Number(item?.min_price || item?.minPrice || item?.min || 0);
+  const maxPrice = Number(item?.max_price || item?.maxPrice || item?.max || 0);
+  const priceRange = minPrice || maxPrice
+    ? `N${minPrice.toLocaleString('en-NG')} - N${maxPrice.toLocaleString('en-NG')}`
+    : 'Price on request';
+
+  return {
+    id: String(item?.id || item?._id || item?.mechanic_id || `mech-${index}`),
+    name: fullName,
+    initials,
+    rating: Number(item?.rating || item?.average_rating || 0) || 0,
+    distanceKm: Number(item?.distance_km || item?.distance || 0),
+    etaMins: Number(item?.eta_minutes || item?.eta || 0),
+    priceRange,
+    available: item?.available !== false,
+    raw: item,
+  };
+};
+
 const HireButton = ({ onPress, loading }) => {
   return (
     <Pressable onPress={onPress} disabled={loading} style={[styles.hireButton, loading ? styles.hireButtonBusy : null]}>
@@ -63,10 +116,14 @@ const MechanicCard = ({ item, loading, onHire }) => {
           <View style={styles.metaRow}>
             <View style={styles.ratingRow}>
               <StarIcon color={darkTheme.colors.accent} />
-              <AppText style={styles.metaText}>{item.rating.toFixed(1)}</AppText>
+              <AppText style={styles.metaText}>{item.rating ? item.rating.toFixed(1) : 'N/A'}</AppText>
             </View>
-            <AppText style={styles.metaText}>{item.distanceKm}km away</AppText>
-            <AppText style={styles.metaText}>{item.etaMins} minutes</AppText>
+            <AppText style={styles.metaText}>
+              {item.distanceKm ? `${item.distanceKm}km away` : 'Distance unavailable'}
+            </AppText>
+            <AppText style={styles.metaText}>
+              {item.etaMins ? `${item.etaMins} minutes` : 'ETA unavailable'}
+            </AppText>
           </View>
 
           <AppText style={styles.priceLabel}>Estimated price</AppText>
@@ -88,69 +145,78 @@ const MechanicCard = ({ item, loading, onHire }) => {
 };
 
 const FindMechanicsScreen = ({ navigation, route }) => {
+  const { startConversation } = useChat();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [loadingMechanicId, setLoadingMechanicId] = useState(null);
+  const [mechanics, setMechanics] = useState([]);
 
-  const mechanics = useMemo(
-    () => [
-      {
-        id: 'm_01',
-        name: 'Danjuma Auto Clinic',
-        initials: 'DA',
-        rating: 4.8,
-        distanceKm: 1.3,
-        etaMins: 10,
-        priceRange: 'N5,000 - N8,000',
-        available: true,
-      },
-      {
-        id: 'm_02',
-        name: 'Kwara Garage Pro',
-        initials: 'KG',
-        rating: 4.6,
-        distanceKm: 2.1,
-        etaMins: 14,
-        priceRange: 'N4,500 - N7,500',
-        available: true,
-      },
-      {
-        id: 'm_03',
-        name: 'Torque Masters',
-        initials: 'TM',
-        rating: 4.7,
-        distanceKm: 3.4,
-        etaMins: 20,
-        priceRange: 'N6,000 - N9,000',
-        available: false,
-      },
-    ],
-    [],
-  );
-
+  const jobId = String(route?.params?.jobId || '').trim();
   const locationText = route?.params?.location || 'Ahmadu Bello way, Kwara state';
 
-  const handleHire = (mechanic) => {
-    if (loadingMechanicId) {
+  const fetchMechanics = useCallback(async () => {
+    if (!jobId) {
+      setError('No job selected.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await getMechanicsForJob(jobId);
+      const nextMechanics = readMechanics(response).map(normalizeMechanic);
+      setMechanics(nextMechanics);
+    } catch (fetchError) {
+      setError(fetchError?.message || 'Could not load mechanics.');
+      setMechanics([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [jobId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMechanics();
+    }, [fetchMechanics])
+  );
+
+  const handleHire = async (mechanic) => {
+    if (!jobId || loadingMechanicId) {
       return;
     }
 
     setLoadingMechanicId(mechanic.id);
 
-    setTimeout(() => {
-      const jobId = `job_${Date.now()}`;
+    try {
+      const response = await startConversation({ mechanic_id: mechanic.id, job_id: jobId });
+      const conversation = response?.data?.conversation || response?.data || null;
+      const conversationId = String(
+        conversation?.id || conversation?._id || conversation?.conversation_id || conversation?.conversationId || ''
+      ).trim();
+
+      navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+        mechanic,
+        jobId,
+        mechanicId: mechanic.id,
+        conversationId,
+        conversation,
+      });
+    } catch (hireError) {
+      setError(hireError?.message || 'Could not start chat with mechanic.');
+    } finally {
       setLoadingMechanicId(null);
-      navigation.navigate(ROUTES.CAR_OWNER_CHAT, { mechanic, jobId, mechanicId: mechanic.id });
-    }, 1200);
+    }
   };
 
-  const renderItem = ({ item }) => {
-    return (
-      <MechanicCard
-        item={item}
-        loading={loadingMechanicId === item.id}
-        onHire={() => handleHire(item)}
-      />
-    );
-  };
+  const renderItem = ({ item }) => (
+    <MechanicCard
+      item={item}
+      loading={loadingMechanicId === item.id}
+      onHire={() => handleHire(item)}
+    />
+  );
 
   return (
     <ScreenContainer style={styles.screen} padded={false}>
@@ -171,13 +237,35 @@ const FindMechanicsScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      <FlatList
-        data={mechanics}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+        </View>
+      ) : null}
+
+      {!loading && error ? (
+        <View style={styles.centerState}>
+          <AppText style={styles.errorText}>{error}</AppText>
+          <TouchableOpacity activeOpacity={0.85} onPress={fetchMechanics} style={styles.retryBtn}>
+            <AppText style={styles.retryText}>Retry</AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {!loading && !error ? (
+        <FlatList
+          data={mechanics}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.centerState}>
+              <AppText style={styles.emptyText}>No mechanics available for this job yet.</AppText>
+            </View>
+          }
+        />
+      ) : null}
     </ScreenContainer>
   );
 };
@@ -327,6 +415,31 @@ const styles = StyleSheet.create({
   unavailableText: {
     color: darkTheme.colors.muted,
     fontSize: darkTheme.typography.fontSizes.xs,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#FF7F7F',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  retryBtn: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  retryText: {
+    color: darkTheme.colors.accent,
   },
 });
 

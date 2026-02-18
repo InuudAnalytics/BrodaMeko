@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Car02Icon, CallIcon, GearsIcon, Location01Icon, Mail01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { confirmJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -103,6 +104,7 @@ const LiveTrackingScreen = ({ navigation, route }) => {
   };
 
   const [currentStep, setCurrentStep] = useState(EN_ROUTE_INDEX);
+  const [confirmingCompletion, setConfirmingCompletion] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -119,6 +121,26 @@ const LiveTrackingScreen = ({ navigation, route }) => {
 
   const isDone = currentStep === STATUS_STEPS.length - 1;
   const distanceText = useMemo(() => (isDone ? 'has completed your request' : 'is 1.2 miles away and driving towards you'), [isDone]);
+
+  const handleConfirmCompletion = async () => {
+    const jobId = String(route?.params?.jobId || '').trim();
+
+    if (!jobId) {
+      Alert.alert('Unable to confirm', 'Job reference is missing.');
+      return;
+    }
+
+    setConfirmingCompletion(true);
+    try {
+      await confirmJob(jobId);
+      Alert.alert('Success', 'Job completion confirmed.');
+      navigation.navigate(ROUTES.CAR_OWNER_HISTORY);
+    } catch (confirmError) {
+      Alert.alert('Error', confirmError?.message || 'Could not confirm completion.');
+    } finally {
+      setConfirmingCompletion(false);
+    }
+  };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -157,6 +179,14 @@ const LiveTrackingScreen = ({ navigation, route }) => {
         {isDone ? (
           <View style={styles.doneWrap}>
             <AppText style={styles.doneText}>Job completed</AppText>
+            <TouchableOpacity
+              style={[styles.rateBtn, confirmingCompletion ? styles.rateBtnDisabled : null]}
+              activeOpacity={0.88}
+              onPress={handleConfirmCompletion}
+              disabled={confirmingCompletion}
+            >
+              <AppText style={styles.rateBtnText}>{confirmingCompletion ? 'Confirming...' : 'Confirm completion'}</AppText>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.rateBtn}
               activeOpacity={0.88}
@@ -422,6 +452,10 @@ const styles = StyleSheet.create({
     borderRadius: darkTheme.radius.md,
     paddingHorizontal: darkTheme.spacing.md,
     paddingVertical: darkTheme.spacing.xs,
+    marginTop: darkTheme.spacing.xs,
+  },
+  rateBtnDisabled: {
+    opacity: 0.7,
   },
   rateBtnText: {
     color: darkTheme.colors.accent,

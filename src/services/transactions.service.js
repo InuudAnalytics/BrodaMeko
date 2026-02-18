@@ -1,15 +1,43 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
-const normalizeResponse = (payload, fallbackMessage) => {
-  const root = payload?.data || payload || {};
-  const nestedData = root?.data !== undefined ? root.data : root;
+const listFallbacks = [
+  ENDPOINTS.transactions.list,
+  '/api/v1/transactions',
+  '/api/v1/wallets/transactions',
+  '/api/v1/wallet/transactions',
+];
 
-  return {
-    success: Boolean(root?.success ?? true),
-    message: root?.message || fallbackMessage,
-    data: nestedData,
-  };
+const detailsFallbacks = (reference) => [
+  ENDPOINTS.transactions.details(reference),
+  `/api/v1/transactions/details/${encodeURIComponent(String(reference || ''))}`,
+  `/api/v1/wallets/transactions/${encodeURIComponent(String(reference || ''))}`,
+  `/api/v1/wallet/transactions/${encodeURIComponent(String(reference || ''))}`,
+];
+
+const getStatusCode = (error) => Number(error?.response?.status || error?.statusCode || 0);
+
+const tryGet = async (urls) => {
+  let lastError = null;
+
+  for (let index = 0; index < urls.length; index += 1) {
+    const url = urls[index];
+
+    try {
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      const statusCode = getStatusCode(error);
+
+      // Try next fallback route only for 404-like route misses.
+      if (statusCode !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
 };
 
 const assertReference = (reference) => {
@@ -26,14 +54,12 @@ const assertReference = (reference) => {
 };
 
 export const getTransactions = async () => {
-  const response = await api.get(ENDPOINTS.transactions.list);
-  return normalizeResponse(response.data, 'Transactions retrieved successfully.');
+  return tryGet(listFallbacks);
 };
 
 export const getTransactionDetails = async (reference) => {
   const safeReference = assertReference(reference);
-  const response = await api.get(ENDPOINTS.transactions.details(safeReference));
-  return normalizeResponse(response.data, 'Transaction details retrieved successfully.');
+  return tryGet(detailsFallbacks(safeReference));
 };
 
 export default {

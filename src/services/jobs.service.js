@@ -1,17 +1,6 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
-const normalizeResponse = (payload, fallbackMessage) => {
-  const root = payload?.data || payload || {};
-  const nestedData = root?.data !== undefined ? root.data : root;
-
-  return {
-    success: Boolean(root?.success ?? true),
-    message: root?.message || fallbackMessage,
-    data: nestedData,
-  };
-};
-
 const buildServiceError = (message) => {
   const error = new Error(message);
   error.statusCode = 400;
@@ -119,12 +108,10 @@ export const buildFormData = (fields = {}) => {
   return form;
 };
 
-const buildCarOwnerJobsEndpoint = (limit = 10, page = 1) => {
+const buildCarOwnerJobsParams = (limit = 10, page = 1) => {
   const safeLimit = Number.isFinite(Number(limit)) ? Number(limit) : 10;
   const safePage = Number.isFinite(Number(page)) ? Number(page) : 1;
-  const basePath = ENDPOINTS.jobs.carOwnerList.split('?')[0];
-
-  return `${basePath}?limit=${encodeURIComponent(String(safeLimit))}&page=${encodeURIComponent(String(safePage))}`;
+  return { limit: safeLimit, page: safePage };
 };
 
 export const createJob = async ({ issue_type, description, car_make, images }) => {
@@ -150,8 +137,9 @@ export const createJob = async ({ issue_type, description, car_make, images }) =
     payload.description = safeDescription;
   }
 
-  if (Array.isArray(images) && images.length) {
-    payload.images = images;
+  const imageFiles = Array.isArray(images) ? images.slice(0, 5) : [];
+  if (imageFiles.length) {
+    payload.images = imageFiles;
   }
 
   const formData = buildFormData(payload);
@@ -159,26 +147,29 @@ export const createJob = async ({ issue_type, description, car_make, images }) =
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
-  return normalizeResponse(response.data, 'Job created successfully.');
+  return response.data;
 };
 
 export const getCarOwnerJobs = async ({ limit = 10, page = 1 } = {}) => {
-  const endpoint = buildCarOwnerJobsEndpoint(limit, page);
-  const response = await api.get(endpoint);
-  return normalizeResponse(response.data, 'Jobs retrieved successfully.');
+  const response = await api.get(ENDPOINTS.jobs.carOwnerList, {
+    params: buildCarOwnerJobsParams(limit, page),
+  });
+  return response.data;
 };
-
-export const getAvailableJobs = getCarOwnerJobs;
 
 export const getCarOwnerJob = async (jobId) => {
   const safeJobId = assertJobId(jobId);
   const response = await api.get(ENDPOINTS.jobs.carOwnerDetails(safeJobId));
-  return normalizeResponse(response.data, 'Job retrieved successfully.');
+  return response.data;
 };
 
-export const updateCarOwnerJob = async (jobId, { car_make, imagesToAdd, remove_images } = {}) => {
+export const updateCarOwnerJob = async (jobId, { description, car_make, imagesToAdd, remove_images } = {}) => {
   const safeJobId = assertJobId(jobId);
   const payload = {};
+
+  if (description !== undefined) {
+    payload.description = String(description || '').trim();
+  }
 
   if (car_make !== undefined) {
     const safeCarMake = String(car_make || '').trim();
@@ -191,7 +182,7 @@ export const updateCarOwnerJob = async (jobId, { car_make, imagesToAdd, remove_i
   }
 
   if (Array.isArray(imagesToAdd) && imagesToAdd.length) {
-    payload.images = imagesToAdd;
+    payload.images = imagesToAdd.slice(0, 5);
   }
 
   if (remove_images !== undefined) {
@@ -207,25 +198,90 @@ export const updateCarOwnerJob = async (jobId, { car_make, imagesToAdd, remove_i
   }
 
   const formData = buildFormData(payload);
-  const response = await api.patch(ENDPOINTS.jobs.carOwnerUpdate(safeJobId), formData, {
+  const response = await api.post(ENDPOINTS.jobs.carOwnerUpdate(safeJobId), formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
-  return normalizeResponse(response.data, 'Job updated successfully.');
+  return response.data;
 };
 
 export const deleteJob = async (jobId) => {
   const safeJobId = assertJobId(jobId);
   const response = await api.delete(ENDPOINTS.jobs.delete(safeJobId));
-  return normalizeResponse(response.data, 'Job deleted successfully.');
+  return response.data;
 };
+
+const buildMechanicAssignedParams = ({ status, created_after, page = 1, limit = 10 } = {}) => {
+  const params = {};
+
+  if (status !== undefined && String(status).trim()) {
+    params.status = String(status).trim();
+  }
+
+  if (created_after !== undefined && String(created_after).trim()) {
+    params.created_after = String(created_after).trim();
+  }
+
+  params.page = Number.isFinite(Number(page)) ? Number(page) : 1;
+  params.limit = Number.isFinite(Number(limit)) ? Number(limit) : 10;
+
+  return params;
+};
+
+export const getMechanicAssignedJobs = async ({ status, created_after, page = 1, limit = 10 } = {}) => {
+  const response = await api.get(ENDPOINTS.jobs.mechanicAssigned, {
+    params: buildMechanicAssignedParams({ status, created_after, page, limit }),
+  });
+  return response.data;
+};
+
+export const getMechanicAssignedJob = async (jobId) => {
+  const safeJobId = assertJobId(jobId);
+  const response = await api.get(ENDPOINTS.jobs.mechanicAssignedDetails(safeJobId));
+  return response.data;
+};
+
+export const updateJobStatus = async (jobId, status) => {
+  const safeJobId = assertJobId(jobId);
+  const safeStatus = String(status || '').trim();
+
+  if (!safeStatus) {
+    buildServiceError('status is required.');
+  }
+
+  const response = await api.post(ENDPOINTS.jobs.updateStatus(safeJobId), { status: safeStatus });
+  return response.data;
+};
+
+export const confirmJob = async (jobId) => {
+  const safeJobId = assertJobId(jobId);
+  const response = await api.post(ENDPOINTS.jobs.confirm(safeJobId), {});
+  return response.data;
+};
+
+export const getMechanicsForJob = async (jobId) => {
+  const safeJobId = assertJobId(jobId);
+  const response = await api.get(ENDPOINTS.jobs.mechanicsForJob(safeJobId));
+  return response.data;
+};
+
+export const getSingleJob = getCarOwnerJob;
+export const updateJob = updateCarOwnerJob;
+export const getAvailableJobs = getMechanicAssignedJobs;
 
 export default {
   buildFormData,
   createJob,
   getCarOwnerJobs,
   getCarOwnerJob,
+  getSingleJob,
   updateCarOwnerJob,
+  updateJob,
   deleteJob,
   getAvailableJobs,
+  getMechanicAssignedJobs,
+  getMechanicAssignedJob,
+  updateJobStatus,
+  confirmJob,
+  getMechanicsForJob,
 };

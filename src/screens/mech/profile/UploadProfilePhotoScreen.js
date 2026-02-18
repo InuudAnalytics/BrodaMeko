@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
+import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
 import { darkTheme } from '../../../theme';
 import { getNextOnboardingRoute, getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
@@ -11,6 +12,7 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
   const { mechanicProfile, setProfilePhoto, completedSteps } = useMechanicProfile();
   const [selectedUri, setSelectedUri] = useState(mechanicProfile.profilePhotoUri || null);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
   const skippedSteps = route?.params?.skippedSteps || [];
   const stepIndex = getOnboardingStepIndex(ROUTES.MECH_UPLOAD_PROFILE_PHOTO);
@@ -32,7 +34,6 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
 
       if (asset?.uri) {
         setSelectedUri(asset.uri);
-        setProfilePhoto(asset.uri);
       }
     } finally {
       setLoading(false);
@@ -45,23 +46,49 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
       return;
     }
 
-    setProfilePhoto(selectedUri);
+    const submit = async () => {
+      setUploading(true);
 
-    if (isOnboarding) {
-      const { nextRoute, nextSkipped } = getNextOnboardingRoute({
-        currentRoute: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
-        completedSteps: { ...completedSteps, photo: true },
-        skippedSteps,
-      });
-      if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
-        navigation.navigate(nextRoute);
-        return;
+      try {
+        const response = await uploadAvatarService({
+          uri: selectedUri,
+          fileName: 'mechanic-avatar.jpg',
+          type: 'image/jpeg',
+        });
+        const payload = response?.data || response || {};
+        const uploadedUri = String(
+          payload?.avatar ||
+          payload?.avatar_url ||
+          payload?.url ||
+          payload?.profile_photo ||
+          selectedUri
+        ).trim();
+
+        setProfilePhoto(uploadedUri);
+
+        if (isOnboarding) {
+          const { nextRoute, nextSkipped } = getNextOnboardingRoute({
+            currentRoute: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
+            completedSteps: { ...completedSteps, photo: true },
+            skippedSteps,
+          });
+          if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
+            navigation.navigate(nextRoute);
+            return;
+          }
+          navigation.replace(nextRoute, { onboarding: true, skippedSteps: nextSkipped });
+          return;
+        }
+
+        navigation.goBack();
+      } catch (uploadError) {
+        Alert.alert('Upload failed', uploadError?.message || 'Could not upload profile photo.');
+      } finally {
+        setUploading(false);
       }
-      navigation.replace(nextRoute, { onboarding: true, skippedSteps: nextSkipped });
-      return;
-    }
+    };
 
-    navigation.goBack();
+    submit();
   };
 
   const handleSkipNext = () => {
@@ -114,7 +141,12 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
           style={styles.selectBtn}
           textStyle={styles.selectBtnText}
         />
-        <AppButton label="Save & continue" onPress={handleSave} style={styles.saveBtn} />
+        <AppButton
+          label={uploading ? 'Saving...' : 'Save & continue'}
+          onPress={handleSave}
+          style={styles.saveBtn}
+          disabled={uploading}
+        />
 
         {isOnboarding ? (
           <View style={styles.skipRow}>

@@ -1,0 +1,91 @@
+# Production Wiring Report (dev usage excluded)
+
+## Wired in production screens/contexts (dev does not count)
+
+### Authentication
+- POST `/api/v1/auth/signup` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/verify-otp` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/resend-otp` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/login` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/logout` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/forgot-password` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/reset-password/reset` -> `src/context/AuthContext.js`
+- GET `/api/v1/auth/me` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/update-password` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/devices/register` -> `src/context/AuthContext.js`
+- POST `/api/v1/auth/upload-avatar` -> `src/screens/shared/profile/UserProfileScreen.js`, `src/screens/mech/profile/UploadProfilePhotoScreen.js`
+
+### Wallet + Transactions
+- POST `/api/v1/wallets/top-up` -> `src/screens/carowner/wallet/FundWalletScreen.js`
+- GET `/api/v1/wallets/verify/payment` -> `src/screens/carowner/wallet/FundWalletScreen.js`
+- GET `/api/v1/transactions/list` -> `src/screens/carowner/wallet/WalletScreen.js`
+- GET `/api/v1/transactions/:reference` -> `src/screens/carowner/wallet/TransactionDetailsScreen.js`
+
+### Mechanic profile/settings
+- POST `/api/v1/me/mechanic/add-services` -> `src/screens/mech/home/SetServicesScreen.js`, `src/context/MechanicServicesContext.js`
+- GET `/api/v1/me/mechanic/services` -> `src/screens/mech/home/SetServicesScreen.js`, `src/context/MechanicServicesContext.js`
+- PATCH `/api/v1/me/mechanic/:serviceId` -> `src/screens/mech/home/SetServicesScreen.js`, `src/context/MechanicServicesContext.js`
+- DELETE `/api/v1/me/mechanic/:serviceId/delete` -> `src/screens/mech/home/SetServicesScreen.js`, `src/context/MechanicServicesContext.js`
+- GET `/api/v1/me/mechanic/bank/list` -> `src/screens/mech/profile/BankDetailsScreen.js`
+- POST `/api/v1/me/mechanic/bank/verify` -> `src/screens/mech/profile/BankDetailsScreen.js`
+- POST `/api/v1/me/mechanic/bank` -> `src/screens/mech/profile/BankDetailsScreen.js`
+- POST `/api/v1/me/mechanic/bank/:bankId/primary` -> `src/screens/mech/profile/BankDetailsScreen.js`
+- DELETE `/api/v1/me/mechanic/bank/:bankId/delete` -> `src/screens/mech/profile/BankDetailsScreen.js`
+
+### Jobs
+- POST `/api/v1/jobs/create` -> `src/screens/carowner/assistance/ReportIssueScreen.js`, `src/context/JobsContext.js`
+- GET `/api/v1/jobs/car-owner` -> `src/screens/carowner/history/HistoryScreen.js`, `src/context/JobsContext.js`
+- GET `/api/v1/jobs/car-owner/:jobId` -> `src/context/JobsContext.js`
+- POST `/api/v1/jobs/car-owner/:jobId/update` -> `src/context/JobsContext.js`
+- DELETE `/api/v1/jobs/:jobId` -> `src/context/JobsContext.js`
+- GET `/api/v1/jobs/:jobId/mechanics/for-job` -> `src/screens/carowner/assistance/FindMechanicsScreen.js`
+- GET `/api/v1/jobs/mechanic/assigned` -> `src/screens/mech/home/MechanicDashboardScreen.js`, `src/screens/mech/jobs/MechanicJobsScreen.js`
+- GET `/api/v1/jobs/mechanic/assigned/:jobId` -> `src/screens/mech/jobs/MechanicJobsScreen.js`
+- POST `/api/v1/jobs/:jobId/status` -> `src/screens/mech/jobs/MechanicJobsScreen.js`
+- POST `/api/v1/jobs/:jobId/confirm` -> `src/screens/carowner/assistance/LiveTrackingScreen.js`
+
+### Chat
+- POST `/api/v1/chat/conversations/create` -> `src/screens/carowner/assistance/FindMechanicsScreen.js`, `src/context/ChatContext.js`
+- GET `/api/v1/chat/conversations` -> `src/context/ChatContext.js`
+- GET `/api/v1/chat/conversations/:conversationId/messages` -> `src/context/ChatContext.js`, `src/screens/shared/ChatScreen.js`
+- POST `/api/v1/chat/conversations/:conversationId/read` -> `src/context/ChatContext.js`, `src/screens/shared/ChatScreen.js`
+- POST `/api/v1/chat/conversations/images/upload/:conversationId` -> `src/context/ChatContext.js`, `src/screens/shared/ChatScreen.js`
+- POST `/api/v1/chat/conversations/:conversationId/quotation` -> `src/context/ChatContext.js`, `src/screens/shared/ChatScreen.js`
+- POST `/api/v1/chat/conversations/:conversationId/quotation/respond` -> `src/context/ChatContext.js`, `src/screens/shared/ChatScreen.js`
+- POST `/api/v1/chat/jobs/:jobId/payment/initiate` -> `src/context/ChatContext.js`, `src/screens/shared/ChatScreen.js`
+
+## 🧩 Partially wired
+
+- Mechanic dashboard summary fields (name, earnings, jobs done, rating, wallet balance)
+  - `GET /api/v1/auth/me` is used for mechanic name and can provide rating if backend returns `rating` or `average_rating`.
+  - `GET /api/v1/jobs/mechanic/assigned` is used for total jobs done on dashboard (using `total` or list length).
+  - `GET /api/v1/wallet/balance` is used for wallet balance.
+  - Earnings still has no dedicated mechanic earnings summary endpoint in current spec, so dashboard earnings remain placeholder.
+
+- GET `/api/v1/jobs/car-owner/:jobId`, POST `/api/v1/jobs/car-owner/:jobId/update`, DELETE `/api/v1/jobs/:jobId`
+  - service + context wiring exist, but no dedicated production job detail/edit/delete screen yet.
+- GET `/api/v1/jobs/mechanic/assigned/:jobId`
+  - currently shown via alert payload in `src/screens/mech/jobs/MechanicJobsScreen.js` instead of a dedicated detail page.
+- POST `/api/v1/chat/jobs/:jobId/payment/initiate`
+  - called after quotation accept, but payment-method UX is still simple/defaulted in chat flow.
+- Wallet verify callback
+  - manual verify flow exists in `FundWalletScreen`; no dedicated callback/deeplink verification screen.
+
+## Not wired
+
+- WebSocket chat stream:
+  - `wss://brodameko-server-50cv.onrender.com/api/v1/chat/ws`
+  - `connectChatWebSocket`, `sendMessage`, `closeChatWebSocket` in `src/services/ws.service.js` are not used in production context/screens yet.
+
+## 🧱 Missing screens
+
+- `src/screens/carowner/history/JobDetailsScreen.js`
+  - needed to fully use `GET /api/v1/jobs/car-owner/:jobId`.
+- `src/screens/carowner/history/EditJobScreen.js`
+  - needed to fully use `POST /api/v1/jobs/car-owner/:jobId/update` + image removals.
+- Job delete confirmation UI in production history/detail flow
+  - needed to expose `DELETE /api/v1/jobs/:jobId`.
+- `src/screens/mech/jobs/MechanicJobDetailsScreen.js`
+  - needed to replace alert-based use of `GET /api/v1/jobs/mechanic/assigned/:jobId`.
+- `src/screens/carowner/wallet/VerifyTopUpScreen.js` (optional but recommended)
+  - needed for callback/deeplink-based verification flow.

@@ -4,10 +4,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText } from '../../../components';
+import { useAuth } from '../../../context';
 import { getAvailableJobs } from '../../../services/jobs.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
 
 const FILTERS = [
   { key: 'all', label: 'All jobs' },
@@ -34,17 +34,39 @@ const normalizeJob = (job) => {
     id: job.id || job._id,
     name: job.car_owner?.name || job.user?.name || 'Customer',
     issue: job.title || job.issue_type || job.description || 'Car Issue',
-    distance: job.distance || '1.2km away', // Mock if missing
-    eta: job.eta || '10 mins', // Mock if missing
+    distance: job.distance || '',
+    eta: job.eta || '',
     urgent: job.priority === 'urgent' || false,
   };
 };
 
+const readMechanicName = (user) => {
+  const raw =
+    user?.first_name ||
+    user?.firstName ||
+    user?.full_name ||
+    user?.fullName ||
+    user?.name ||
+    'Michael';
+
+  return String(raw || 'Michael').trim();
+};
+
+const readMechanicRating = (user) => {
+  const value = Number(user?.rating || user?.average_rating || 4.9);
+  return Number.isFinite(value) ? value : 4.9;
+};
+
 const MechanicDashboardScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState('all');
   const [walletBalance, setWalletBalance] = useState(0);
   const [jobs, setJobs] = useState([]);
+  const [totalJobs, setTotalJobs] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const mechanicName = readMechanicName(user);
+  const mechanicRating = readMechanicRating(user);
 
   const visibleJobs = useMemo(() => {
     let filtered = jobs;
@@ -62,21 +84,29 @@ const MechanicDashboardScreen = ({ navigation }) => {
       const fetchData = async () => {
         try {
           const [walletRes, jobsRes] = await Promise.all([
-            getWalletBalance().catch(() => ({ success: false })),
-            getAvailableJobs({ limit: 10 }).catch(() => ({ success: false }))
+            getWalletBalance().catch(() => null),
+            getAvailableJobs({ page: 1, limit: 100 }).catch(() => null)
           ]);
 
           if (active) {
-            if (walletRes.success) {
-              setWalletBalance(walletRes.data?.balance || 0);
+            if (walletRes) {
+              const walletPayload = walletRes?.data || walletRes;
+              setWalletBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
             }
-            if (jobsRes.success) {
-              const rawJobs = Array.isArray(jobsRes.data) ? jobsRes.data : (jobsRes.data?.jobs || []);
+            if (jobsRes) {
+              const jobsPayload = jobsRes?.data || jobsRes;
+              const rawJobs = Array.isArray(jobsPayload)
+                ? jobsPayload
+                : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
               setJobs(rawJobs.map(normalizeJob));
+              setTotalJobs(Number(jobsPayload?.total || rawJobs.length || 0));
             }
+            setError('');
           }
-        } catch (error) {
-          // ignore
+        } catch (fetchError) {
+          if (active) {
+            setError('Could not load available jobs.');
+          }
         } finally {
           if (active) setLoading(false);
         }
@@ -94,15 +124,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.avatar}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate(ROUTES.USER_PROFILE)}
-          >
-            <AppText style={styles.avatarText}>M</AppText>
-          </TouchableOpacity>
+          <View style={styles.avatar}>
+            <AppText style={styles.avatarText}>{initialsFromName(mechanicName)}</AppText>
+          </View>
           <View>
-            <AppText style={styles.welcome}>Welcome Michael</AppText>
+            <AppText style={styles.welcome}>Welcome {mechanicName}</AppText>
             <AppText style={styles.partner}>BrodaMeko partner</AppText>
           </View>
         </View>
@@ -120,13 +146,13 @@ const MechanicDashboardScreen = ({ navigation }) => {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <AppText style={styles.statLabel}>Total jobs</AppText>
-          <AppText style={styles.statValue}>128</AppText>
+          <AppText style={styles.statValue}>{totalJobs}</AppText>
         </View>
         <View style={styles.statCard}>
           <AppText style={styles.statLabel}>Ratings</AppText>
           <View style={styles.ratingRow}>
             <HugeiconsIcon icon={StarIcon} size={14} color={darkTheme.colors.accent} strokeWidth={2.1} />
-            <AppText style={styles.statValue}>4.9</AppText>
+            <AppText style={styles.statValue}>{mechanicRating.toFixed(1)}</AppText>
           </View>
         </View>
         <View style={styles.statCard}>
@@ -163,9 +189,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
 
       <View style={styles.jobsList}>
         {loading ? (
-          <AppText style={{ color: darkTheme.colors.muted, textAlign: 'center', marginTop: 20 }}>Loading jobs...</AppText>
+          <AppText style={styles.jobsStateText}>Loading jobs...</AppText>
+        ) : error ? (
+          <AppText style={styles.jobsErrorText}>{error}</AppText>
         ) : visibleJobs.length === 0 ? (
-          <AppText style={{ color: darkTheme.colors.muted, textAlign: 'center', marginTop: 20 }}>No jobs available at the moment.</AppText>
+          <AppText style={styles.jobsStateText}>No jobs available at the moment.</AppText>
         ) : (
           visibleJobs.map((job) => (
             <View key={job.id} style={styles.jobCard}>
@@ -189,11 +217,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
               <View style={styles.metaRow}>
                 <View style={styles.metaItem}>
                   <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-                  <AppText style={styles.metaText}>{job.distance}</AppText>
+                  <AppText style={styles.metaText}>{job.distance || 'Distance unavailable'}</AppText>
                 </View>
                 <View style={styles.metaItem}>
                   <HugeiconsIcon icon={Time04Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-                  <AppText style={styles.metaText}>{job.eta}</AppText>
+                  <AppText style={styles.metaText}>{job.eta || 'ETA unavailable'}</AppText>
                 </View>
               </View>
 
@@ -366,6 +394,16 @@ const styles = StyleSheet.create({
   jobsList: {
     marginTop: 12,
     rowGap: 10,
+  },
+  jobsStateText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  jobsErrorText: {
+    color: '#FF7F7F',
+    textAlign: 'center',
+    marginTop: 20,
   },
   jobCard: {
     borderWidth: 1,

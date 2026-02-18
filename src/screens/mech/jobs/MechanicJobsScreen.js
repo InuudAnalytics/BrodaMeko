@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Clock01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { getMechanicAssignedJob, getMechanicAssignedJobs, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 
 const TABS = [
@@ -11,68 +13,27 @@ const TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 
-const AVAILABLE_JOBS = [
-  {
-    id: 'av_1',
-    name: 'Amina Yusuf',
-    issue: 'Flat tire - Toyota Camry',
-    distanceKm: 1.3,
-    etaMins: 2,
-    urgent: true,
-  },
-  {
-    id: 'av_2',
-    name: 'Emeka Okafor',
-    issue: 'Battery problem - Honda Accord',
-    distanceKm: 2.7,
-    etaMins: 8,
-    urgent: false,
-  },
-  {
-    id: 'av_3',
-    name: 'Dami Ade',
-    issue: 'Brake service - Lexus RX',
-    distanceKm: 3.4,
-    etaMins: 11,
-    urgent: false,
-  },
-];
+const readJobs = (payload) => {
+  const root = payload?.data || payload || {};
 
-const ACTIVE_JOBS = [
-  {
-    id: 'ac_1',
-    name: 'Chioma Nwosu',
-    issue: 'Engine overheating - Toyota Corolla',
-    distanceKm: 0.9,
-    etaMins: 3,
-    urgent: true,
-  },
-  {
-    id: 'ac_2',
-    name: 'Samuel Hassan',
-    issue: 'Oil leak - BMW 3 Series',
-    distanceKm: 2.1,
-    etaMins: 7,
-    urgent: false,
-  },
-];
+  if (Array.isArray(root)) {
+    return root;
+  }
 
-const COMPLETED_JOBS = [
-  {
-    id: 'cp_1',
-    name: 'Femi Williams',
-    issue: 'Spark plug replacement - Kia Rio',
-    distanceKm: 1.8,
-    etaMins: 5,
-  },
-  {
-    id: 'cp_2',
-    name: 'Mercy Bello',
-    issue: 'Brake pad change - Nissan Altima',
-    distanceKm: 2.5,
-    etaMins: 9,
-  },
-];
+  if (Array.isArray(root.jobs)) {
+    return root.jobs;
+  }
+
+  if (Array.isArray(root.items)) {
+    return root.items;
+  }
+
+  if (Array.isArray(root.results)) {
+    return root.results;
+  }
+
+  return [];
+};
 
 const initialsFromName = (name) => {
   return String(name || 'M')
@@ -83,10 +44,38 @@ const initialsFromName = (name) => {
     .join('');
 };
 
-const JobCard = ({ item, tab, onAccept }) => {
+const normalizeJob = (item, index) => ({
+  id: String(item?.id || item?._id || item?.job_id || `job-${index}`),
+  raw: item,
+  name: item?.car_owner?.name || item?.user?.name || item?.owner?.name || 'Customer',
+  issue: item?.issue_type || item?.title || item?.description || 'Car issue',
+  vehicle: item?.car_make || item?.vehicle || '',
+  distanceKm: Number(item?.distance_km || item?.distance || 0),
+  etaMins: Number(item?.eta_minutes || item?.eta || 0),
+  urgent: String(item?.priority || '').toLowerCase() === 'urgent',
+  status: String(item?.status || '').toLowerCase(),
+});
+
+const ACTIVE_STATUSES = new Set(['accepted', 'en_route', 'arrived', 'repairing', 'in_progress', 'active']);
+const COMPLETED_STATUSES = new Set(['completed', 'done']);
+
+const filterJobsForTab = (jobs, tabKey) => {
+  if (tabKey === 'completed') {
+    return jobs.filter((job) => COMPLETED_STATUSES.has(job.status));
+  }
+
+  if (tabKey === 'active') {
+    return jobs.filter((job) => ACTIVE_STATUSES.has(job.status));
+  }
+
+  return jobs.filter((job) => !ACTIVE_STATUSES.has(job.status) && !COMPLETED_STATUSES.has(job.status));
+};
+
+const JobCard = ({ item, tab, loadingAction, onAccept, onViewDetails }) => {
   const isAvailable = tab === 'available';
   const isActive = tab === 'active';
   const isCompleted = tab === 'completed';
+  const isBusy = loadingAction === item.id;
 
   return (
     <View style={styles.card}>
@@ -97,7 +86,9 @@ const JobCard = ({ item, tab, onAccept }) => {
           </View>
           <View style={styles.info}>
             <AppText style={styles.name}>{item.name}</AppText>
-            <AppText style={styles.issue}>{item.issue}</AppText>
+            <AppText style={styles.issue}>
+              {item.issue}{item.vehicle ? ` - ${item.vehicle}` : ''}
+            </AppText>
           </View>
         </View>
 
@@ -111,25 +102,36 @@ const JobCard = ({ item, tab, onAccept }) => {
       <View style={styles.metaRow}>
         <View style={styles.metaItem}>
           <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-          <AppText style={styles.metaText}>{item.distanceKm}km away</AppText>
+          <AppText style={styles.metaText}>
+            {item.distanceKm ? `${item.distanceKm}km away` : 'Distance unavailable'}
+          </AppText>
         </View>
         <View style={styles.metaItem}>
           <HugeiconsIcon icon={Clock01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-          <AppText style={styles.metaText}>{item.etaMins} minutes</AppText>
+          <AppText style={styles.metaText}>
+            {item.etaMins ? `${item.etaMins} minutes` : 'ETA unavailable'}
+          </AppText>
         </View>
       </View>
 
       {isAvailable ? (
         <AppButton
-          label="Accept job"
+          label={isBusy ? 'Accepting...' : 'Accept job'}
           onPress={() => onAccept(item)}
           style={styles.ctaBtn}
           textStyle={styles.ctaBtnText}
+          disabled={isBusy}
+          left={isBusy ? <ActivityIndicator size="small" color="#1A1A1A" /> : null}
         />
       ) : null}
 
       {isActive ? (
-        <AppButton label="View details" onPress={() => {}} style={styles.ctaBtn} textStyle={styles.ctaBtnText} />
+        <AppButton
+          label="View details"
+          onPress={() => onViewDetails(item)}
+          style={styles.ctaBtn}
+          textStyle={styles.ctaBtnText}
+        />
       ) : null}
 
       {isCompleted ? (
@@ -143,18 +145,70 @@ const JobCard = ({ item, tab, onAccept }) => {
 
 const MechanicJobsScreen = () => {
   const [activeTab, setActiveTab] = useState('available');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [loadingAction, setLoadingAction] = useState('');
+  const [jobsByTab, setJobsByTab] = useState({
+    available: [],
+    active: [],
+    completed: [],
+  });
 
-  const currentList = useMemo(() => {
-    if (activeTab === 'active') {
-      return ACTIVE_JOBS;
+  const fetchTabJobs = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await getMechanicAssignedJobs({ page: 1, limit: 50 });
+      const normalized = readJobs(response).map(normalizeJob);
+
+      setJobsByTab({
+        available: filterJobsForTab(normalized, 'available'),
+        active: filterJobsForTab(normalized, 'active'),
+        completed: filterJobsForTab(normalized, 'completed'),
+      });
+    } catch (fetchError) {
+      setError(fetchError?.message || 'Could not load jobs.');
+      setJobsByTab({
+        available: [],
+        active: [],
+        completed: [],
+      });
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    if (activeTab === 'completed') {
-      return COMPLETED_JOBS;
+  useFocusEffect(
+    useCallback(() => {
+      fetchTabJobs();
+    }, [fetchTabJobs])
+  );
+
+  const currentList = useMemo(() => jobsByTab[activeTab] || [], [activeTab, jobsByTab]);
+
+  const handleAccept = async (job) => {
+    setLoadingAction(job.id);
+    try {
+      await updateJobStatus(job.id, 'accepted');
+      await fetchTabJobs();
+      Alert.alert('Success', 'Job accepted');
+    } catch (updateError) {
+      Alert.alert('Error', updateError?.message || 'Could not accept this job.');
+    } finally {
+      setLoadingAction('');
     }
+  };
 
-    return AVAILABLE_JOBS;
-  }, [activeTab]);
+  const handleViewDetails = async (job) => {
+    try {
+      const response = await getMechanicAssignedJob(job.id);
+      const payload = response?.data || response || {};
+      Alert.alert('Job details', JSON.stringify(payload, null, 2));
+    } catch (detailsError) {
+      Alert.alert('Error', detailsError?.message || 'Could not load job details.');
+    }
+  };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -175,16 +229,41 @@ const MechanicJobsScreen = () => {
           })}
         </View>
 
-        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-          {currentList.map((item) => (
-            <JobCard
-              key={`${activeTab}-${item.id}`}
-              item={item}
-              tab={activeTab}
-              onAccept={() => Alert.alert('Success', 'Job accepted')}
-            />
-          ))}
-        </ScrollView>
+        {loading ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+          </View>
+        ) : null}
+
+        {!loading && error ? (
+          <View style={styles.centerState}>
+            <AppText style={styles.errorText}>{error}</AppText>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => fetchTabJobs(activeTab)}>
+              <AppText style={styles.retryText}>Retry</AppText>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {!loading && !error ? (
+          <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+            {currentList.map((item) => (
+              <JobCard
+                key={`${activeTab}-${item.id}`}
+                item={item}
+                tab={activeTab}
+                loadingAction={loadingAction}
+                onAccept={handleAccept}
+                onViewDetails={handleViewDetails}
+              />
+            ))}
+
+            {!currentList.length ? (
+              <View style={styles.centerState}>
+                <AppText style={styles.emptyText}>No jobs in this tab right now.</AppText>
+              </View>
+            ) : null}
+          </ScrollView>
+        ) : null}
       </View>
     </ScreenContainer>
   );
@@ -336,6 +415,24 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.text,
     fontSize: 11,
     lineHeight: 14,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    rowGap: 8,
+  },
+  errorText: {
+    color: '#FF7F7F',
+    textAlign: 'center',
+  },
+  retryText: {
+    color: darkTheme.colors.accent,
+  },
+  emptyText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
   },
 });
 

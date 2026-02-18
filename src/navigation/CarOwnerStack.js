@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   CarOwnerDashboardScreen,
   CarOwnerFundWalletScreen,
+  CarOwnerTransactionDetailsScreen,
   CarOwnerChatScreen,
   CarOwnerEditProfileScreen,
   CarOwnerDiagnosticExpertsScreen,
@@ -50,6 +51,11 @@ const CarOwnerStack = () => {
         name={ROUTES.CAR_OWNER_FUND_WALLET}
         component={CarOwnerFundWalletScreen}
         options={{ title: 'Fund Wallet' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_TRANSACTION_DETAILS}
+        component={CarOwnerTransactionDetailsScreen}
+        options={{ title: 'Transaction details' }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_WITHDRAW}

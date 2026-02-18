@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import { NativeModules } from 'react-native';
 import { GOOGLE_CONFIG } from '../config/google';
 import { MOCK_FCM_TOKEN, getMockDeviceType } from '../config/mockDevice';
 import {
@@ -27,12 +27,25 @@ const STORAGE_KEYS = {
   role: '@brodameko/role',
 };
 
-// Initialize Google Sign-In
-GoogleSignin.configure({
-  webClientId: GOOGLE_CONFIG.webClientId,
-  offlineAccess: GOOGLE_CONFIG.offlineAccess,
-  forceCodeForRefreshToken: GOOGLE_CONFIG.forceCodeForRefreshToken,
-});
+const GOOGLE_STATUS = {
+  SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+};
+
+const getGoogleSigninClient = () => {
+  if (!NativeModules?.RNGoogleSignin) {
+    return null;
+  }
+
+  try {
+    // Lazy load to avoid crashing app startup when native module is not linked yet.
+    const { GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin');
+    return { GoogleSignin, statusCodes: statusCodes || GOOGLE_STATUS };
+  } catch (error) {
+    return null;
+  }
+};
 
 const normalizeRole = (value) => {
   const role = String(value || '').toLowerCase();
@@ -105,6 +118,20 @@ export const AuthProvider = ({ children }) => {
 
   const clearError = () => setError(null);
 
+  useEffect(() => {
+    const googleClient = getGoogleSigninClient();
+
+    if (!googleClient?.GoogleSignin) {
+      return;
+    }
+
+    googleClient.GoogleSignin.configure({
+      webClientId: GOOGLE_CONFIG.webClientId,
+      offlineAccess: GOOGLE_CONFIG.offlineAccess,
+      forceCodeForRefreshToken: GOOGLE_CONFIG.forceCodeForRefreshToken,
+    });
+  }, []);
+
   const persistAuthState = async (nextToken, nextUser, nextRole) => {
     await AsyncStorage.multiSet([
       [STORAGE_KEYS.token, nextToken || ''],
@@ -122,6 +149,31 @@ export const AuthProvider = ({ children }) => {
     setUser(nextUser || null);
     setRole(nextRole || null);
     await persistAuthState(nextToken || '', nextUser || null, nextRole || '');
+  };
+
+  const updateUserData = async (updates = {}) => {
+    const current = user && typeof user === 'object' ? user : {};
+    const patch = updates && typeof updates === 'object' ? updates : {};
+    const nextUser = { ...current, ...patch };
+
+    setUser(nextUser);
+    await persistAuthState(token || '', nextUser, role || '');
+  };
+
+  const refreshUserProfile = async () => {
+    if (!token) {
+      return null;
+    }
+
+    const me = await getCurrentUser();
+    const mePayload = pickAuthPayload(me);
+    const nextUser = mePayload.user || user || null;
+    const nextRole = mePayload.role || role || null;
+
+    setUser(nextUser);
+    setRole(nextRole);
+    await persistAuthState(token || '', nextUser, nextRole || '');
+    return nextUser;
   };
 
   const registerCurrentDevice = async () => {
@@ -367,8 +419,16 @@ export const AuthProvider = ({ children }) => {
     clearError();
 
     try {
+      const googleClient = getGoogleSigninClient();
+
+      if (!googleClient?.GoogleSignin) {
+        throw new Error('Google Sign-In is not available in this build yet.');
+      }
+
+      const { GoogleSignin } = googleClient;
+
       await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
+      await GoogleSignin.signIn();
 
       const { idToken } = await GoogleSignin.getTokens();
 
@@ -396,6 +456,7 @@ export const AuthProvider = ({ children }) => {
 
       return true;
     } catch (googleError) {
+      const statusCodes = getGoogleSigninClient()?.statusCodes || GOOGLE_STATUS;
       let errorMessage = 'Google Sign-In failed.';
 
       if (googleError.code === statusCodes.SIGN_IN_CANCELLED) {
@@ -500,6 +561,7 @@ export const AuthProvider = ({ children }) => {
         error,
         pendingVerification,
         signIn,
+        signInWithGoogle,
         signUp,
         verifyOtp,
         resendOtp,
@@ -507,6 +569,8 @@ export const AuthProvider = ({ children }) => {
         resetPasswordWithOtp,
         updatePassword,
         signOut,
+        updateUserData,
+        refreshUserProfile,
         clearError,
         login: signIn,
         logout: signOut,

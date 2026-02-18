@@ -19,7 +19,7 @@ const TABS = [
   { key: 'home', label: 'Home', iconType: 'home' },
   { key: 'jobs', label: 'Jobs', icon: Briefcase01Icon },
   { key: 'wallet', label: 'Wallet', icon: Wallet01Icon },
-  { key: 'chat', label: 'Chat', icon: User02Icon },
+  { key: 'profile', label: 'Profile', icon: User02Icon },
 ];
 
 const MechanicTabBar = ({ activeTab, onTabPress }) => {

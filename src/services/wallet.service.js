@@ -1,17 +1,6 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
-const normalizeResponse = (payload, fallbackMessage) => {
-  const root = payload?.data || payload || {};
-  const nestedData = root?.data !== undefined ? root.data : root;
-
-  return {
-    success: Boolean(root?.success ?? true),
-    message: root?.message || fallbackMessage,
-    data: nestedData,
-  };
-};
-
 const buildServiceError = (message) => {
   const error = new Error(message);
   error.statusCode = 400;
@@ -32,20 +21,22 @@ export const validateTopUpAmount = (amount) => {
 export const topUpWallet = async (amount) => {
   const validAmount = validateTopUpAmount(amount);
   const response = await api.post(ENDPOINTS.wallet.topUp, { amount: validAmount });
-
-  return normalizeResponse(response.data, 'Wallet top-up initialized.');
+  return response.data;
 };
 
 export const verifyWalletPayment = async (reference, trxref) => {
-  const endpoint = ENDPOINTS.wallet.verifyPayment(reference, trxref);
-  const response = await api.get(endpoint);
-
-  return normalizeResponse(response.data, 'Wallet payment verification completed.');
+  const response = await api.get(ENDPOINTS.wallet.verifyPayment, {
+    params: {
+      reference: String(reference || '').trim(),
+      trxref: String(trxref || '').trim(),
+    },
+  });
+  return response.data;
 };
 
 export const getWalletBalance = async () => {
   const response = await api.get(ENDPOINTS.wallet.balance);
-  return normalizeResponse(response.data, 'Wallet balance retrieved.');
+  return response.data;
 };
 
 export default {

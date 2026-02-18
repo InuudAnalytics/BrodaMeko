@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -17,13 +17,14 @@ import {
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
+import { getCarOwnerJobs, getMechanicAssignedJobs } from '../../../services/jobs.service';
+import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { pickSingleImageFromGallery, ROLES, ROUTES } from '../../../utils';
 
 const MOCK_USER = {
   fullName: 'Saheed Niyi',
-  email: 'saheedniyi@gmail.com',
 };
 
 const SETTINGS_ROWS = [
@@ -39,11 +40,19 @@ const readUser = (user) => {
     user?.fullName ||
     user?.name ||
     MOCK_USER.fullName;
-  const email = user?.email || MOCK_USER.email;
+  const email = String(user?.email || '').trim();
 
   return {
     fullName: String(fullName || MOCK_USER.fullName),
-    email: String(email || MOCK_USER.email),
+    email,
+    avatarUri: String(
+      user?.avatar ||
+      user?.avatar_url ||
+      user?.avatarUri ||
+      user?.profile_photo ||
+      user?.profile_photo_url ||
+      ''
+    ).trim() || null,
   };
 };
 
@@ -69,8 +78,11 @@ const SettingRow = ({ label, icon, onPress, isLast }) => {
 };
 
 const UserProfileScreen = ({ navigation }) => {
-  const { user, signOut } = useAuth();
+  const { user, role, signOut, updateUserData, refreshUserProfile } = useAuth();
   const [walletBalance, setWalletBalance] = useState(0);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const profile = readUser(user);
   const initials = profile.fullName
@@ -86,10 +98,28 @@ const UserProfileScreen = ({ navigation }) => {
 
       const fetchBalance = async () => {
         try {
-          const response = await getWalletBalance();
-          if (active && response.success) {
-            setWalletBalance(response.data?.balance || 0);
+          const [walletResponse, jobsResponse] = await Promise.all([
+            getWalletBalance(),
+            role === ROLES.MECH
+              ? getMechanicAssignedJobs({ page: 1, limit: 100 })
+              : getCarOwnerJobs({ page: 1, limit: 100 }),
+          ]);
+
+          if (!active) {
+            return;
           }
+
+          const walletPayload = walletResponse?.data || walletResponse || {};
+          setWalletBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
+
+          const jobsPayload = jobsResponse?.data || jobsResponse || {};
+          const jobsList = Array.isArray(jobsPayload)
+            ? jobsPayload
+            : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
+          setTotalJobs(Number(jobsPayload?.total || jobsList.length || 0));
+
+          const rawRating = Number(user?.rating || user?.average_rating || user?.avg_rating || 0);
+          setRating(Number.isFinite(rawRating) ? rawRating : 0);
         } catch (error) {
           // refined error handling can go here
         }
@@ -100,8 +130,64 @@ const UserProfileScreen = ({ navigation }) => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [role, user?.average_rating, user?.avg_rating, user?.rating])
   );
+
+  const handleViewWallet = () => {
+    if (role === ROLES.MECH) {
+      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'wallet' });
+      return;
+    }
+
+    navigation.navigate(ROUTES.CAR_OWNER_REWARDS);
+  };
+
+  const handleUploadAvatar = async () => {
+    if (uploadingAvatar) {
+      return;
+    }
+
+    setUploadingAvatar(true);
+
+    try {
+      const { asset, cancelled, error: pickerError } = await pickSingleImageFromGallery();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (pickerError) {
+        Alert.alert('Upload failed', pickerError);
+        return;
+      }
+
+      if (!asset?.uri) {
+        return;
+      }
+
+      const response = await uploadAvatarService(asset);
+      const payload = response?.data || response || {};
+      const avatarUrl = String(
+        payload?.avatar ||
+        payload?.avatar_url ||
+        payload?.url ||
+        payload?.profile_photo ||
+        asset?.uri
+      ).trim();
+
+      await updateUserData({
+        avatar: avatarUrl,
+        avatar_url: avatarUrl,
+        profile_photo: avatarUrl,
+      });
+
+      await refreshUserProfile().catch(() => {});
+    } catch (uploadError) {
+      Alert.alert('Upload failed', uploadError?.message || 'Could not upload avatar.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -119,17 +205,35 @@ const UserProfileScreen = ({ navigation }) => {
 
         <View style={styles.userBlock}>
           <View style={styles.avatar}>
-            <AppText style={styles.avatarText}>{initials}</AppText>
+            {profile.avatarUri ? (
+              <Image source={{ uri: profile.avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <AppText style={styles.avatarText}>{initials}</AppText>
+            )}
+            <TouchableOpacity
+              style={styles.avatarEditBtn}
+              activeOpacity={0.85}
+              onPress={handleUploadAvatar}
+              disabled={uploadingAvatar}
+            >
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#1A1A1A" />
+              ) : (
+                <HugeiconsIcon icon={Edit01Icon} size={12} color="#1A1A1A" strokeWidth={2} />
+              )}
+            </TouchableOpacity>
           </View>
           <AppText variant="subtitle" style={styles.name}>
             {profile.fullName}
           </AppText>
-          <View style={styles.emailRow}>
-            <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.muted} strokeWidth={1.9} />
-            <AppText variant="muted" style={styles.email}>
-              {profile.email}
-            </AppText>
-          </View>
+          {profile.email ? (
+            <View style={styles.emailRow}>
+              <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.muted} strokeWidth={1.9} />
+              <AppText variant="muted" style={styles.email}>
+                {profile.email}
+              </AppText>
+            </View>
+          ) : null}
 
           <AppButton
             label="Edit profile"
@@ -153,7 +257,7 @@ const UserProfileScreen = ({ navigation }) => {
 
             <AppButton
               label="View wallet"
-              onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REWARDS)}
+              onPress={handleViewWallet}
               style={styles.walletCta}
               textStyle={styles.walletCtaText}
               icon={Wallet01Icon}
@@ -169,7 +273,7 @@ const UserProfileScreen = ({ navigation }) => {
                   <HugeiconsIcon icon={Briefcase01Icon} size={14} color={darkTheme.colors.accent} strokeWidth={2} />
                 </View>
                 <View style={styles.chipTextColumn}>
-                  <AppText style={styles.chipValue}>12</AppText>
+                  <AppText style={styles.chipValue}>{totalJobs}</AppText>
                   <AppText variant="muted" style={styles.chipLabel}>
                     Total jobs
                   </AppText>
@@ -182,7 +286,7 @@ const UserProfileScreen = ({ navigation }) => {
                   <HugeiconsIcon icon={StarIcon} size={14} color={darkTheme.colors.accent} strokeWidth={2} />
                 </View>
                 <View style={styles.chipTextColumn}>
-                  <AppText style={styles.chipValue}>4.8</AppText>
+                  <AppText style={styles.chipValue}>{rating ? rating.toFixed(1) : '0.0'}</AppText>
                   <AppText variant="muted" style={styles.chipLabel}>
                     Ratings
                   </AppText>
@@ -260,11 +364,30 @@ const styles = StyleSheet.create({
     borderColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarText: {
     color: darkTheme.colors.accent,
     fontSize: 26,
     fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  avatarEditBtn: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
   },
   name: {
     color: darkTheme.colors.text,

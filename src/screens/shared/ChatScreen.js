@@ -180,6 +180,9 @@ const SharedChatScreen = ({
         markConversationRead,
         addMockTextMessage,
         addLocalMessage,
+        sendQuotation,
+        respondQuotation,
+        initiatePaymentForJob,
         uploadImages,
         uploadingImages,
     } = useChat();
@@ -248,7 +251,7 @@ const SharedChatScreen = ({
         setHasInteracted(true);
     };
 
-    const handleConfirmPrice = (confirmed) => {
+    const handleConfirmPrice = async (confirmed) => {
         if (!confirmed) {
             setShowPriceConfirm(false);
             return;
@@ -260,9 +263,25 @@ const SharedChatScreen = ({
             return;
         }
 
-        addLocalMessage(conversationId, {
-            type: 'price_quote',
+        const response = await sendQuotation(conversationId, {
             amount,
+            job_id: route?.params?.jobId,
+        });
+
+        if (!response) {
+            Alert.alert('Error', 'Could not send quotation.');
+            setShowPriceConfirm(false);
+            return;
+        }
+
+        const quotationPayload = response?.data?.quotation || response?.data || null;
+        const normalizedId = quotationPayload?.id || quotationPayload?._id || quotationPayload?.quotation_id || `local-quote-${Date.now()}`;
+
+        addLocalMessage(conversationId, {
+            id: normalizedId,
+            type: 'price_quote',
+            amount: Number(quotationPayload?.amount || amount),
+            quotation_id: normalizedId,
             text: `Set price at ${amount} NGN`,
             sender: 'me',
         });
@@ -307,7 +326,34 @@ const SharedChatScreen = ({
         }
     };
 
-    const handleAcceptPrice = (message) => {
+    const handleAcceptPrice = async (message) => {
+        const quotationId = String(
+            message?.quotation_id || message?.id || message?._id || ''
+        ).trim();
+
+        if (!quotationId) {
+            Alert.alert('Unable to continue', 'Quotation reference is missing.');
+            return;
+        }
+
+        const quotationResponse = await respondQuotation(conversationId, {
+            quotation_id: quotationId,
+            action: 'accept',
+        });
+
+        if (!quotationResponse) {
+            Alert.alert('Error', 'Could not accept quotation.');
+            return;
+        }
+
+        const jobId = route?.params?.jobId;
+        const paymentResponse = await initiatePaymentForJob(jobId, route?.params?.paymentMethod || 'wallet');
+
+        if (!paymentResponse) {
+            Alert.alert('Error', 'Payment could not be initiated.');
+            return;
+        }
+
         addLocalMessage(conversationId, {
             type: 'system',
             text: 'Price accepted',
@@ -320,7 +366,18 @@ const SharedChatScreen = ({
         });
     };
 
-    const handleDeclinePrice = () => {
+    const handleDeclinePrice = async (message) => {
+        const quotationId = String(
+            message?.quotation_id || message?.id || message?._id || ''
+        ).trim();
+
+        if (quotationId) {
+            await respondQuotation(conversationId, {
+                quotation_id: quotationId,
+                action: 'reject',
+            });
+        }
+
         addLocalMessage(conversationId, {
             type: 'system',
             text: 'Price declined',
@@ -376,7 +433,7 @@ const SharedChatScreen = ({
                                 item={item}
                                 currentUserRole={currentUserRole}
                                 onAcceptPrice={() => handleAcceptPrice(item)}
-                                onDeclinePrice={handleDeclinePrice}
+                                onDeclinePrice={() => handleDeclinePrice(item)}
                             />
                         )}
                         ListHeaderComponent={<AppText style={styles.todayLabel}>Today</AppText>}

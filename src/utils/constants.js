@@ -17,6 +17,7 @@ export const ROUTES = {
   CAR_OWNER_HISTORY: 'CarOwnerHistory',
   CAR_OWNER_REWARDS: 'CarOwnerRewards',
   CAR_OWNER_FUND_WALLET: 'CarOwnerFundWallet',
+  CAR_OWNER_TRANSACTION_DETAILS: 'CarOwnerTransactionDetails',
   CAR_OWNER_WITHDRAW: 'CarOwnerWithdraw',
   CAR_OWNER_SETTINGS: 'CarOwnerSettings',
   CAR_OWNER_CHAT: 'CarOwnerChat',
@@ -38,5 +39,6 @@ export const ROUTES = {
   MECH_KYC_UPLOAD: 'MechanicKycUpload',
   MECH_BANK_DETAILS: 'MechanicBankDetails',
   MECH_CHAT: 'MechanicChat', // Added new route
+  USER_PROFILE: 'UserProfile',
   ADMIN_DASHBOARD: 'AdminDashboard',
 };

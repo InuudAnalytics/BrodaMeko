@@ -108,10 +108,6 @@ export const resetPassword = async ({ email, phoneNumber, otp, newPassword, conf
   return response.data;
 };
 
-const response = await api.post('/api/v1/auth/google', payload);
-return response.data;
-};
-
 export const getCurrentUser = async () => {
   const response = await api.get(ENDPOINTS.auth.me);
   return response.data;
@@ -121,6 +117,30 @@ export const updatePassword = async ({ currentPassword, newPassword }) => {
   const response = await api.post(ENDPOINTS.auth.updatePassword, {
     current_password: currentPassword,
     new_password: newPassword,
+  });
+
+  return response.data;
+};
+
+export const uploadAvatar = async (avatarFile) => {
+  const uri = String(avatarFile?.uri || avatarFile?.path || '').trim();
+
+  if (!uri) {
+    const error = new Error('avatar file is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const formData = new FormData();
+  formData.append('avatar', {
+    uri,
+    name: String(avatarFile?.fileName || avatarFile?.name || 'avatar.jpg'),
+    type: String(avatarFile?.type || 'image/jpeg'),
+  });
+
+  const response = await api.post(ENDPOINTS.auth.uploadAvatar, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
 
   return response.data;
@@ -150,4 +170,5 @@ export default {
   resetPassword,
   getCurrentUser,
   updatePassword,
+  uploadAvatar,
 };

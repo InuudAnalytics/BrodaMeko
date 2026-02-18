@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowDownLeft01Icon,
@@ -11,47 +12,59 @@ import {
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { getTransactions } from '../../../services/transactions.service';
+import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
-const TRANSACTIONS = [
-  {
-    id: 'txn-1',
-    title: 'Escrow refund',
-    subtitle: 'Job #1208 cancelled',
-    amount: '+3000',
-    time: 'Today 2:14PM',
-    positive: true,
-    icon: ArrowDownLeft01Icon,
-  },
-  {
-    id: 'txn-2',
-    title: 'Engine repair',
-    subtitle: 'Emeka Okafor',
-    amount: '-300',
-    time: 'Today 7:14PM',
-    positive: false,
-    icon: Wrench01Icon,
-  },
-  {
-    id: 'txn-3',
-    title: 'Wallet top-up',
-    subtitle: 'Visa card',
-    amount: '+93600',
-    time: 'Today 7:14PM',
-    positive: true,
-    icon: PlusSignIcon,
-  },
-  {
-    id: 'txn-4',
-    title: 'Brake service',
-    subtitle: 'Chidi Nwosu',
-    amount: '-9300',
-    time: 'Today 7:14PM',
-    positive: false,
-    icon: Wrench01Icon,
-  },
-];
+const toNaira = (value) => {
+  const amount = Number(value || 0);
+  return `#${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+};
+
+const toAmountWithSign = (amount) => {
+  const numeric = Number(amount || 0);
+  const sign = numeric >= 0 ? '+' : '-';
+  return `${sign}${Math.abs(numeric).toLocaleString('en-NG')}`;
+};
+
+const readTransactions = (payload) => {
+  const root = payload?.data || payload || {};
+
+  if (Array.isArray(root)) {
+    return root;
+  }
+
+  if (Array.isArray(root.transactions)) {
+    return root.transactions;
+  }
+
+  if (Array.isArray(root.items)) {
+    return root.items;
+  }
+
+  if (Array.isArray(root.results)) {
+    return root.results;
+  }
+
+  return [];
+};
+
+const normalizeTransaction = (item, index) => {
+  const amount = Number(item?.amount || item?.value || 0);
+  const type = String(item?.type || item?.transaction_type || '').toLowerCase();
+
+  return {
+    id: String(item?.id || item?._id || item?.reference || `txn-${index}`),
+    reference: String(item?.reference || item?.trxref || item?.id || '').trim(),
+    title: item?.title || item?.narration || item?.description || 'Transaction',
+    subtitle: item?.subtitle || item?.channel || item?.status || '',
+    amountText: toAmountWithSign(amount),
+    time: item?.created_at || item?.createdAt || item?.date || '',
+    positive: amount >= 0 || type.includes('credit'),
+    icon: amount >= 0 ? PlusSignIcon : Wrench01Icon,
+  };
+};
 
 const ActionButton = ({ label, icon, filled = false, onPress }) => {
   return (
@@ -73,34 +86,82 @@ const ActionButton = ({ label, icon, filled = false, onPress }) => {
   );
 };
 
-const TransactionItem = ({ item }) => {
+const TransactionItem = ({ item, onPress }) => {
   return (
-    <View style={styles.txnRow}>
+    <TouchableOpacity
+      style={styles.txnRow}
+      activeOpacity={0.85}
+      onPress={onPress}
+      disabled={!item?.reference}
+    >
       <View style={styles.txnIconWrap}>
-        <HugeiconsIcon icon={item.icon} size={18} color={darkTheme.colors.text} strokeWidth={2} />
+        <HugeiconsIcon icon={item.icon || ArrowDownLeft01Icon} size={18} color={darkTheme.colors.text} strokeWidth={2} />
       </View>
 
       <View style={styles.txnBody}>
         <AppText style={styles.txnTitle}>{item.title}</AppText>
-        <AppText variant="muted" style={styles.txnSubtitle}>
+        <AppText variant="muted" style={styles.txnSubtitle} numberOfLines={1}>
           {item.subtitle}
         </AppText>
       </View>
 
       <View style={styles.txnMeta}>
         <AppText style={[styles.txnAmount, item.positive ? styles.txnAmountPositive : styles.txnAmountNegative]}>
-          {item.amount}
+          {item.amountText}
         </AppText>
-        <AppText variant="muted" style={styles.txnTime}>
+        <AppText variant="muted" style={styles.txnTime} numberOfLines={1}>
           {item.time}
         </AppText>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
 const WalletScreen = ({ navigation }) => {
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
+
+  const fetchWalletData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const [walletResponse, transactionsResponse] = await Promise.all([
+        getWalletBalance(),
+        getTransactions(),
+      ]);
+
+      const walletPayload = walletResponse?.data || walletResponse || {};
+      const transactionItems = readTransactions(transactionsResponse).map(normalizeTransaction);
+
+      setBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
+      setTransactions(transactionItems);
+    } catch (requestError) {
+      setError('Could not load transactions right now.');
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchWalletData();
+    }, [fetchWalletData])
+  );
+
+  const emptyText = useMemo(() => {
+    if (loading) {
+      return 'Loading transactions...';
+    }
+    if (error) {
+      return error;
+    }
+    return 'No transactions yet.';
+  }, [loading, error]);
 
   return (
     <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
@@ -122,10 +183,10 @@ const WalletScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <AppText style={styles.balanceAmount}>{isBalanceVisible ? 'N 5000' : 'N *****'}</AppText>
+          <AppText style={styles.balanceAmount}>{isBalanceVisible ? toNaira(balance) : '# *****'}</AppText>
 
           <AppText variant="muted" style={styles.balanceSubtext}>
-            You have transacted 4 times today
+            Recent transactions from your wallet
           </AppText>
 
           <View style={styles.actionsRow}>
@@ -147,11 +208,35 @@ const WalletScreen = ({ navigation }) => {
           Recent transactions
         </AppText>
 
-        <View style={styles.txnList}>
-          {TRANSACTIONS.map((txn) => (
-            <TransactionItem key={txn.id} item={txn} />
-          ))}
-        </View>
+        {loading ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+          </View>
+        ) : null}
+
+        {!loading && transactions.length ? (
+          <View style={styles.txnList}>
+            {transactions.map((txn) => (
+              <TransactionItem
+                key={txn.id}
+                item={txn}
+                onPress={() => {
+                  if (!txn.reference) {
+                    return;
+                  }
+
+                  navigation.navigate(ROUTES.CAR_OWNER_TRANSACTION_DETAILS, { reference: txn.reference });
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {!loading && !transactions.length ? (
+          <View style={styles.centerState}>
+            <AppText style={styles.errorText}>{emptyText}</AppText>
+          </View>
+        ) : null}
       </View>
 
       <AppBottomNav
@@ -190,8 +275,8 @@ const styles = StyleSheet.create({
   balanceAmount: {
     marginTop: darkTheme.spacing.xs,
     color: darkTheme.colors.accent,
-    fontSize: 52,
-    lineHeight: 58,
+    fontSize: 40,
+    lineHeight: 46,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     letterSpacing: -0.3,
   },
@@ -263,7 +348,7 @@ const styles = StyleSheet.create({
   },
   txnTitle: {
     color: darkTheme.colors.text,
-    fontSize: 30 / 2,
+    fontSize: 15,
     lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
@@ -277,6 +362,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
     marginLeft: darkTheme.spacing.sm,
+    maxWidth: 120,
   },
   txnAmount: {
     fontSize: darkTheme.typography.fontSizes.lg,
@@ -294,6 +380,15 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.42)',
     fontSize: darkTheme.typography.fontSizes.sm,
     lineHeight: 18,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  errorText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
   },
   bottomNav: {
     borderTopWidth: 0,
