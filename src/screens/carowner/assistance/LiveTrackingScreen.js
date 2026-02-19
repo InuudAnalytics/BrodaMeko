@@ -4,12 +4,13 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Car02Icon, CallIcon, GearsIcon, Location01Icon, Mail01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
-import { confirmJob } from '../../../services/jobs.service';
+import { confirmJob, getCarOwnerJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const STATUS_STEPS = ['Accepted', 'En Route', 'Arrived', 'Repairing', 'Done'];
 const EN_ROUTE_INDEX = 1;
+const ACCEPTED_STATUSES = new Set(['accepted', 'en_route', 'arrived', 'repairing', 'in_progress', 'active', 'completed', 'done']);
 
 const StarIcon = ({ color }) => {
   return (
@@ -58,7 +59,7 @@ const StatusStepper = ({ currentIndex }) => {
   );
 };
 
-const MechanicCard = ({ mechanic, onCallPress, onMessagePress }) => {
+const MechanicCard = ({ mechanic, onCallPress, onMessagePress, showActions, showMessageBadge = false, waitingText = '' }) => {
   return (
     <View style={styles.mechanicCard}>
       <View style={styles.mechanicRow}>
@@ -80,18 +81,25 @@ const MechanicCard = ({ mechanic, onCallPress, onMessagePress }) => {
         </View>
       </View>
 
-      <View style={styles.actionRow}>
-        <AppButton
-          label="Call"
-          onPress={onCallPress}
-          style={styles.callBtn}
-          left={<HugeiconsIcon icon={CallIcon} size={18} color={darkTheme.colors.background} strokeWidth={2} />}
-        />
-        <TouchableOpacity style={styles.messageBtn} activeOpacity={0.88} onPress={onMessagePress}>
-          <HugeiconsIcon icon={Mail01Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
-          <AppText style={styles.messageBtnText}>Message</AppText>
-        </TouchableOpacity>
-      </View>
+      {showActions ? (
+        <View style={styles.actionRow}>
+          <AppButton
+            label="Call"
+            onPress={onCallPress}
+            style={styles.callBtn}
+            left={<HugeiconsIcon icon={CallIcon} size={18} color={darkTheme.colors.background} strokeWidth={2} />}
+          />
+          <TouchableOpacity style={styles.messageBtn} activeOpacity={0.88} onPress={onMessagePress}>
+            <HugeiconsIcon icon={Mail01Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+            <AppText style={styles.messageBtnText}>Message</AppText>
+            {showMessageBadge ? <View style={styles.messageBadge} /> : null}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.waitingWrap}>
+          <AppText style={styles.waitingText}>{waitingText || 'Waiting for mechanic to accept'}</AppText>
+        </View>
+      )}
     </View>
   );
 };
@@ -105,8 +113,17 @@ const LiveTrackingScreen = ({ navigation, route }) => {
 
   const [currentStep, setCurrentStep] = useState(EN_ROUTE_INDEX);
   const [confirmingCompletion, setConfirmingCompletion] = useState(false);
+  const [hasMessageBadge, setHasMessageBadge] = useState(Boolean(route?.params?.conversationId));
+  const [isAwaitingAcceptance, setIsAwaitingAcceptance] = useState(
+    String(route?.params?.trackingStatus || '').trim() === 'waiting_acceptance'
+  );
+  const jobId = String(route?.params?.jobId || '').trim();
 
   useEffect(() => {
+    if (isAwaitingAcceptance) {
+      return undefined;
+    }
+
     const timer = setInterval(() => {
       setCurrentStep((prev) => {
         if (prev >= STATUS_STEPS.length - 1) {
@@ -117,14 +134,45 @@ const LiveTrackingScreen = ({ navigation, route }) => {
     }, 3000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [isAwaitingAcceptance]);
+
+  useEffect(() => {
+    if (!isAwaitingAcceptance || !jobId) {
+      return undefined;
+    }
+
+    let active = true;
+    const poll = async () => {
+      try {
+        const response = await getCarOwnerJob(jobId);
+        const payload = response?.data || response || {};
+        const nextStatus = String(payload?.status || payload?.job?.status || '').trim().toLowerCase();
+        if (active && ACCEPTED_STATUSES.has(nextStatus)) {
+          setIsAwaitingAcceptance(false);
+          setCurrentStep(EN_ROUTE_INDEX);
+        }
+      } catch {
+        // Best-effort polling; silent fail to avoid noisy UX.
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 8000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [isAwaitingAcceptance, jobId]);
 
   const isDone = currentStep === STATUS_STEPS.length - 1;
-  const distanceText = useMemo(() => (isDone ? 'has completed your request' : 'is 1.2 miles away and driving towards you'), [isDone]);
+  const distanceText = useMemo(() => {
+    if (isAwaitingAcceptance) {
+      return 'will begin tracking once job is accepted';
+    }
+    return isDone ? 'has completed your request' : 'is 1.2 miles away and driving towards you';
+  }, [isAwaitingAcceptance, isDone]);
 
   const handleConfirmCompletion = async () => {
-    const jobId = String(route?.params?.jobId || '').trim();
-
     if (!jobId) {
       Alert.alert('Unable to confirm', 'Job reference is missing.');
       return;
@@ -149,34 +197,44 @@ const LiveTrackingScreen = ({ navigation, route }) => {
         <View style={styles.mapRoadB} />
         <View style={styles.mapRoadC} />
         <View style={styles.routeLine} />
-        <View style={styles.routePin} />
+        <View style={styles.selfPin} />
+        <View style={styles.targetPin} />
       </View>
 
       <View style={styles.sheet}>
-        <AppText style={styles.sheetTitle}>En Route</AppText>
+        <AppText style={styles.sheetTitle}>{isAwaitingAcceptance ? 'Waiting' : 'En Route'}</AppText>
         <AppText variant="muted" style={styles.sheetSubtitle}>
           {mechanic.name} {distanceText}
         </AppText>
 
-        <StatusStepper currentIndex={currentStep} />
+        <StatusStepper currentIndex={isAwaitingAcceptance ? 0 : currentStep} />
 
         <MechanicCard
           mechanic={mechanic}
           onCallPress={() => Alert.alert('Call', `Calling ${mechanic.name}`)}
-          onMessagePress={() =>
+          showActions={!isAwaitingAcceptance}
+          showMessageBadge={hasMessageBadge}
+          waitingText="Waiting for mechanic to accept"
+          onMessagePress={() => {
+            setHasMessageBadge(false);
             navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
               mechanic,
               jobId: route?.params?.jobId,
               mechanicId: route?.params?.mechanic?.id || route?.params?.mechanicId || mechanic?.id,
-            })
-          }
+              conversationId: route?.params?.conversationId,
+              conversation: route?.params?.conversation,
+              issueSummary: route?.params?.issueSummary,
+            });
+          }}
         />
 
-        <Pressable style={styles.nextBtn} onPress={() => setCurrentStep((s) => Math.min(s + 1, STATUS_STEPS.length - 1))}>
-          <AppText style={styles.nextBtnText}>Advance status</AppText>
-        </Pressable>
+        {!isAwaitingAcceptance ? (
+          <Pressable style={styles.nextBtn} onPress={() => setCurrentStep((s) => Math.min(s + 1, STATUS_STEPS.length - 1))}>
+            <AppText style={styles.nextBtnText}>Advance status</AppText>
+          </Pressable>
+        ) : null}
 
-        {isDone ? (
+        {!isAwaitingAcceptance && isDone ? (
           <View style={styles.doneWrap}>
             <AppText style={styles.doneText}>Job completed</AppText>
             <TouchableOpacity
@@ -252,7 +310,18 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#2FAEFC',
   },
-  routePin: {
+  selfPin: {
+    position: 'absolute',
+    top: 250,
+    left: 110,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#E2FF31',
+    borderWidth: 4,
+    borderColor: '#2B2B31',
+  },
+  targetPin: {
     position: 'absolute',
     top: 122,
     left: 50,
@@ -427,6 +496,29 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
     fontSize: darkTheme.typography.fontSizes.sm,
     fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  messageBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 14,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+  },
+  waitingWrap: {
+    marginTop: darkTheme.spacing.md,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: darkTheme.radius.md,
+    paddingVertical: darkTheme.spacing.sm,
+    paddingHorizontal: darkTheme.spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  waitingText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
+    fontSize: darkTheme.typography.fontSizes.sm,
   },
   nextBtn: {
     alignSelf: 'center',

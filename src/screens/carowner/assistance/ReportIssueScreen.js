@@ -1,7 +1,19 @@
 import React, { useContext, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
+  ArrowLeft01Icon,
   BatteryCharging02Icon,
   HelpCircleIcon,
   MinusSignIcon,
@@ -261,7 +273,10 @@ const ReportIssueScreen = ({ navigation }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [descriptionY, setDescriptionY] = useState(0);
+  const [carMakeY, setCarMakeY] = useState(0);
   const isCreatingJob = Boolean(jobsContext?.loading?.createJob);
+  const scrollRef = React.useRef(null);
 
   const activeGroup = useMemo(
     () => ISSUE_GROUPS.find((group) => group.key === activeGroupKey) || ISSUE_GROUPS[0],
@@ -425,9 +440,33 @@ const ReportIssueScreen = ({ navigation }) => {
     }
   };
 
+  const focusInputAtCenter = (yPosition) => {
+    if (!scrollRef.current || !Number.isFinite(yPosition)) {
+      return;
+    }
+
+    const targetY = Math.max(0, yPosition - 140);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: targetY, animated: true });
+    });
+  };
+
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
+      <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
+          </TouchableOpacity>
+          <AppText style={styles.headerTitle}>What is the issue</AppText>
+        </View>
+
         <AppText variant="subtitle" style={styles.sectionTitle}>
           Select an issue
         </AppText>
@@ -464,36 +503,42 @@ const ReportIssueScreen = ({ navigation }) => {
 
         {errors.issue ? <AppText style={styles.errorText}>{errors.issue}</AppText> : null}
 
-        <AppInput
-          label={selectedIssueType === 'other' ? 'Description (required)' : 'Description (optional)'}
-          placeholder={
-            selectedIssueType === 'other'
-              ? 'Please describe your issue'
-              : selectedIssueLabel
-                ? `Describe your ${selectedIssueLabel.toLowerCase()} issue`
-                : 'Describe your problem here'
-          }
-          value={description}
-          onChangeText={(text) => {
-            setDescription(text);
-            setErrors((prev) => ({ ...prev, description: '', submit: '' }));
-          }}
-          multiline
-          textAlignVertical="top"
-          inputStyle={styles.descriptionInput}
-        />
+        <View onLayout={(event) => setDescriptionY(event.nativeEvent.layout.y)}>
+          <AppInput
+            label={selectedIssueType === 'other' ? 'Description (required)' : 'Description (optional)'}
+            placeholder={
+              selectedIssueType === 'other'
+                ? 'Please describe your issue'
+                : selectedIssueLabel
+                  ? `Describe your ${selectedIssueLabel.toLowerCase()} issue`
+                  : 'Describe your problem here'
+            }
+            value={description}
+            onChangeText={(text) => {
+              setDescription(text);
+              setErrors((prev) => ({ ...prev, description: '', submit: '' }));
+            }}
+            onFocus={() => focusInputAtCenter(descriptionY)}
+            multiline
+            textAlignVertical="top"
+            inputStyle={styles.descriptionInput}
+          />
+        </View>
         {errors.description ? <AppText style={styles.errorText}>{errors.description}</AppText> : null}
 
-        <AppInput
-          label="Car make"
-          placeholder="Toyota Corolla"
-          value={carMake}
-          onChangeText={(text) => {
-            setCarMake(text);
-            setErrors((prev) => ({ ...prev, carMake: '', submit: '' }));
-          }}
-          autoCapitalize="words"
-        />
+        <View onLayout={(event) => setCarMakeY(event.nativeEvent.layout.y)}>
+          <AppInput
+            label="Car make"
+            placeholder="Toyota Corolla"
+            value={carMake}
+            onChangeText={(text) => {
+              setCarMake(text);
+              setErrors((prev) => ({ ...prev, carMake: '', submit: '' }));
+            }}
+            onFocus={() => focusInputAtCenter(carMakeY)}
+            autoCapitalize="words"
+          />
+        </View>
         {errors.carMake ? <AppText style={styles.errorText}>{errors.carMake}</AppText> : null}
 
         <UploadBox
@@ -518,15 +563,40 @@ const ReportIssueScreen = ({ navigation }) => {
         {errors.submit ? <AppText style={styles.errorText}>{errors.submit}</AppText> : null}
         {successMessage ? <AppText style={styles.successText}>{successMessage}</AppText> : null}
       </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardWrap: {
+    flex: 1,
+  },
   content: {
     paddingHorizontal: darkTheme.spacing.xl,
-    paddingTop: darkTheme.spacing.lg,
+    paddingTop: darkTheme.spacing.sm,
     paddingBottom: darkTheme.spacing.xxl,
+  },
+  header: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: darkTheme.spacing.md,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
   sectionTitle: {
     color: darkTheme.colors.text,

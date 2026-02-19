@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowRight01Icon, StarIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ArrowRight01Icon, StarIcon } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
 import { getCarOwnerJobs } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
@@ -244,9 +244,13 @@ const HistoryScreen = ({ navigation }) => {
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
+          </TouchableOpacity>
           <AppText style={styles.heading}>History</AppText>
-          <AppText style={styles.subText}>Completed jobs</AppText>
+          <View style={styles.backButtonSpacer} />
         </View>
+        <AppText style={styles.subText}>Completed jobs</AppText>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {content}
@@ -266,22 +270,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
   },
   header: {
-    marginBottom: 10,
+    minHeight: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonSpacer: {
+    width: 36,
+    height: 36,
   },
   heading: {
     color: darkTheme.colors.text,
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+    flex: 1,
+    textAlign: 'center',
   },
   subText: {
-    marginTop: 2,
+    marginBottom: 10,
     color: darkTheme.colors.muted,
     fontSize: 13,
     lineHeight: 18,
+    textAlign: 'center',
   },
   content: {
     paddingBottom: 24,

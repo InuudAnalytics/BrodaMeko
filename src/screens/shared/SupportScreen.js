@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Alert, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
-import { AppButton, AppText, ScreenContainer } from '../../components';
+import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../components';
 import { darkTheme } from '../../theme';
 import { pickSingleImageFromGallery } from '../../utils';
 
@@ -73,7 +73,7 @@ const SupportScreen = ({ navigation }) => {
         </View>
 
         <AppText style={styles.label}>Description</AppText>
-        <TextInput
+        <LiftableTextInput
           multiline
           value={description}
           onChangeText={setDescription}

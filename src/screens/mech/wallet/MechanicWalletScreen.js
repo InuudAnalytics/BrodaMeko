@@ -288,20 +288,22 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginTop: 18,
-    color: darkTheme.colors.text,
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: darkTheme.typography.fontWeights.medium,
+    marginBottom: 8,
+    color: 'rgba(255,255,255,0.56)',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.regular,
   },
   txnList: {
-    marginTop: 10,
-    rowGap: 12,
+    marginTop: 2,
+    rowGap: 6,
   },
   txnRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     columnGap: 10,
+    paddingVertical: 9,
   },
   txnLeft: {
     flexDirection: 'row',
@@ -319,22 +321,22 @@ const styles = StyleSheet.create({
   },
   txnTitle: {
     color: darkTheme.colors.text,
-    fontSize: 17,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   txnSubtitle: {
     marginTop: 2,
-    color: darkTheme.colors.muted,
-    fontSize: 13,
-    lineHeight: 16,
+    color: 'rgba(255,255,255,0.48)',
+    fontSize: 14,
+    lineHeight: 18,
   },
   txnRight: {
     alignItems: 'flex-end',
   },
   txnAmount: {
-    fontSize: 22,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   txnAmountCredit: {
@@ -345,9 +347,9 @@ const styles = StyleSheet.create({
   },
   txnTime: {
     marginTop: 2,
-    color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
+    color: 'rgba(255,255,255,0.48)',
+    fontSize: 14,
+    lineHeight: 18,
   },
 });
 

@@ -96,7 +96,7 @@ const TransactionItem = ({ item, onPress }) => {
       disabled={!item?.reference}
     >
       <View style={styles.txnIconWrap}>
-        <HugeiconsIcon icon={item.icon || ArrowDownLeft01Icon} size={18} color={darkTheme.colors.text} strokeWidth={2} />
+        <HugeiconsIcon icon={item.icon || ArrowDownLeft01Icon} size={18} color="#6D7392" strokeWidth={2} />
       </View>
 
       <View style={styles.txnBody}>
@@ -165,7 +165,7 @@ const WalletScreen = ({ navigation }) => {
   }, [loading, error]);
 
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.content}>
         <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
 
@@ -360,42 +360,43 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
   },
   sectionTitle: {
-    marginTop: 16,
-    marginBottom: 4,
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
-    lineHeight: 18,
+    marginTop: 18,
+    marginBottom: 8,
+    color: 'rgba(255,255,255,0.56)',
+    fontSize: 15,
+    lineHeight: 20,
   },
   txnList: {
-    marginTop: 6,
+    marginTop: 2,
+    rowGap: 6,
   },
   txnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 9,
   },
   txnIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   txnBody: {
     flex: 1,
   },
   txnTitle: {
     color: darkTheme.colors.text,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   txnSubtitle: {
-    marginTop: 1,
-    color: 'rgba(255,255,255,0.42)',
-    fontSize: 12,
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.48)',
+    fontSize: 14,
     lineHeight: 16,
   },
   txnMeta: {
@@ -405,8 +406,8 @@ const styles = StyleSheet.create({
     maxWidth: 120,
   },
   txnAmount: {
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   txnAmountPositive: {
@@ -417,9 +418,9 @@ const styles = StyleSheet.create({
   },
   txnTime: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.42)',
-    fontSize: 11,
-    lineHeight: 14,
+    color: 'rgba(255,255,255,0.48)',
+    fontSize: 14,
+    lineHeight: 18,
   },
   centerState: {
     alignItems: 'center',

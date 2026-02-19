@@ -151,6 +151,38 @@ const normalizeAvatarUri = (value) => {
   return base ? `${base}/${path}` : raw;
 };
 
+const normalizeIssueSummary = (job) => {
+  const source = job && typeof job === 'object' ? job : {};
+  const images = Array.isArray(source?.images) ? source.images : [];
+
+  const imageUris = images
+    .map((image) => {
+      if (typeof image === 'string') {
+        return normalizeAvatarUri(image);
+      }
+      return normalizeAvatarUri(image?.url || image?.uri || image?.path || '');
+    })
+    .filter(Boolean);
+
+  return {
+    issueType: String(source?.issue_type || source?.title || '').trim(),
+    description: String(source?.description || '').trim(),
+    carMake: String(source?.car_make || '').trim(),
+    images: imageUris,
+  };
+};
+
+const formatIssueSummaryForMessage = (summary) => {
+  const parts = [
+    summary?.issueType ? `Issue: ${summary.issueType}` : '',
+    summary?.description ? `Description: ${summary.description}` : '',
+    summary?.carMake ? `Car make: ${summary.carMake}` : '',
+    Array.isArray(summary?.images) && summary.images.length ? `Images: ${summary.images.length}` : '',
+  ].filter(Boolean);
+
+  return parts.length ? parts.join(' | ') : 'New service request created.';
+};
+
 const HireButton = ({ onPress, loading }) => {
   return (
     <Pressable onPress={onPress} disabled={loading} style={[styles.hireButton, loading ? styles.hireButtonBusy : null]}>
@@ -211,13 +243,14 @@ const MechanicCard = ({ item, loading, onHire }) => {
 };
 
 const FindMechanicsScreen = ({ navigation, route }) => {
-  const { startConversation } = useChat();
+  const { startConversation, addLocalMessage } = useChat();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadingMechanicId, setLoadingMechanicId] = useState(null);
   const [mechanics, setMechanics] = useState([]);
 
   const jobId = String(route?.params?.jobId || '').trim();
+  const issueSummary = normalizeIssueSummary(route?.params?.job);
   const locationText = route?.params?.location || 'Ahmadu Bello way, Kwara state';
 
   const fetchMechanics = useCallback(async () => {
@@ -262,12 +295,22 @@ const FindMechanicsScreen = ({ navigation, route }) => {
         conversation?.id || conversation?._id || conversation?.conversation_id || conversation?.conversationId || ''
       ).trim();
 
-      navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+      if (conversationId) {
+        addLocalMessage(conversationId, {
+          type: 'system',
+          text: formatIssueSummaryForMessage(issueSummary),
+          sender: 'user',
+        });
+      }
+
+      navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
         mechanic,
         jobId,
         mechanicId: mechanic.id,
         conversationId,
         conversation,
+        trackingStatus: 'waiting_acceptance',
+        issueSummary,
       });
     } catch (hireError) {
       setError(hireError?.message || 'Could not start chat with mechanic.');

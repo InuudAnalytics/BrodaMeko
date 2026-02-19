@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import {
@@ -282,7 +282,7 @@ const EditProfileScreen = ({ navigation }) => {
         <View style={styles.field}>
           <AppText style={styles.label}>Name</AppText>
           <View style={styles.inputWrap}>
-            <TextInput
+            <LiftableTextInput
               value={name}
               onChangeText={setName}
               editable={!isSaving}
@@ -296,7 +296,7 @@ const EditProfileScreen = ({ navigation }) => {
         <View style={styles.field}>
           <AppText style={styles.label}>Email address</AppText>
           <View style={styles.inputWrap}>
-            <TextInput
+            <LiftableTextInput
               value={email}
               onChangeText={setEmail}
               editable={!isSaving}
@@ -312,7 +312,7 @@ const EditProfileScreen = ({ navigation }) => {
         <View style={styles.field}>
           <AppText style={styles.label}>Phone number</AppText>
           <View style={styles.inputWrap}>
-            <TextInput
+            <LiftableTextInput
               value={phone}
               onChangeText={setPhone}
               editable={!isSaving}
@@ -331,7 +331,7 @@ const EditProfileScreen = ({ navigation }) => {
               Enter the OTP sent to {pendingContactVerification.value}
             </AppText>
             <View style={styles.inputWrap}>
-              <TextInput
+              <LiftableTextInput
                 value={otpCode}
                 onChangeText={setOtpCode}
                 editable={!isVerifyingOtp && !isResendingOtp}

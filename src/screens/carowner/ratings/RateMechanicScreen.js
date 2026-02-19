@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
 
 const Star = ({ filled }) => {
@@ -64,7 +64,7 @@ const RateMechanicScreen = ({ navigation, route }) => {
           {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
           <View style={styles.inputWrap}>
-            <TextInput
+            <LiftableTextInput
               value={comment}
               onChangeText={setComment}
               style={styles.input}

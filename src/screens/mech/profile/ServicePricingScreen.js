@@ -6,13 +6,12 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import {
   addMechanicService,
@@ -481,7 +480,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
                 <View style={styles.priceRow}>
                   <View style={styles.priceCell}>
                     <AppText style={styles.priceLabel}>Min price</AppText>
-                    <TextInput
+                    <LiftableTextInput
                       value={row.min_price}
                       onChangeText={(value) => updateRow(row.id, { min_price: toDigits(value) })}
                       onFocus={() => centerRow(row.id)}
@@ -495,7 +494,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
 
                   <View style={styles.priceCell}>
                     <AppText style={styles.priceLabel}>Max price</AppText>
-                    <TextInput
+                    <LiftableTextInput
                       value={row.max_price}
                       onChangeText={(value) => updateRow(row.id, { max_price: toDigits(value) })}
                       onFocus={() => centerRow(row.id)}

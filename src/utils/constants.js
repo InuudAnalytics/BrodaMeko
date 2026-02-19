@@ -46,6 +46,7 @@ export const ROUTES = {
   MECH_EDIT_PROFILE: 'MechanicEditProfile',
   MECH_JOB_DETAILS: 'MechanicJobDetails',
   MECH_CHAT: 'MechanicChat', // Added new route
+  MECH_LIVE_TRACKING: 'MechanicLiveTracking',
   USER_PROFILE: 'UserProfile',
   ADMIN_DASHBOARD: 'AdminDashboard',
 };

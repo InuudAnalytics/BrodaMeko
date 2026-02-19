@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { MinusSignIcon, PlusSignIcon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { useJobs } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
@@ -143,7 +143,7 @@ const EditJobScreen = ({ navigation, route }) => {
         </View>
 
         <AppText style={styles.label}>Car make</AppText>
-        <TextInput
+        <LiftableTextInput
           value={carMake}
           onChangeText={setCarMake}
           placeholder="Toyota Camry"
@@ -152,7 +152,7 @@ const EditJobScreen = ({ navigation, route }) => {
         />
 
         <AppText style={styles.label}>Description</AppText>
-        <TextInput
+        <LiftableTextInput
           value={description}
           onChangeText={setDescription}
           placeholder="Describe your issue"

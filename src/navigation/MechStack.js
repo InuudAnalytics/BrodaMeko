@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MechanicDashboardTabs from './MechanicDashboardTabs';
 import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
+import MechanicLiveTrackingScreen from '../screens/mech/assistance/MechanicLiveTrackingScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
@@ -80,6 +81,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.MECH_JOB_DETAILS}
         component={MechanicJobDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_LIVE_TRACKING}
+        component={MechanicLiveTrackingScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />

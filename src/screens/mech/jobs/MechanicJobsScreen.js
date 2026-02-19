@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Clock01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
-import { getMechanicAssignedJobs, updateJobStatus } from '../../../services/jobs.service';
+import { getMechanicAssignedJob, getMechanicAssignedJobs, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -56,6 +56,34 @@ const normalizeJob = (item, index) => ({
   urgent: String(item?.priority || '').toLowerCase() === 'urgent',
   status: String(item?.status || '').toLowerCase(),
 });
+
+const normalizeIssueSummary = (job) => {
+  const source = job && typeof job === 'object' ? job : {};
+  const rawImages = Array.isArray(source?.images) ? source.images : [];
+  const images = rawImages
+    .map((image) => {
+      if (typeof image === 'string') {
+        return image;
+      }
+      return String(image?.url || image?.uri || image?.path || '').trim();
+    })
+    .filter(Boolean);
+
+  return {
+    issueType: String(source?.issue_type || source?.title || '').trim(),
+    description: String(source?.description || '').trim(),
+    carMake: String(source?.car_make || '').trim(),
+    images,
+  };
+};
+
+const readJobPayload = (response) => {
+  const root = response?.data || response || {};
+  if (root?.job && typeof root.job === 'object') {
+    return root.job;
+  }
+  return root;
+};
 
 const ACTIVE_STATUSES = new Set(['accepted', 'en_route', 'arrived', 'repairing', 'in_progress', 'active']);
 const COMPLETED_STATUSES = new Set(['completed', 'done']);
@@ -193,7 +221,51 @@ const MechanicJobsScreen = ({ navigation }) => {
     try {
       await updateJobStatus(job.id, 'accepted');
       await fetchTabJobs();
-      Alert.alert('Success', 'Job accepted');
+
+      const detailsResponse = await getMechanicAssignedJob(job.id).catch(() => null);
+      const detailedJob = detailsResponse ? readJobPayload(detailsResponse) : null;
+      const source = detailedJob || job?.raw || {};
+      const customerName =
+        source?.car_owner?.name ||
+        source?.user?.name ||
+        source?.owner?.name ||
+        job?.name ||
+        'Customer';
+      const customerInitials = initialsFromName(customerName) || 'C';
+      const conversationId = String(
+        source?.conversation_id ||
+        source?.conversationId ||
+        source?.conversation?.id ||
+        source?.conversation?._id ||
+        ''
+      ).trim();
+      const mechanicId = String(
+        source?.mechanic_id ||
+        source?.mechanic?.id ||
+        source?.assigned_mechanic_id ||
+        'self'
+      ).trim();
+      const carOwnerId = String(
+        source?.car_owner_id ||
+        source?.car_owner?.id ||
+        source?.user_id ||
+        source?.user?.id ||
+        ''
+      ).trim();
+
+      navigation.navigate(ROUTES.MECH_CHAT, {
+        jobId: job.id,
+        mechanicId: mechanicId || 'self',
+        carOwnerId,
+        conversationId,
+        issueSummary: normalizeIssueSummary(source),
+        customer: {
+          id: carOwnerId,
+          name: customerName,
+          initials: customerInitials,
+          rating: String(source?.car_owner?.rating || source?.user?.rating || ''),
+        },
+      });
     } catch (updateError) {
       Alert.alert('Error', updateError?.message || 'Could not accept this job.');
     } finally {

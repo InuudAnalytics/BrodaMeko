@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
@@ -72,8 +74,16 @@ const RequestDiagnosticsScreen = ({ navigation }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
+          </TouchableOpacity>
+          <AppText style={styles.headerTitle}>Book a diagnostic expert</AppText>
+          <View style={styles.backButtonSpacer} />
+        </View>
+
         <AppText variant="body" style={styles.introText}>
           Not sure what is wrong yet? Request a certified diagnostic expert for an onsite visit before choosing a
           repair.
@@ -111,8 +121,33 @@ const RequestDiagnosticsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: darkTheme.spacing.xl,
-    paddingTop: darkTheme.spacing.lg,
+    paddingTop: darkTheme.spacing.sm,
     paddingBottom: darkTheme.spacing.xxl,
+  },
+  header: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: darkTheme.spacing.md,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonSpacer: {
+    width: 36,
+    height: 36,
+  },
+  headerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+    flex: 1,
+    textAlign: 'center',
   },
   introText: {
     color: darkTheme.colors.text,

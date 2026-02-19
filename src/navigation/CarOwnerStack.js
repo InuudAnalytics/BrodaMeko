@@ -49,8 +49,16 @@ const CarOwnerStack = () => {
         component={CarOwnerDashboardScreen}
         options={{ title: 'Home', headerShown: false }}
       />
-      <Stack.Screen name={ROUTES.CAR_OWNER_HISTORY} component={CarOwnerHistoryScreen} options={{ title: 'History' }} />
-      <Stack.Screen name={ROUTES.CAR_OWNER_REWARDS} component={CarOwnerRewardsScreen} options={{ title: 'Wallet' }} />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_HISTORY}
+        component={CarOwnerHistoryScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_REWARDS}
+        component={CarOwnerRewardsScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_FUND_WALLET}
         component={CarOwnerFundWalletScreen}
@@ -99,12 +107,12 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REPORT_ISSUE}
         component={CarOwnerReportIssueScreen}
-        options={{ title: 'What is the issue' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS}
         component={CarOwnerRequestDiagnosticsScreen}
-        options={{ title: 'Book a diagnostic expert' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_DIAGNOSTIC_EXPERTS}
