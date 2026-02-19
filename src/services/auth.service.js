@@ -1,6 +1,8 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
+const PUBLIC_AUTH_CONFIG = { skipAuth: true };
+
 const mapRoleToBackend = (role) => {
   const normalized = String(role || '').toUpperCase();
 
@@ -30,12 +32,12 @@ export const signup = async ({ fullName, email, phoneNumber, password, role }) =
     payload.phone_number = phoneNumber;
   }
 
-  const response = await api.post(ENDPOINTS.auth.signup, payload);
+  const response = await api.post(ENDPOINTS.auth.signup, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
 export const verifyOtp = async ({ otp }) => {
-  const response = await api.post(ENDPOINTS.auth.verifyOtp, { otp });
+  const response = await api.post(ENDPOINTS.auth.verifyOtp, { otp }, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -50,7 +52,7 @@ export const resendOtp = async ({ email, phoneNumber }) => {
     payload.phone_number = phoneNumber;
   }
 
-  const response = await api.post(ENDPOINTS.auth.resendOtp, payload);
+  const response = await api.post(ENDPOINTS.auth.resendOtp, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -65,7 +67,7 @@ export const login = async ({ email, phoneNumber, password }) => {
     payload.phone_number = phoneNumber;
   }
 
-  const response = await api.post(ENDPOINTS.auth.login, payload);
+  const response = await api.post(ENDPOINTS.auth.login, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -85,7 +87,7 @@ export const forgotPassword = async ({ email, phoneNumber }) => {
     payload.phone_number = phoneNumber;
   }
 
-  const response = await api.post(ENDPOINTS.auth.forgotPassword, payload);
+  const response = await api.post(ENDPOINTS.auth.forgotPassword, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -104,7 +106,7 @@ export const resetPassword = async ({ email, phoneNumber, otp, newPassword, conf
     payload.phone_number = phoneNumber;
   }
 
-  const response = await api.post(ENDPOINTS.auth.resetPassword, payload);
+  const response = await api.post(ENDPOINTS.auth.resetPassword, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -114,7 +116,7 @@ export const getCurrentUser = async () => {
 };
 
 export const updatePassword = async ({ currentPassword, newPassword }) => {
-  const response = await api.post(ENDPOINTS.auth.updatePassword, {
+  const response = await api.patch(ENDPOINTS.auth.updatePassword, {
     current_password: currentPassword,
     new_password: newPassword,
   });
@@ -146,6 +148,49 @@ export const uploadAvatar = async (avatarFile) => {
   return response.data;
 };
 
+export const verifyAddContact = async ({ email, phoneNumber }) => {
+  const endpoint = ENDPOINTS.auth.verifyAddContact;
+  const normalizedEmail = String(email || '').trim();
+  const normalizedPhone = String(phoneNumber || '').trim();
+
+  const payloads = [];
+
+  if (normalizedEmail) {
+    payloads.push({ email: normalizedEmail });
+  }
+
+  if (normalizedPhone) {
+    payloads.push({ phone_number: normalizedPhone });
+    payloads.push({ 'phone-number': normalizedPhone });
+    payloads.push({ phoneNumber: normalizedPhone });
+  }
+
+  if (!payloads.length) {
+    const error = new Error('email or phone number is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  let lastError = null;
+
+  for (let index = 0; index < payloads.length; index += 1) {
+    try {
+      const response = await api.post(endpoint, payloads[index]);
+      return response.data;
+    } catch (requestError) {
+      lastError = requestError;
+
+      const statusCode = Number(requestError?.statusCode || 0);
+      if (statusCode !== 404 && statusCode !== 400) {
+        throw requestError;
+      }
+    }
+  }
+
+  throw lastError || new Error('Could not verify contact.');
+};
+
 export const googleLogin = async ({ idToken, role }) => {
   const payload = {
     id_token: idToken,
@@ -155,7 +200,7 @@ export const googleLogin = async ({ idToken, role }) => {
   // Assuming the backend has this endpoint. 
   // If not, it needs to be created on the backend.
   // Using a likely path based on other endpoints.
-  const response = await api.post('/api/v1/auth/google', payload);
+  const response = await api.post('/api/v1/auth/google', payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -171,4 +216,5 @@ export default {
   getCurrentUser,
   updatePassword,
   uploadAvatar,
+  verifyAddContact,
 };

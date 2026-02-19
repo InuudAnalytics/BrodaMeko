@@ -1,9 +1,13 @@
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowRight01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
+import { ArrowRight01Icon, Location06Icon, Notification01Icon } from '@hugeicons/core-free-icons';
+import { openSettings } from 'react-native-permissions';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import { darkTheme } from '../../../theme';
 import { getWATGreeting, ROUTES } from '../../../utils';
 
@@ -33,12 +37,103 @@ const HelpActionRow = ({ label, onPress }) => {
   );
 };
 
+const normalizeAvatarUri = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    return raw;
+  }
+
+  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const path = raw.replace(/^\/+/, '');
+  return base ? `${base}/${path}` : raw;
+};
+
+const readAvatarUri = (user) =>
+  normalizeAvatarUri(
+    user?.avatar ||
+    user?.avatar_url ||
+    user?.avatarUrl ||
+    user?.avatarUri ||
+    user?.profile_photo ||
+    user?.profile_photo_url ||
+    user?.profile_picture ||
+    user?.image_url ||
+    user?.photo_url ||
+    ''
+  );
+
+const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loading }) => {
+  return (
+    <View style={styles.locationFallbackWrap}>
+      <View style={styles.locationFallbackCard}>
+        <View style={styles.locationIconWrap}>
+          <HugeiconsIcon icon={Location06Icon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
+        </View>
+        <AppText style={styles.locationFallbackTitle}>Location is off</AppText>
+        <AppText style={styles.locationFallbackBody}>
+          Turn on location to find mechanics near you.
+        </AppText>
+
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[styles.locationActionBtn, loading ? styles.locationActionBtnDisabled : null]}
+          onPress={onEnableLocation}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#1A1A1A" />
+          ) : (
+            <AppText style={styles.locationActionBtnText}>Enable location</AppText>
+          )}
+        </TouchableOpacity>
+
+        {isBlocked ? (
+          <TouchableOpacity activeOpacity={0.9} style={styles.settingsBtn} onPress={onOpenSettings}>
+            <AppText style={styles.settingsBtnText}>Open settings</AppText>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
 const DashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
+  const mapRef = useRef(null);
+  const { location, permissionStatus, loading, requestPermission, startWatching, stopWatching, refreshOnce } = useUserLocation();
   const firstName = extractFirstName(user);
   const greetingPrefix = getWATGreeting();
   const greetingText = firstName ? `${greetingPrefix}, ${firstName}` : greetingPrefix;
   const avatarInitial = firstName.charAt(0).toUpperCase() || 'U';
+  const avatarUri = readAvatarUri(user);
+  const hasLocationPermission = permissionStatus === 'granted';
+  const isLocationBlocked = permissionStatus === 'blocked';
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasLocationPermission) {
+        return undefined;
+      }
+
+      startWatching();
+
+      return () => {
+        stopWatching();
+      };
+    }, [hasLocationPermission, startWatching, stopWatching])
+  );
+
+  const locationBadgeText = useMemo(() => {
+    if (!location) {
+      return 'Detecting location...';
+    }
+
+    return `Lat ${location.latitude.toFixed(4)} • Lng ${location.longitude.toFixed(4)}`;
+  }, [location]);
 
   const handleTabPress = (routeName) => {
     if (routeName === ROUTES.CAR_OWNER_DASHBOARD) {
@@ -48,19 +143,57 @@ const DashboardScreen = ({ navigation }) => {
     navigation.navigate(routeName);
   };
 
+  const handleEnableLocation = useCallback(async () => {
+    const status = await requestPermission();
+
+    if (status === 'granted') {
+      await refreshOnce();
+      startWatching();
+    }
+  }, [refreshOnce, requestPermission, startWatching]);
+
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.mapBackdrop}>
-        <View style={styles.mapLineA} />
-        <View style={styles.mapLineB} />
-        <View style={styles.mapLineC} />
-        <View style={styles.routeLine} />
-        <View style={styles.pin} />
+        {hasLocationPermission ? (
+          <>
+            {/* GOOGLE MAPS RENDERING IS INTENTIONALLY DISABLED UNTIL BILLING IS ENABLED. */}
+            <View style={styles.mapMockWrap} ref={mapRef}>
+              <View style={styles.mapLineA} />
+              <View style={styles.mapLineB} />
+              <View style={styles.mapLineC} />
+              <View style={styles.routeLine} />
+              <View style={styles.pin} />
+            </View>
+
+            {!location ? (
+              <View style={styles.locationLoadingOverlay}>
+                <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+                <AppText style={styles.locationLoadingText}>Getting your location...</AppText>
+              </View>
+            ) : null}
+
+            <View style={styles.locationLiveBadge}>
+              <AppText style={styles.locationLiveBadgeText}>{locationBadgeText}</AppText>
+            </View>
+          </>
+        ) : (
+          <LocationFallbackCard
+            isBlocked={isLocationBlocked}
+            onEnableLocation={handleEnableLocation}
+            onOpenSettings={openSettings}
+            loading={loading}
+          />
+        )}
 
         <View style={styles.topBar}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>{avatarInitial}</AppText>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <AppText style={styles.avatarText}>{avatarInitial}</AppText>
+              )}
             </View>
             <View>
               <AppText variant="body" style={styles.greeting}>
@@ -119,6 +252,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#2B2B31',
     overflow: 'hidden',
   },
+  mapMockWrap: {
+    ...StyleSheet.absoluteFillObject,
+  },
   mapLineA: {
     position: 'absolute',
     top: 20,
@@ -176,6 +312,108 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  locationLoadingOverlay: {
+    position: 'absolute',
+    left: darkTheme.spacing.lg,
+    right: darkTheme.spacing.lg,
+    bottom: 190,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    backgroundColor: 'rgba(0,0,51,0.78)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 8,
+  },
+  locationLiveBadge: {
+    position: 'absolute',
+    left: darkTheme.spacing.lg,
+    right: darkTheme.spacing.lg,
+    bottom: 240,
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    backgroundColor: 'rgba(0,0,51,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: darkTheme.spacing.sm,
+  },
+  locationLiveBadgeText: {
+    color: darkTheme.colors.accent,
+    fontSize: darkTheme.typography.fontSizes.xs,
+  },
+  locationLoadingText: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.sm,
+  },
+  locationFallbackWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: darkTheme.spacing.lg,
+  },
+  locationFallbackCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    backgroundColor: 'rgba(0,0,51,0.8)',
+    paddingHorizontal: darkTheme.spacing.lg,
+    paddingVertical: darkTheme.spacing.lg,
+    alignItems: 'center',
+  },
+  locationIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    backgroundColor: 'rgba(226,255,49,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: darkTheme.spacing.sm,
+  },
+  locationFallbackTitle: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  locationFallbackBody: {
+    marginTop: darkTheme.spacing.xs,
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
+    fontSize: darkTheme.typography.fontSizes.sm,
+    lineHeight: 20,
+    marginBottom: darkTheme.spacing.md,
+  },
+  locationActionBtn: {
+    minHeight: 44,
+    minWidth: 170,
+    borderRadius: 12,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: darkTheme.spacing.lg,
+  },
+  locationActionBtnDisabled: {
+    opacity: 0.85,
+  },
+  locationActionBtnText: {
+    color: '#1A1A1A',
+    fontSize: darkTheme.typography.fontSizes.sm,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  settingsBtn: {
+    marginTop: darkTheme.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  settingsBtnText: {
+    color: darkTheme.colors.text,
+    textDecorationLine: 'underline',
+    fontSize: darkTheme.typography.fontSizes.sm,
+  },
   avatarWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -188,6 +426,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF7B4A',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarText: {
     color: darkTheme.colors.text,

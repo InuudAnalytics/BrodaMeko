@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React from 'react';
+import { Image } from 'react-native';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -11,36 +12,46 @@ import {
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const CHECKLIST_ITEMS = [
   {
-    key: 'kyc',
-    label: 'Upload NIN document',
-    icon: Shield01Icon,
-    route: ROUTES.MECH_KYC_UPLOAD,
+    key: 'photo',
+    label: 'Upload profile picture',
+    icon: Camera01Icon,
   },
   {
-    key: 'photo',
-    label: 'Upload passport photo',
-    icon: Camera01Icon,
-    route: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
+    key: 'id',
+    label: 'Upload ID for verification',
+    icon: Shield01Icon,
+  },
+  {
+    key: 'certificate',
+    label: 'Upload certificate',
+    icon: Shield01Icon,
   },
   {
     key: 'bank',
     label: 'Add bank details',
     icon: Wallet01Icon,
-    route: ROUTES.MECH_BANK_DETAILS,
   },
   {
-    key: 'pricing',
+    key: 'services',
     label: 'Set service charges',
     icon: DollarCircleIcon,
-    route: ROUTES.MECH_SERVICE_PRICING,
   },
 ];
+
+const STEP_ROUTE_BY_KEY = {
+  photo: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
+  id: ROUTES.MECH_KYC_UPLOAD,
+  certificate: ROUTES.MECH_UPLOAD_CERTIFICATE,
+  bank: ROUTES.MECH_BANK_DETAILS,
+  services: ROUTES.MECH_SERVICE_PRICING,
+};
 
 const getFirstName = (user) => {
   const raw = user?.full_name || user?.fullName || user?.name || 'Michael';
@@ -52,18 +63,36 @@ const getFirstName = (user) => {
   return first || 'Michael';
 };
 
+const normalizeAvatarUri = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    return raw;
+  }
+
+  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const path = raw.replace(/^\/+/, '');
+  return base ? `${base}/${path}` : raw;
+};
+
 const MechanicProfileSetupScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const { completedSteps, completionPercent, isComplete } = useMechanicProfile();
+  const { mechanicProfile, completedSteps, completionPercent, isComplete } = useMechanicProfile();
 
   const firstName = getFirstName(user);
   const title = isComplete ? 'Profile completed' : 'Complete your profile to receive jobs';
   const cta = isComplete ? 'Proceed' : 'Complete profile';
-
-  const firstIncompleteRoute = useMemo(() => {
-    const item = CHECKLIST_ITEMS.find((step) => !completedSteps[step.key]);
-    return item?.route || ROUTES.MECH_PROFILE_SETUP;
-  }, [completedSteps]);
+  const avatarUri = normalizeAvatarUri(
+    user?.avatar ||
+      user?.avatar_url ||
+      user?.profile_photo ||
+      user?.image ||
+      mechanicProfile?.profilePhotoUri ||
+      ''
+  );
 
   const handlePrimaryAction = () => {
     if (isComplete) {
@@ -71,16 +100,27 @@ const MechanicProfileSetupScreen = ({ navigation }) => {
       return;
     }
 
-    navigation.navigate(firstIncompleteRoute, { onboarding: true, skippedSteps: [] });
+    const firstPending = CHECKLIST_ITEMS.find((item) => !completedSteps[item.key]);
+    const nextRoute = firstPending ? STEP_ROUTE_BY_KEY[firstPending.key] : ROUTES.MECH_UPLOAD_PROFILE_PHOTO;
+    navigation.navigate(nextRoute, { onboarding: true });
   };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
-          <View>
-            <AppText style={styles.greeting}>Welcome {firstName}</AppText>
-            <AppText style={styles.subGreeting}>BrodaMeko partner</AppText>
+          <View style={styles.userWrap}>
+            <View style={styles.avatarWrap}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <AppText style={styles.avatarFallback}>{String(firstName || 'M').charAt(0).toUpperCase()}</AppText>
+              )}
+            </View>
+            <View>
+              <AppText style={styles.greeting}>Welcome {firstName}</AppText>
+              <AppText style={styles.subGreeting}>BrodaMeko partner</AppText>
+            </View>
           </View>
 
           <View style={styles.bellWrap}>
@@ -88,17 +128,19 @@ const MechanicProfileSetupScreen = ({ navigation }) => {
           </View>
         </View>
 
-        <View style={styles.progressHead}>
-          <AppText style={styles.progressLabel}>Profile completion</AppText>
-          <AppText style={styles.progressPercent}>{completionPercent}%</AppText>
-        </View>
+        <View style={styles.progressBar}>
+          <View style={styles.progressHead}>
+            <AppText style={styles.progressLabel}>Profile completion</AppText>
+            <AppText style={styles.progressPercent}>{completionPercent}%</AppText>
+          </View>
 
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${completionPercent}%` }]} />
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${completionPercent}%` }]} />
+          </View>
         </View>
 
         <View style={styles.heroIconWrap}>
-          <HugeiconsIcon icon={Wrench01Icon} size={40} color="rgba(255,255,255,0.72)" strokeWidth={1.9} />
+          <HugeiconsIcon icon={Wrench01Icon} size={46} color="rgba(255,255,255,0.72)" strokeWidth={1.9} />
         </View>
 
         <AppText style={styles.title}>{title}</AppText>
@@ -154,6 +196,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  userWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
+  },
+  avatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.4,
+    borderColor: '#FF8A3D',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  avatarFallback: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
   greeting: {
     color: darkTheme.colors.text,
     fontSize: 22,
@@ -174,6 +242,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  progressBar: {
+    paddingHorizontal: 12,
+  },
+
   progressHead: {
     marginTop: 18,
     flexDirection: 'row',
@@ -191,7 +263,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     marginTop: 8,
-    height: 12,
+    height: 14,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.2)',
     overflow: 'hidden',
@@ -204,8 +276,8 @@ const styles = StyleSheet.create({
   heroIconWrap: {
     marginTop: 22,
     alignSelf: 'center',
-    width: 110,
-    height: 110,
+    width: 100,
+    height: 100,
     borderRadius: 55,
     backgroundColor: '#2E3C3A',
     alignItems: 'center',
@@ -213,17 +285,18 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: 16,
+    paddingHorizontal: 12,
     color: darkTheme.colors.text,
-    fontSize: 38,
-    lineHeight: 44,
+    fontSize: 30,
+    lineHeight: 42,
     textAlign: 'center',
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   subtitle: {
     marginTop: 10,
     color: darkTheme.colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 21,
     textAlign: 'center',
   },
   primaryBtn: {
@@ -235,7 +308,7 @@ const styles = StyleSheet.create({
   checklistTitle: {
     marginTop: 22,
     color: darkTheme.colors.muted,
-    fontSize: 20,
+    fontSize: 17,
     lineHeight: 26,
   },
   list: {

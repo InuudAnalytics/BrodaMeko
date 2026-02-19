@@ -19,7 +19,7 @@ const toNaira = (value) => {
   if (!Number.isFinite(amount)) {
     return String(value || 'N/A');
   }
-  return `#${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const TransactionDetailsScreen = ({ navigation, route }) => {

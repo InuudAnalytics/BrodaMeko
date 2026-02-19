@@ -29,7 +29,7 @@ const MOCK_BREAKDOWN = {
 
 const formatNaira = (value) => {
   const amount = Number(value || 0);
-  return `#${amount.toLocaleString()}`;
+  return `₦${amount.toLocaleString()}`;
 };
 
 const EscrowFundingScreen = ({ navigation, route }) => {

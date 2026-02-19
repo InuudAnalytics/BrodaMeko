@@ -1,14 +1,17 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MechanicDashboardTabs from './MechanicDashboardTabs';
+import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
 import {
   BankDetailsScreen,
+  EditProfileScreen as MechanicEditProfileScreen,
   KycUploadScreen,
   MechanicProfileSetupScreen,
   ServicePricingScreen,
+  UploadCertificateScreen,
   UploadProfilePhotoScreen,
 } from '../screens/mech/profile';
 import MechanicChatScreen from '../screens/mech/chat/MechanicChatScreen';
@@ -60,6 +63,11 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name={ROUTES.MECH_UPLOAD_CERTIFICATE}
+        component={UploadCertificateScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name={ROUTES.MECH_BANK_DETAILS}
         component={BankDetailsScreen}
         options={{ headerShown: false }}
@@ -75,11 +83,21 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.CHANGE_PASSWORD}
+        component={ChangePasswordScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.USER_PROFILE}
         component={UserProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_EDIT_PROFILE}
+        component={MechanicEditProfileScreen}
         options={{ headerShown: false }}
       />
       {isComplete ? (

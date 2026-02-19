@@ -27,11 +27,15 @@ const normalizeError = (error) => {
     const payload = error.response.data;
     const statusCode = error.response.status;
     const isUnauthorized = statusCode === 401;
+    const isPublicAuthRequest = Boolean(error?.config?.skipAuth);
+    const serverMessage = pickErrorMessage(payload);
 
     return {
       message: isUnauthorized
-        ? 'Your session is unauthorized. Please sign in again.'
-        : pickErrorMessage(payload) || 'Request failed',
+        ? (isPublicAuthRequest
+            ? serverMessage || 'Request failed'
+            : 'Your session is unauthorized. Please sign in again.')
+        : serverMessage || 'Request failed',
       statusCode,
       data: payload || null,
     };
@@ -65,6 +69,13 @@ const api = axios.create({
 
 api.interceptors.request.use(
   async (config) => {
+    if (config?.skipAuth) {
+      if (config.headers?.Authorization) {
+        delete config.headers.Authorization;
+      }
+      return config;
+    }
+
     const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
 
     if (token) {

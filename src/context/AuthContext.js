@@ -68,6 +68,41 @@ const normalizeRole = (value) => {
   return null;
 };
 
+const normalizeUserShape = (rawUser) => {
+  if (!rawUser || typeof rawUser !== 'object' || Array.isArray(rawUser)) {
+    return null;
+  }
+
+  const avatarValue = rawUser?.avatar;
+  const avatarUrl =
+    typeof avatarValue === 'string'
+      ? avatarValue
+      : (avatarValue && typeof avatarValue === 'object'
+          ? String(
+              avatarValue?.url ||
+              avatarValue?.secure_url ||
+              avatarValue?.avatar_url ||
+              ''
+            ).trim()
+          : '');
+
+  return {
+    ...rawUser,
+    ...(avatarUrl
+      ? {
+          avatar: avatarUrl,
+          avatar_url: avatarUrl,
+          avatarUrl,
+          profile_photo: avatarUrl,
+          profile_photo_url: avatarUrl,
+          profile_picture: avatarUrl,
+          image_url: avatarUrl,
+          photo_url: avatarUrl,
+        }
+      : {}),
+  };
+};
+
 const pickAuthPayload = (payload) => {
   const root = payload?.data || payload || {};
   const nested = root?.data || {};
@@ -80,7 +115,18 @@ const pickAuthPayload = (payload) => {
     payload?.access_token ||
     null;
 
-  const user = root?.user || nested?.user || payload?.user || null;
+  const rootLooksLikeUser = Boolean(root?.id || root?.full_name || root?.email);
+  const nestedLooksLikeUser = Boolean(nested?.id || nested?.full_name || nested?.email);
+
+  const rawUser =
+    root?.user ||
+    nested?.user ||
+    payload?.user ||
+    (rootLooksLikeUser ? root : null) ||
+    (nestedLooksLikeUser ? nested : null) ||
+    null;
+
+  const user = normalizeUserShape(rawUser);
   const role = normalizeRole(user?.role || root?.role || nested?.role || payload?.role);
 
   return { token, user, role };
@@ -182,19 +228,27 @@ export const AuthProvider = ({ children }) => {
     await persistAuthState(token || '', nextUser, role || '');
   };
 
-  const refreshUserProfile = async () => {
-    if (!token) {
+  const refreshUserProfile = async (tokenOverride = null) => {
+    const effectiveToken = String(tokenOverride || token || '').trim();
+
+    if (!effectiveToken) {
       return null;
+    }
+
+    if (tokenOverride) {
+      await AsyncStorage.setItem(STORAGE_KEYS.token, effectiveToken);
     }
 
     const me = await getCurrentUser();
     const mePayload = pickAuthPayload(me);
-    const nextUser = mePayload.user || user || null;
+    const currentUser = user && typeof user === 'object' ? user : {};
+    const incomingUser = mePayload.user && typeof mePayload.user === 'object' ? mePayload.user : null;
+    const nextUser = incomingUser ? { ...currentUser, ...incomingUser } : (Object.keys(currentUser).length ? currentUser : null);
     const nextRole = mePayload.role || role || null;
 
     setUser(nextUser);
     setRole(nextRole);
-    await persistAuthState(token || '', nextUser, nextRole || '');
+    await persistAuthState(effectiveToken, nextUser, nextRole || '');
 
     const normalizedNextRole = normalizeRole(nextRole);
     if (normalizedNextRole) {
@@ -391,17 +445,7 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const response = await verifyOtpService({ otp });
-      let authPayload = pickAuthPayload(response);
-
-      if (!authPayload.token || !authPayload.user) {
-        const me = await getCurrentUser();
-        const mePayload = pickAuthPayload(me);
-        authPayload = {
-          token: authPayload.token,
-          user: authPayload.user || mePayload.user,
-          role: authPayload.role || mePayload.role,
-        };
-      }
+      const authPayload = pickAuthPayload(response);
 
       if (!authPayload.token) {
         throw new Error('Verification succeeded but no token was returned. Please log in.');
@@ -412,6 +456,7 @@ export const AuthProvider = ({ children }) => {
         nextUser: authPayload.user,
         nextRole: authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
       });
+      await refreshUserProfile(authPayload.token).catch(() => {});
       registerCurrentDevice();
 
       setPendingVerification(null);
@@ -461,22 +506,15 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Login response did not include an auth token.');
       }
 
-      let nextUser = authPayload.user;
-      let nextRole = authPayload.role;
       const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole);
-
-      if (!nextUser || !nextRole) {
-        const me = await getCurrentUser();
-        const mePayload = pickAuthPayload(me);
-        nextUser = nextUser || mePayload.user;
-        nextRole = nextRole || mePayload.role;
-      }
+      const nextRole = authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER;
 
       await setAuthedState({
         nextToken: authPayload.token,
-        nextUser,
-        nextRole: nextRole || normalizedSelectedRole || ROLES.CAR_OWNER,
+        nextUser: authPayload.user,
+        nextRole,
       });
+      await refreshUserProfile(authPayload.token).catch(() => {});
       registerCurrentDevice();
 
       return true;
@@ -532,6 +570,7 @@ export const AuthProvider = ({ children }) => {
         nextUser: authPayload.user,
         nextRole: authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER,
       });
+      await refreshUserProfile(authPayload.token).catch(() => {});
       registerCurrentDevice();
 
       return true;
@@ -565,7 +604,12 @@ export const AuthProvider = ({ children }) => {
       await forgotPasswordService({ email, phoneNumber });
       return true;
     } catch (forgotError) {
-      setError(forgotError?.message || 'Failed to send reset OTP.');
+      const statusCode = Number(forgotError?.statusCode || 0);
+      if (statusCode === 401) {
+        setError('Could not send reset OTP. Please verify the email/phone and try again.');
+      } else {
+        setError(forgotError?.message || 'Failed to send reset OTP.');
+      }
       return false;
     } finally {
       setIsLoading(false);

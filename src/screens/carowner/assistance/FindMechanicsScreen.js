@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   TouchableOpacity,
@@ -10,6 +11,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
+import { BASE_URL } from '../../../config/endpoints';
 import { useChat } from '../../../context';
 import { getMechanicsForJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
@@ -62,8 +64,25 @@ const readMechanics = (payload) => {
   return [];
 };
 
+const parseMaybeNumber = (value) => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+
+  const fromString = parseFloat(String(value || '').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(fromString) ? fromString : 0;
+};
+
 const normalizeMechanic = (item, index) => {
-  const fullName = item?.name || item?.full_name || item?.mechanic_name || `Mechanic ${index + 1}`;
+  const user = item?.user || {};
+  const fullName =
+    item?.name ||
+    item?.full_name ||
+    item?.mechanic_name ||
+    user?.name ||
+    user?.full_name ||
+    `Mechanic ${index + 1}`;
   const initials = String(fullName)
     .split(/\s+/)
     .filter(Boolean)
@@ -76,18 +95,60 @@ const normalizeMechanic = (item, index) => {
   const priceRange = minPrice || maxPrice
     ? `N${minPrice.toLocaleString('en-NG')} - N${maxPrice.toLocaleString('en-NG')}`
     : 'Price on request';
+  const avatarUri = normalizeAvatarUri(
+    item?.avatar ||
+    item?.avatar_url ||
+    item?.avatarUrl ||
+    item?.profile_photo ||
+    item?.profile_photo_url ||
+    item?.profile_picture ||
+    item?.image_url ||
+    item?.photo_url ||
+    item?.user?.avatar ||
+    item?.user?.avatar_url ||
+    item?.user?.profile_photo ||
+    ''
+  );
+  const specialty =
+    item?.specialty ||
+    item?.specialization ||
+    item?.service_type ||
+    item?.issue_type ||
+    item?.expertise ||
+    '';
+  const experienceYears = item?.years_of_experience || item?.experience_years || item?.yearsExperience || '';
+  const details = [specialty ? String(specialty) : '', experienceYears ? `${experienceYears} yrs exp` : '']
+    .filter(Boolean)
+    .join(' • ');
 
   return {
     id: String(item?.id || item?._id || item?.mechanic_id || `mech-${index}`),
     name: fullName,
     initials,
-    rating: Number(item?.rating || item?.average_rating || 0) || 0,
-    distanceKm: Number(item?.distance_km || item?.distance || 0),
-    etaMins: Number(item?.eta_minutes || item?.eta || 0),
+    avatarUri,
+    details,
+    rating: parseMaybeNumber(item?.rating || item?.average_rating || user?.rating || user?.average_rating || 0),
+    distanceKm: parseMaybeNumber(item?.distance_km || item?.distance || 0),
+    etaMins: parseMaybeNumber(item?.eta_minutes || item?.eta || 0),
     priceRange,
     available: item?.available !== false,
     raw: item,
   };
+};
+
+const normalizeAvatarUri = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    return raw;
+  }
+
+  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const path = raw.replace(/^\/+/, '');
+  return base ? `${base}/${path}` : raw;
 };
 
 const HireButton = ({ onPress, loading }) => {
@@ -107,11 +168,16 @@ const MechanicCard = ({ item, loading, onHire }) => {
     <View style={styles.card}>
       <View style={styles.cardMain}>
         <View style={styles.avatar}>
-          <AppText style={styles.avatarText}>{item.initials}</AppText>
+          {item.avatarUri ? (
+            <Image source={{ uri: item.avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <AppText style={styles.avatarText}>{item.initials}</AppText>
+          )}
         </View>
 
         <View style={styles.cardDetails}>
           <AppText style={styles.name}>{item.name}</AppText>
+          {item.details ? <AppText style={styles.detailsText}>{item.details}</AppText> : null}
 
           <View style={styles.metaRow}>
             <View style={styles.ratingRow}>
@@ -333,6 +399,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: darkTheme.spacing.sm,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarText: {
     color: darkTheme.colors.text,
@@ -347,6 +419,12 @@ const styles = StyleSheet.create({
     fontWeight: darkTheme.typography.fontWeights.semibold,
     fontSize: darkTheme.typography.fontSizes.md,
     lineHeight: 22,
+  },
+  detailsText: {
+    marginTop: 1,
+    color: darkTheme.colors.muted,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    lineHeight: 16,
   },
   metaRow: {
     marginTop: 2,

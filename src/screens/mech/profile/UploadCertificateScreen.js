@@ -7,30 +7,28 @@ import { useMechanicProfile } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
-const KycUploadScreen = ({ navigation, route }) => {
-  const { mechanicProfile, setKyc, completedSteps } = useMechanicProfile();
-  const [ninImages, setNinImages] = useState(mechanicProfile.ninImages?.slice(0, 1) || []);
-  const [loading, setLoading] = useState(false);
+const UploadCertificateScreen = ({ navigation, route }) => {
+  const { mechanicProfile, setCertificateImages, completedSteps } = useMechanicProfile();
+  const [images, setImages] = useState(mechanicProfile.certificateImages?.slice(0, 1) || []);
+  const [openingPicker, setOpeningPicker] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
-  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_KYC_UPLOAD);
+  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_UPLOAD_CERTIFICATE);
   const progressPercent = useMemo(() => (stepIndex / 5) * 100, [stepIndex]);
-
   React.useEffect(() => {
     if (!isOnboarding) {
       return;
     }
 
-    if (!completedSteps.photo) {
-      Alert.alert('Complete previous step', 'Please upload your profile photo first.');
+    if (!completedSteps.id) {
+      Alert.alert('Complete previous step', 'Please upload your ID first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
-  }, [completedSteps.photo, isOnboarding, navigation]);
+  }, [completedSteps.id, isOnboarding, navigation]);
 
-  const canUpload = useMemo(() => ninImages.length > 0, [ninImages.length]);
+  const canContinue = images.length > 0;
 
-  const addImage = async () => {
-    setLoading(true);
-
+  const handlePickImage = async () => {
+    setOpeningPicker(true);
     try {
       const { cancelled, asset, error } = await pickSingleImageFromGallery();
 
@@ -47,21 +45,21 @@ const KycUploadScreen = ({ navigation, route }) => {
         return;
       }
 
-      setNinImages([asset.uri]);
+      setImages([asset.uri]);
     } finally {
-      setLoading(false);
+      setOpeningPicker(false);
     }
   };
 
-  const handleUpload = () => {
-    if (!canUpload) {
+  const handleContinue = () => {
+    if (!canContinue) {
       return;
     }
 
-    setKyc({ ninImages });
+    setCertificateImages(images);
 
     if (isOnboarding) {
-      navigation.replace(ROUTES.MECH_UPLOAD_CERTIFICATE, { onboarding: true });
+      navigation.replace(ROUTES.MECH_BANK_DETAILS, { onboarding: true });
       return;
     }
 
@@ -79,31 +77,29 @@ const KycUploadScreen = ({ navigation, route }) => {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <AppText style={styles.subTitle}>Please upload a clear photo of your documents</AppText>
+          <AppText style={styles.subTitle}>Please upload your certificate</AppText>
           <AppText style={styles.stepLabel}>Step {stepIndex} of 5</AppText>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>
 
           <TouchableOpacity
-            style={[styles.uploadCard, ninImages.length ? styles.uploadCardFilled : null]}
+            style={[styles.uploadCard, images.length ? styles.uploadCardFilled : null]}
             activeOpacity={0.9}
-            onPress={addImage}
+            onPress={handlePickImage}
           >
-            {ninImages.length ? (
-              <Image source={{ uri: ninImages[0] }} style={styles.uploadedImage} />
+            {images.length ? (
+              <Image source={{ uri: images[0] }} style={styles.uploadedImage} />
             ) : (
               <>
                 <View style={styles.uploadIconBadge}>
                   <HugeiconsIcon icon={ImageUploadIcon} size={24} color={darkTheme.colors.accent} strokeWidth={1.9} />
                 </View>
-                <AppText style={styles.uploadCardTitle}>Upload NIN</AppText>
-                <AppText style={styles.uploadCardSubtitle}>
-                  Add photos of national identification number for identification
-                </AppText>
+                <AppText style={styles.uploadCardTitle}>Upload certificate</AppText>
+                <AppText style={styles.uploadCardSubtitle}>Add clear certificate image(s) for verification</AppText>
 
                 <View style={styles.addPhotosBtn}>
-                  <AppText style={styles.addPhotosText}>{loading ? 'Opening...' : 'Add photos'}</AppText>
+                  <AppText style={styles.addPhotosText}>{openingPicker ? 'Opening...' : 'Add photos'}</AppText>
                 </View>
               </>
             )}
@@ -111,7 +107,7 @@ const KycUploadScreen = ({ navigation, route }) => {
         </ScrollView>
 
         <View style={styles.footer}>
-          <AppButton label="Continue" onPress={handleUpload} disabled={!canUpload} style={styles.uploadBtn} />
+          <AppButton label="Continue" onPress={handleContinue} disabled={!canContinue} />
         </View>
       </View>
     </ScreenContainer>
@@ -186,7 +182,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 14,
     alignItems: 'center',
-    marginBottom: 14,
     height: 225,
     justifyContent: 'center',
     overflow: 'hidden',
@@ -220,7 +215,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
     textAlign: 'center',
-    maxWidth: 260,
   },
   addPhotosBtn: {
     marginTop: 12,
@@ -243,9 +237,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingTop: 8,
   },
-  uploadBtn: {
-    borderRadius: 10,
-  },
 });
 
-export default KycUploadScreen;
+export default UploadCertificateScreen;

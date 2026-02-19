@@ -1,22 +1,48 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { BASE_URL } from '../../../config/endpoints';
+import { useAuth } from '../../../context';
 import { useMechanicProfile } from '../../../context';
 import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
 import { darkTheme } from '../../../theme';
-import { getNextOnboardingRoute, getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
+import { getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
+
+const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    if (cacheBust && /^https?:\/\//i.test(raw)) {
+      return `${raw}${raw.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    }
+    return raw;
+  }
+
+  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const path = raw.replace(/^\/+/, '');
+  const absolute = base ? `${base}/${path}` : raw;
+
+  if (cacheBust) {
+    return `${absolute}${absolute.includes('?') ? '&' : '?'}t=${Date.now()}`;
+  }
+
+  return absolute;
+};
 
 const UploadProfilePhotoScreen = ({ navigation, route }) => {
-  const { mechanicProfile, setProfilePhoto, completedSteps } = useMechanicProfile();
+  const { mechanicProfile, setProfilePhoto } = useMechanicProfile();
+  const { updateUserData, refreshUserProfile } = useAuth();
   const [selectedUri, setSelectedUri] = useState(mechanicProfile.profilePhotoUri || null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
-  const skippedSteps = route?.params?.skippedSteps || [];
   const stepIndex = getOnboardingStepIndex(ROUTES.MECH_UPLOAD_PROFILE_PHOTO);
-  const progressPercent = useMemo(() => (stepIndex / 4) * 100, [stepIndex]);
+  const progressPercent = useMemo(() => (stepIndex / 5) * 100, [stepIndex]);
 
   const handlePickPhoto = async () => {
     setLoading(true);
@@ -56,27 +82,34 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
           type: 'image/jpeg',
         });
         const payload = response?.data || response || {};
-        const uploadedUri = String(
+        const uploadedUri = normalizeAvatarUri(
           payload?.avatar ||
           payload?.avatar_url ||
+          payload?.avatarUrl ||
           payload?.url ||
           payload?.profile_photo ||
+          payload?.profile_photo_url ||
+          payload?.profile_picture ||
+          payload?.image_url ||
+          payload?.photo_url ||
           selectedUri
-        ).trim();
+        , { cacheBust: true });
 
         setProfilePhoto(uploadedUri);
+        await updateUserData({
+          avatar: uploadedUri,
+          avatar_url: uploadedUri,
+          avatarUrl: uploadedUri,
+          profile_photo: uploadedUri,
+          profile_photo_url: uploadedUri,
+          profile_picture: uploadedUri,
+          image_url: uploadedUri,
+          photo_url: uploadedUri,
+        });
+        await refreshUserProfile().catch(() => {});
 
         if (isOnboarding) {
-          const { nextRoute, nextSkipped } = getNextOnboardingRoute({
-            currentRoute: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
-            completedSteps: { ...completedSteps, photo: true },
-            skippedSteps,
-          });
-          if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
-            navigation.navigate(nextRoute);
-            return;
-          }
-          navigation.replace(nextRoute, { onboarding: true, skippedSteps: nextSkipped });
+          navigation.replace(ROUTES.MECH_KYC_UPLOAD, { onboarding: true });
           return;
         }
 
@@ -91,24 +124,6 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
     submit();
   };
 
-  const handleSkipNext = () => {
-    const nextSkipped = Array.from(new Set([...skippedSteps, ROUTES.MECH_UPLOAD_PROFILE_PHOTO]));
-    const { nextRoute, nextSkipped: resolvedSkipped } = getNextOnboardingRoute({
-      currentRoute: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
-      completedSteps,
-      skippedSteps: nextSkipped,
-    });
-    if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
-      navigation.navigate(nextRoute);
-      return;
-    }
-    navigation.replace(nextRoute, { onboarding: true, skippedSteps: resolvedSkipped });
-  };
-
-  const handleSkipAll = () => {
-    navigation.navigate(ROUTES.MECH_PROFILE_SETUP);
-  };
-
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.content}>
@@ -120,44 +135,40 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
         </View>
 
         <AppText style={styles.subtitle}>Please upload a clear photo of your documents</AppText>
-        <AppText style={styles.stepLabel}>Step {stepIndex} of 4</AppText>
+        <AppText style={styles.stepLabel}>Step {stepIndex} of 5</AppText>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
         </View>
 
-        <View style={styles.avatarWrap}>
-          {selectedUri ? (
-            <Image source={{ uri: selectedUri }} style={styles.avatarImage} />
-          ) : (
-            <HugeiconsIcon icon={Camera01Icon} size={42} color="rgba(255,255,255,0.75)" strokeWidth={1.8} />
-          )}
-        </View>
-
-        <AppText style={styles.helperText}>Upload passport photo</AppText>
-
-        <AppButton
-          label={loading ? 'Opening gallery...' : 'Choose photo'}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={[styles.uploadCard, selectedUri ? styles.uploadCardFilled : null]}
           onPress={handlePickPhoto}
-          style={styles.selectBtn}
-          textStyle={styles.selectBtnText}
-        />
+        >
+          {selectedUri ? (
+            <Image source={{ uri: selectedUri }} style={styles.uploadedImage} />
+          ) : (
+            <>
+              <View style={styles.uploadIconBadge}>
+                <HugeiconsIcon icon={ImageUploadIcon} size={24} color={darkTheme.colors.accent} strokeWidth={1.9} />
+              </View>
+              <AppText style={styles.uploadCardTitle}>Upload profile photo</AppText>
+              <AppText style={styles.uploadCardSubtitle}>
+                Add a clear passport-style photo for profile identification
+              </AppText>
+              <View style={styles.addPhotosBtn}>
+                <AppText style={styles.addPhotosText}>{loading ? 'Opening...' : 'Add photos'}</AppText>
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
         <AppButton
-          label={uploading ? 'Saving...' : 'Save & continue'}
+          label={uploading ? 'Saving...' : 'Continue'}
           onPress={handleSave}
           style={styles.saveBtn}
           disabled={uploading}
         />
 
-        {isOnboarding ? (
-          <View style={styles.skipRow}>
-            <TouchableOpacity activeOpacity={0.85} onPress={handleSkipNext}>
-              <AppText style={styles.skipText}>Skip next</AppText>
-            </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.85} onPress={handleSkipAll}>
-              <AppText style={styles.skipText}>Skip all</AppText>
-            </TouchableOpacity>
-          </View>
-        ) : null}
       </View>
     </ScreenContainer>
   );
@@ -218,54 +229,68 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: darkTheme.colors.accent,
   },
-  avatarWrap: {
+  uploadCard: {
     marginTop: 24,
-    alignSelf: 'center',
-    width: 154,
-    height: 154,
-    borderRadius: 77,
-    borderWidth: 1.5,
-    borderColor: darkTheme.colors.inputBorder,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    overflow: 'hidden',
+    width: '100%',
+    height: 225,
+    borderWidth: 1.2,
+    borderColor: 'rgba(226,255,49,0.5)',
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    backgroundColor: '#727497',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  avatarImage: {
+  uploadCardFilled: {
+    paddingVertical: 0,
+  },
+  uploadedImage: {
     width: '100%',
-    height: '100%',
+    height: 225,
     resizeMode: 'cover',
   },
-  helperText: {
-    marginTop: 16,
-    color: darkTheme.colors.muted,
-    fontSize: 14,
-    lineHeight: 20,
+  uploadIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  uploadCardTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  uploadCardSubtitle: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: 13,
+    lineHeight: 16,
     textAlign: 'center',
-    paddingHorizontal: 8,
+    maxWidth: 260,
   },
-  selectBtn: {
-    marginTop: 22,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
+  addPhotosBtn: {
+    marginTop: 12,
+    minWidth: 120,
+    minHeight: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
   },
-  selectBtnText: {
-    color: darkTheme.colors.accent,
+  addPhotosText: {
+    color: '#333333',
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
   saveBtn: {
     marginTop: 12,
-  },
-  skipRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
-  },
-  skipText: {
-    color: darkTheme.colors.muted,
-    fontSize: 13,
   },
 });
 

@@ -1,5 +1,6 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
+import { getCurrentUser } from './auth.service';
 
 const buildServiceError = (message) => {
   const error = new Error(message);
@@ -44,6 +45,17 @@ export const verifyWalletPayment = async (referenceInput, trxrefInput) => {
 };
 
 export const getWalletBalance = async () => {
+  const me = await getCurrentUser();
+  const wallet =
+    (me?.wallet && typeof me.wallet === 'object' ? me.wallet : null) ||
+    (me?.data?.wallet && typeof me.data.wallet === 'object' ? me.data.wallet : null) ||
+    null;
+
+  if (wallet) {
+    return wallet;
+  }
+
+  // Fallback for legacy backend shape/rollout windows.
   const response = await api.get(ENDPOINTS.wallet.balance);
   return response.data;
 };

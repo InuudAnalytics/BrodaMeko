@@ -86,7 +86,7 @@ const ISSUE_GROUPS = [
   },
   {
     key: 'steering',
-    label: 'Steering',
+    label: 'Steering & Suspension',
     icon: HelpCircleIcon,
     issues: [
       { label: 'Steering problem', value: 'steering_problem' },
@@ -96,7 +96,7 @@ const ISSUE_GROUPS = [
   },
   {
     key: 'fuel',
-    label: 'Fuel',
+    label: 'Fuel System',
     icon: HelpCircleIcon,
     issues: [
       { label: 'Fuel pump failure', value: 'fuel_pump_failure' },
@@ -105,12 +105,10 @@ const ISSUE_GROUPS = [
     ],
   },
   {
-    key: 'cooling',
-    label: 'Cooling',
+    key: 'ac_comfort',
+    label: 'AC & Comfort',
     icon: TemperatureIcon,
     issues: [
-      { label: 'Engine overheating', value: 'engine_overheating' },
-      { label: 'Coolant leak', value: 'coolant_leak' },
       { label: 'AC not cooling', value: 'ac_not_cooling' },
     ],
   },
@@ -135,7 +133,7 @@ const ISSUE_GROUPS = [
   },
   {
     key: 'emergency',
-    label: 'Emergency',
+    label: 'Emergency / Misc',
     icon: HelpCircleIcon,
     issues: [
       { label: 'Car accident damage', value: 'car_accident_damage' },

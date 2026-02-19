@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   Briefcase01Icon,
+  DollarCircleIcon,
   Edit01Icon,
   HelpCircleIcon,
   Mail01Icon,
@@ -16,12 +17,12 @@ import {
   Wallet01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { getCarOwnerJobs, getMechanicAssignedJobs } from '../../../services/jobs.service';
-import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
-import { pickSingleImageFromGallery, ROLES, ROUTES } from '../../../utils';
+import { ROLES, ROUTES } from '../../../utils';
 
 const MOCK_USER = {
   fullName: 'Saheed Niyi',
@@ -29,10 +30,26 @@ const MOCK_USER = {
 
 const SETTINGS_ROWS = [
   { key: 'personal', label: 'Personal information', icon: User02Icon },
-  { key: 'security', label: 'Security', icon: ShieldUserIcon },
+  { key: 'service_pricing', label: 'Service price', icon: DollarCircleIcon, mechanicOnly: true },
+  { key: 'change_password', label: 'Change password', icon: ShieldUserIcon },
   { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
   { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
 ];
+
+const normalizeAvatarUri = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    return raw;
+  }
+
+  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const path = raw.replace(/^\/+/, '');
+  return base ? `${base}/${path}` : raw;
+};
 
 const readUser = (user) => {
   const fullName =
@@ -45,20 +62,39 @@ const readUser = (user) => {
   return {
     fullName: String(fullName || MOCK_USER.fullName),
     email,
-    avatarUri: String(
+    avatarUri: normalizeAvatarUri(
       user?.avatar ||
       user?.avatar_url ||
+      user?.avatarUrl ||
       user?.avatarUri ||
       user?.profile_photo ||
       user?.profile_photo_url ||
+      user?.profile_picture ||
+      user?.profilePicture ||
+      user?.image ||
+      user?.image_url ||
+      user?.photo_url ||
       ''
-    ).trim() || null,
+    ) || null,
   };
 };
 
 const formatCurrency = (amount) => {
   const value = Number(amount || 0);
-  return `#${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₦${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const maskEmail = (value) => {
+  const email = String(value || '').trim();
+  if (!email.includes('@')) {
+    return email;
+  }
+
+  const [localPart, domain] = email.split('@');
+  const compactLocal = String(localPart || '');
+  const first = compactLocal.slice(0, 3);
+  const last = compactLocal.length > 3 ? compactLocal.slice(-2) : '';
+  return `${first}***${last}@${domain}`;
 };
 
 const SettingRow = ({ label, icon, onPress, isLast }) => {
@@ -78,13 +114,14 @@ const SettingRow = ({ label, icon, onPress, isLast }) => {
 };
 
 const UserProfileScreen = ({ navigation }) => {
-  const { user, role, signOut, updateUserData, refreshUserProfile } = useAuth();
+  const { user, role, signOut, isLoading } = useAuth();
   const [walletBalance, setWalletBalance] = useState(0);
   const [totalJobs, setTotalJobs] = useState(0);
   const [rating, setRating] = useState(0);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const profile = readUser(user);
+  const settingsRows = SETTINGS_ROWS.filter((row) => !row.mechanicOnly || role === ROLES.MECH);
   const initials = profile.fullName
     .split(/\s+/)
     .filter(Boolean)
@@ -142,50 +179,16 @@ const UserProfileScreen = ({ navigation }) => {
     navigation.navigate(ROUTES.CAR_OWNER_REWARDS);
   };
 
-  const handleUploadAvatar = async () => {
-    if (uploadingAvatar) {
+  const handleSignOut = async () => {
+    if (isSigningOut) {
       return;
     }
 
-    setUploadingAvatar(true);
-
+    setIsSigningOut(true);
     try {
-      const { asset, cancelled, error: pickerError } = await pickSingleImageFromGallery();
-
-      if (cancelled) {
-        return;
-      }
-
-      if (pickerError) {
-        Alert.alert('Upload failed', pickerError);
-        return;
-      }
-
-      if (!asset?.uri) {
-        return;
-      }
-
-      const response = await uploadAvatarService(asset);
-      const payload = response?.data || response || {};
-      const avatarUrl = String(
-        payload?.avatar ||
-        payload?.avatar_url ||
-        payload?.url ||
-        payload?.profile_photo ||
-        asset?.uri
-      ).trim();
-
-      await updateUserData({
-        avatar: avatarUrl,
-        avatar_url: avatarUrl,
-        profile_photo: avatarUrl,
-      });
-
-      await refreshUserProfile().catch(() => {});
-    } catch (uploadError) {
-      Alert.alert('Upload failed', uploadError?.message || 'Could not upload avatar.');
+      await signOut();
     } finally {
-      setUploadingAvatar(false);
+      setIsSigningOut(false);
     }
   };
 
@@ -210,18 +213,6 @@ const UserProfileScreen = ({ navigation }) => {
             ) : (
               <AppText style={styles.avatarText}>{initials}</AppText>
             )}
-            <TouchableOpacity
-              style={styles.avatarEditBtn}
-              activeOpacity={0.85}
-              onPress={handleUploadAvatar}
-              disabled={uploadingAvatar}
-            >
-              {uploadingAvatar ? (
-                <ActivityIndicator size="small" color="#1A1A1A" />
-              ) : (
-                <HugeiconsIcon icon={Edit01Icon} size={12} color="#1A1A1A" strokeWidth={2} />
-              )}
-            </TouchableOpacity>
           </View>
           <AppText variant="subtitle" style={styles.name}>
             {profile.fullName}
@@ -230,14 +221,16 @@ const UserProfileScreen = ({ navigation }) => {
             <View style={styles.emailRow}>
               <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.muted} strokeWidth={1.9} />
               <AppText variant="muted" style={styles.email}>
-                {profile.email}
+                {maskEmail(profile.email)}
               </AppText>
             </View>
           ) : null}
 
           <AppButton
             label="Edit profile"
-            onPress={() => navigation.navigate(ROUTES.CAR_OWNER_EDIT_PROFILE)}
+            onPress={() =>
+              navigation.navigate(role === ROLES.MECH ? ROUTES.MECH_EDIT_PROFILE : ROUTES.CAR_OWNER_EDIT_PROFILE)
+            }
             style={styles.editButton}
             textStyle={styles.editButtonText}
             icon={Edit01Icon}
@@ -298,15 +291,21 @@ const UserProfileScreen = ({ navigation }) => {
 
         <AppText style={styles.settingsTitle}>Settings</AppText>
         <View style={styles.settingsCard}>
-          {SETTINGS_ROWS.map((row, index) => (
+          {settingsRows.map((row, index) => (
             <SettingRow
               key={row.key}
               label={row.label}
               icon={row.icon}
-              isLast={index === SETTINGS_ROWS.length - 1}
+              isLast={index === settingsRows.length - 1}
               onPress={() =>
                 row.key === 'help'
                   ? navigation.navigate(ROUTES.SUPPORT)
+                  : row.key === 'service_pricing'
+                    ? navigation.navigate(ROUTES.MECH_SERVICE_PRICING)
+                  : row.key === 'change_password'
+                    ? navigation.navigate(ROUTES.CHANGE_PASSWORD)
+                  : row.key === 'notifications'
+                    ? navigation.navigate('Notifications')
                   : navigation.navigate('Placeholder', { title: row.label })
               }
             />
@@ -314,8 +313,10 @@ const UserProfileScreen = ({ navigation }) => {
         </View>
 
         <AppButton
-          label="Logout"
-          onPress={signOut}
+          label={isSigningOut ? 'Logging out...' : 'Logout'}
+          onPress={handleSignOut}
+          disabled={isSigningOut || isLoading}
+          left={isSigningOut ? <ActivityIndicator size="small" color="#FF7B8A" /> : null}
           style={styles.logoutButton}
           textStyle={styles.logoutText}
         />
@@ -379,19 +380,6 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
     fontSize: 26,
     fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  avatarEditBtn: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: darkTheme.colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#1A1A1A',
   },
   name: {
     color: darkTheme.colors.text,

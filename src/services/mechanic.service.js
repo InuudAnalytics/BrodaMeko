@@ -1,7 +1,48 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
-export const ISSUE_TYPES = ['flat_tires', 'battery_problem', 'brake_failure', 'engine_trouble'];
+export const ISSUE_TYPES = [
+  'flat_tyres',
+  'tyre_burst',
+  'wheel_alignment_issue',
+  'battery_problem',
+  'dead_battery',
+  'alternator_failure',
+  'starter_motor_fault',
+  'engine_overheating',
+  'engine_knocking',
+  'engine_misfire',
+  'engine_stalling',
+  'brake_failure',
+  'brake_pad_worn',
+  'brake_fluid_leak',
+  'abs_fault',
+  'gear_not_shifting',
+  'clutch_problem',
+  'transmission_leak',
+  'electrical_fault',
+  'headlight_issue',
+  'dashboard_warning_light',
+  'wiring_problem',
+  'fuse_problem',
+  'oil_leak',
+  'coolant_leak',
+  'fuel_leak',
+  'power_steering_leak',
+  'steering_problem',
+  'suspension_noise',
+  'shock_absorber_issue',
+  'fuel_pump_failure',
+  'injector_problem',
+  'car_not_accelerating',
+  'ac_not_cooling',
+  'key_locked_inside',
+  'ignition_problem',
+  'car_accident_damage',
+  'towing_needed',
+  'general_inspection',
+  'other',
+];
 
 const toNumber = (value, fieldName) => {
   const parsed = Number(value);

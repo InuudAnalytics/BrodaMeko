@@ -3,6 +3,7 @@ import { ActivityIndicator, StatusBar, StyleSheet, TouchableOpacity, View } from
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
+  ArrowLeft01Icon,
   ArrowDownLeft01Icon,
   PlusSignIcon,
   SentIcon,
@@ -19,7 +20,7 @@ import { ROUTES } from '../../../utils';
 
 const toNaira = (value) => {
   const amount = Number(value || 0);
-  return `#${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+  return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 };
 
 const toAmountWithSign = (amount) => {
@@ -168,6 +169,24 @@ const WalletScreen = ({ navigation }) => {
       <View style={styles.content}>
         <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
 
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.85}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+                return;
+              }
+
+              navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD);
+            }}
+          >
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
+          </TouchableOpacity>
+          <AppText style={styles.headerTitle}>Wallet</AppText>
+        </View>
+
         <View style={styles.balanceCard}>
           <View style={styles.balanceRow}>
             <AppText variant="muted" style={styles.balanceLabel}>
@@ -183,7 +202,7 @@ const WalletScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <AppText style={styles.balanceAmount}>{isBalanceVisible ? toNaira(balance) : '# *****'}</AppText>
+          <AppText style={styles.balanceAmount}>{isBalanceVisible ? toNaira(balance) : '₦ *****'}</AppText>
 
           <AppText variant="muted" style={styles.balanceSubtext}>
             Recent transactions from your wallet
@@ -253,15 +272,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     paddingHorizontal: darkTheme.spacing.xl,
-    paddingTop: 20,
+    paddingTop: 4,
+  },
+  header: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
   balanceCard: {
     borderWidth: 1,
     borderColor: 'rgba(174, 255, 58, 0.4)',
     borderRadius: darkTheme.radius.lg,
     backgroundColor: 'rgba(255,255,255,0.01)',
-    paddingHorizontal: darkTheme.spacing.lg,
-    paddingVertical: darkTheme.spacing.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   balanceRow: {
     flexDirection: 'row',
@@ -273,21 +313,21 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.sm,
   },
   balanceAmount: {
-    marginTop: darkTheme.spacing.xs,
+    marginTop: 4,
     color: darkTheme.colors.accent,
-    fontSize: 40,
-    lineHeight: 46,
+    fontSize: 36,
+    lineHeight: 40,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     letterSpacing: -0.3,
   },
   balanceSubtext: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.35)',
-    fontSize: darkTheme.typography.fontSizes.sm,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   actionsRow: {
-    marginTop: darkTheme.spacing.lg,
+    marginTop: 12,
     flexDirection: 'row',
     columnGap: darkTheme.spacing.sm,
   },
@@ -320,43 +360,43 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
   },
   sectionTitle: {
-    marginTop: darkTheme.spacing.xl,
-    marginBottom: darkTheme.spacing.xs,
+    marginTop: 16,
+    marginBottom: 4,
     color: 'rgba(255,255,255,0.6)',
-    fontSize: darkTheme.typography.fontSizes.md,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 18,
   },
   txnList: {
-    marginTop: darkTheme.spacing.sm,
+    marginTop: 6,
   },
   txnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   txnIconWrap: {
-    width: 52,
-    height: 52,
+    width: 46,
+    height: 46,
     borderRadius: 12,
     backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: darkTheme.spacing.sm,
+    marginRight: 10,
   },
   txnBody: {
     flex: 1,
   },
   txnTitle: {
     color: darkTheme.colors.text,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   txnSubtitle: {
     marginTop: 1,
     color: 'rgba(255,255,255,0.42)',
-    fontSize: darkTheme.typography.fontSizes.sm,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   txnMeta: {
     alignItems: 'flex-end',
@@ -365,8 +405,8 @@ const styles = StyleSheet.create({
     maxWidth: 120,
   },
   txnAmount: {
-    fontSize: darkTheme.typography.fontSizes.lg,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   txnAmountPositive: {
@@ -378,8 +418,8 @@ const styles = StyleSheet.create({
   txnTime: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.42)',
-    fontSize: darkTheme.typography.fontSizes.sm,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 14,
   },
   centerState: {
     alignItems: 'center',

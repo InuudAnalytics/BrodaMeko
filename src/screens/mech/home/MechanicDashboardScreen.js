@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText } from '../../../components';
+import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { getAvailableJobs } from '../../../services/jobs.service';
 import { getWalletBalance } from '../../../services/wallet.service';
@@ -26,7 +27,7 @@ const initialsFromName = (name) =>
 
 const formatCurrency = (amount) => {
   const value = Number(amount || 0);
-  return `#${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₦${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const normalizeJob = (job) => {
@@ -57,6 +58,35 @@ const readMechanicRating = (user) => {
   return Number.isFinite(value) ? value : 4.9;
 };
 
+const normalizeAvatarUri = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    return raw;
+  }
+
+  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const path = raw.replace(/^\/+/, '');
+  return base ? `${base}/${path}` : raw;
+};
+
+const readAvatarUri = (user) =>
+  normalizeAvatarUri(
+    user?.avatar ||
+    user?.avatar_url ||
+    user?.avatarUrl ||
+    user?.avatarUri ||
+    user?.profile_photo ||
+    user?.profile_photo_url ||
+    user?.profile_picture ||
+    user?.image_url ||
+    user?.photo_url ||
+    ''
+  );
+
 const MechanicDashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState('all');
@@ -67,6 +97,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
+  const avatarUri = readAvatarUri(user);
 
   const visibleJobs = useMemo(() => {
     let filtered = jobs;
@@ -125,7 +156,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
-            <AppText style={styles.avatarText}>{initialsFromName(mechanicName)}</AppText>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <AppText style={styles.avatarText}>{initialsFromName(mechanicName)}</AppText>
+            )}
           </View>
           <View>
             <AppText style={styles.welcome}>Welcome {mechanicName}</AppText>
@@ -139,7 +174,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
 
       <View style={styles.earningsCard}>
         <AppText style={styles.earningsLabel}>Todays earnings</AppText>
-        <AppText style={styles.earningsAmount}>#25,000.00</AppText>
+        <AppText style={styles.earningsAmount}>₦25,000.00</AppText>
         <AppText style={styles.trendText}>1.5% increase in the past 5 days</AppText>
       </View>
 
@@ -269,6 +304,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#392425',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarText: {
     color: darkTheme.colors.text,

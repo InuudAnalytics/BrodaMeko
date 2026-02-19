@@ -96,7 +96,7 @@ const MessageBubble = ({ item, currentUserRole, onAcceptPrice, onDeclinePrice, o
   }
 
   if (item?.type === 'price_quote') {
-    const amountText = `#${Number(item?.amount || 0).toLocaleString()}`;
+    const amountText = `₦${Number(item?.amount || 0).toLocaleString()}`;
     const isMechanicView = currentUserRole === ROLES.MECH;
     return (
       <View style={styles.priceQuoteWrap}>

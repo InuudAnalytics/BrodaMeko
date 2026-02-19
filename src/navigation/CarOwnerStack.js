@@ -16,13 +16,13 @@ import {
   CarOwnerRewardsScreen,
   CarOwnerWithdrawScreen,
 } from '../screens';
-import MechanicServicesApiTestScreen from '../screens/dev/MechanicServicesApiTestScreen';
 import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
 import EditJobScreen from '../screens/carowner/history/EditJobScreen';
 import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
 import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
+import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
@@ -131,15 +131,13 @@ const CarOwnerStack = () => {
         component={PlaceholderScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name={ROUTES.CHANGE_PASSWORD}
+        component={ChangePasswordScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
-      {__DEV__ ? (
-        <Stack.Screen
-          name={ROUTES.DEV_API_TEST}
-          component={MechanicServicesApiTestScreen}
-          options={{ title: 'API Test (Dev)' }}
-        />
-      ) : null}
     </Stack.Navigator>
   );
 };

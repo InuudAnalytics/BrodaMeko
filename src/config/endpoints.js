@@ -13,6 +13,7 @@ export const ENDPOINTS = {
     me: '/api/v1/auth/me',
     updatePassword: '/api/v1/auth/update-password',
     uploadAvatar: '/api/v1/auth/upload-avatar',
+    verifyAddContact: '/api/v1/auth/verify/add-contact',
     devices: {
       register: '/api/v1/auth/devices/register',
     },

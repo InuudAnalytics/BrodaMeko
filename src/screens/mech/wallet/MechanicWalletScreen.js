@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
+  ArrowLeft01Icon,
   ArrowDownLeft01Icon,
   PlusSignIcon,
   ViewIcon,
@@ -77,7 +78,7 @@ const TransactionRow = ({ item }) => {
 const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => {
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
 
-  const balanceText = useMemo(() => (isBalanceVisible ? '# 5000' : '****'), [isBalanceVisible]);
+  const balanceText = useMemo(() => (isBalanceVisible ? '₦ 5000' : '****'), [isBalanceVisible]);
 
   const handleTabPress = (tab) => {
     if (typeof onTabPress === 'function') {
@@ -103,9 +104,29 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                  return;
+                }
+
+                if (typeof onTabPress === 'function') {
+                  onTabPress('home');
+                }
+              }}
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
+            </TouchableOpacity>
+            <AppText style={styles.headerTitle}>Wallet</AppText>
+          </View>
+
           <View style={styles.balanceCard}>
             <View style={styles.balanceTopRow}>
               <AppText style={styles.balanceLabel}>Available balance</AppText>
@@ -170,8 +191,29 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 4,
     paddingBottom: 24,
+  },
+  header: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
   balanceCard: {
     borderWidth: 1,

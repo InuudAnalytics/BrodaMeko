@@ -38,7 +38,7 @@ const MOCK_COMPLETED_JOBS = [
 const toCurrency = (amount) => {
   const safe = Number(amount);
   const value = Number.isFinite(safe) ? safe : 0;
-  return `#${value.toLocaleString('en-NG')}`;
+  return `₦${value.toLocaleString('en-NG')}`;
 };
 
 const normalizeJob = (job, index) => {

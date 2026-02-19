@@ -1,15 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from './AuthContext';
 
-const STORAGE_KEY = '@brodameko/mechanic_profile';
+const STORAGE_KEY_BASE = '@brodameko/mechanic_profile';
 
 const INITIAL_PROFILE = {
   profilePhotoUri: null,
   hasServicePricing: false,
   servicePricing: {},
   ninImages: [],
-  passportImages: [],
+  certificateImages: [],
   bankDetails: null,
+  skippedSteps: [],
 };
 
 const MechanicProfileContext = createContext(undefined);
@@ -23,7 +25,7 @@ const sanitizeProfile = (value) => {
     hasServicePricing: Boolean(next.hasServicePricing),
     servicePricing: next.servicePricing && typeof next.servicePricing === 'object' ? next.servicePricing : {},
     ninImages: Array.isArray(next.ninImages) ? next.ninImages.filter(Boolean) : [],
-    passportImages: Array.isArray(next.passportImages) ? next.passportImages.filter(Boolean) : [],
+    certificateImages: Array.isArray(next.certificateImages) ? next.certificateImages.filter(Boolean) : [],
     bankDetails: bank
       ? {
           accountName: String(bank.accountName || '').trim(),
@@ -31,20 +33,39 @@ const sanitizeProfile = (value) => {
           bankName: String(bank.bankName || '').trim(),
         }
       : null,
+    skippedSteps: Array.isArray(next.skippedSteps) ? next.skippedSteps.filter(Boolean) : [],
   };
 };
 
 export const MechanicProfileProvider = ({ children }) => {
+  const { user, role } = useAuth();
   const [mechanicProfile, setMechanicProfile] = useState(INITIAL_PROFILE);
   const [isHydrated, setIsHydrated] = useState(false);
+  const ownerKey = useMemo(() => {
+    const raw =
+      user?.id ||
+      user?._id ||
+      user?.user_id ||
+      user?.mechanic_id ||
+      user?.email ||
+      user?.phone_number ||
+      user?.phoneNumber ||
+      'guest';
+
+    return String(raw || 'guest').trim() || 'guest';
+  }, [user]);
+  const storageKey = useMemo(() => `${STORAGE_KEY_BASE}:${String(role || 'unknown').toLowerCase()}:${ownerKey}`, [ownerKey, role]);
 
   useEffect(() => {
     const restore = async () => {
+      setIsHydrated(false);
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        const raw = await AsyncStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw);
           setMechanicProfile(sanitizeProfile(parsed));
+        } else {
+          setMechanicProfile(INITIAL_PROFILE);
         }
       } catch {
         setMechanicProfile(INITIAL_PROFILE);
@@ -54,15 +75,15 @@ export const MechanicProfileProvider = ({ children }) => {
     };
 
     restore();
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     if (!isHydrated) {
       return;
     }
 
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(mechanicProfile)).catch(() => {});
-  }, [isHydrated, mechanicProfile]);
+    AsyncStorage.setItem(storageKey, JSON.stringify(mechanicProfile)).catch(() => {});
+  }, [isHydrated, mechanicProfile, storageKey]);
 
   const setProfilePhoto = useCallback((uri) => {
     setMechanicProfile((prev) => ({
@@ -88,11 +109,17 @@ export const MechanicProfileProvider = ({ children }) => {
     }));
   }, []);
 
-  const setKyc = useCallback(({ ninImages = [], passportImages = [] }) => {
+  const setKyc = useCallback(({ ninImages = [] }) => {
     setMechanicProfile((prev) => ({
       ...prev,
       ninImages: Array.isArray(ninImages) ? ninImages.filter(Boolean) : [],
-      passportImages: Array.isArray(passportImages) ? passportImages.filter(Boolean) : [],
+    }));
+  }, []);
+
+  const setCertificateImages = useCallback((images = []) => {
+    setMechanicProfile((prev) => ({
+      ...prev,
+      certificateImages: Array.isArray(images) ? images.filter(Boolean) : [],
     }));
   }, []);
 
@@ -115,24 +142,56 @@ export const MechanicProfileProvider = ({ children }) => {
     setMechanicProfile(INITIAL_PROFILE);
   }, []);
 
+  const markStepSkipped = useCallback((routeName) => {
+    const value = String(routeName || '').trim();
+    if (!value) {
+      return;
+    }
+
+    setMechanicProfile((prev) => ({
+      ...prev,
+      skippedSteps: Array.from(new Set([...(prev.skippedSteps || []), value])),
+    }));
+  }, []);
+
+  const clearSkippedStep = useCallback((routeName) => {
+    const value = String(routeName || '').trim();
+    if (!value) {
+      return;
+    }
+
+    setMechanicProfile((prev) => ({
+      ...prev,
+      skippedSteps: (prev.skippedSteps || []).filter((step) => step !== value),
+    }));
+  }, []);
+
+  const resetSkippedSteps = useCallback(() => {
+    setMechanicProfile((prev) => ({
+      ...prev,
+      skippedSteps: [],
+    }));
+  }, []);
+
   const completedSteps = useMemo(() => {
     const bank = mechanicProfile.bankDetails || {};
     const hasBank = Boolean(bank.accountName && bank.accountNumber && bank.bankName);
 
     return {
       photo: Boolean(mechanicProfile.profilePhotoUri),
-      pricing: Boolean(
+      id: mechanicProfile.ninImages.length > 0,
+      certificate: mechanicProfile.certificateImages.length > 0,
+      bank: hasBank,
+      services: Boolean(
         mechanicProfile.hasServicePricing ||
         Object.keys(mechanicProfile.servicePricing || {}).length > 0
       ),
-      kyc: mechanicProfile.ninImages.length > 0,
-      bank: hasBank,
     };
   }, [mechanicProfile]);
 
   const completionPercent = useMemo(() => {
     const completedCount = Object.values(completedSteps).filter(Boolean).length;
-    return completedCount * 25;
+    return completedCount * 20;
   }, [completedSteps]);
 
   const isComplete = completionPercent === 100;
@@ -148,8 +207,13 @@ export const MechanicProfileProvider = ({ children }) => {
       setHasServicePricing,
       setServicePricing,
       setKyc,
+      setCertificateImages,
       setBankDetails,
+      markStepSkipped,
+      clearSkippedStep,
+      resetSkippedSteps,
       resetMechanicProfile,
+      skippedSteps: mechanicProfile.skippedSteps || [],
     }),
     [
       mechanicProfile,
@@ -161,7 +225,11 @@ export const MechanicProfileProvider = ({ children }) => {
       setHasServicePricing,
       setServicePricing,
       setKyc,
+      setCertificateImages,
       setBankDetails,
+      markStepSkipped,
+      clearSkippedStep,
+      resetSkippedSteps,
       resetMechanicProfile,
     ]
   );

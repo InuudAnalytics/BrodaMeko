@@ -1,220 +1,256 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
-import {
-  addMechanicBank,
-  deleteMechanicBank,
-  getMechanicBankList,
-  setPrimaryMechanicBank,
-  verifyMechanicBank,
-} from '../../../services/mechanic.service';
+import { addMechanicBank, getMechanicBankList, verifyMechanicBank } from '../../../services/mechanic.service';
 import { darkTheme } from '../../../theme';
-import { getNextOnboardingRoute, getOnboardingStepIndex, ROUTES } from '../../../utils';
+import { ROUTES } from '../../../utils';
+
+const normalizeBankItems = (payload) => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (Array.isArray(payload?.banks)) {
+    return payload.banks;
+  }
+
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  if (Array.isArray(payload?.results)) {
+    return payload.results;
+  }
+
+  return [];
+};
+
+const sanitizeDigits = (value) => String(value || '').replace(/\D/g, '');
 
 const BankDetailsScreen = ({ navigation, route }) => {
   const { mechanicProfile, setBankDetails, completedSteps } = useMechanicProfile();
-  const existing = mechanicProfile.bankDetails || {};
 
-  const [accountName, setAccountName] = useState(existing.accountName || '');
-  const [accountNumber, setAccountNumber] = useState(existing.accountNumber || '');
-  const [bankName, setBankName] = useState(existing.bankName || '');
-  const [bankCode, setBankCode] = useState('');
-  const [banks, setBanks] = useState([]);
+  const existing = mechanicProfile.bankDetails || {};
+  const isOnboarding = Boolean(route?.params?.onboarding);
+
+  const [allBanks, setAllBanks] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
-  const [bankActionId, setBankActionId] = useState('');
+  const [bankSearch, setBankSearch] = useState(existing.bankName || '');
+  const [selectedBank, setSelectedBank] = useState(null);
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
+
+  const [accountNumber, setAccountNumber] = useState(existing.accountNumber || '');
+  const [accountName, setAccountName] = useState(existing.accountName || '');
+  const [bvn, setBvn] = useState('');
+  const [nin, setNin] = useState('');
+
+  const [fetchError, setFetchError] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [savingError, setSavingError] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const [error, setError] = useState('');
-  const isOnboarding = Boolean(route?.params?.onboarding);
-  const skippedSteps = route?.params?.skippedSteps || [];
-  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_BANK_DETAILS);
-  const progressPercent = useMemo(() => (stepIndex / 4) * 100, [stepIndex]);
 
-  const isValid = useMemo(
-    () => {
-      const normalizedNumber = String(accountNumber || '').replace(/\D/g, '');
-      const hasAllFields =
-        String(accountName).trim().length > 0 &&
-        String(bankName).trim().length > 0 &&
-        normalizedNumber.length >= 10;
+  const verifyDebounce = React.useRef(null);
 
-      return hasAllFields;
-    },
-    [accountName, accountNumber, bankName]
-  );
-
-  const fetchBanks = React.useCallback(async () => {
-    setLoadingBanks(true);
-    setError('');
-
-    try {
-      const response = await getMechanicBankList();
-      const payload = response?.data || response || {};
-      const items = Array.isArray(payload) ? payload : (payload?.banks || payload?.items || payload?.results || []);
-      setBanks(items);
-    } catch (fetchError) {
-      setError(fetchError?.message || 'Could not load bank list.');
-    } finally {
-      setLoadingBanks(false);
+  useEffect(() => {
+    if (!isOnboarding) {
+      return;
     }
-  }, []);
 
-  React.useEffect(() => {
-    fetchBanks();
-  }, [fetchBanks]);
+    if (!completedSteps.certificate) {
+      Alert.alert('Complete previous step', 'Please upload your certificate first.');
+      navigation.replace(ROUTES.MECH_PROFILE_SETUP);
+    }
+  }, [completedSteps.certificate, isOnboarding, navigation]);
 
-  const getBankId = (bank) => String(bank?.id || bank?._id || bank?.bank_id || '').trim();
+  const filteredBanks = useMemo(() => {
+    const query = String(bankSearch || '').trim().toLowerCase();
+    if (!query) {
+      return allBanks.slice(0, 25);
+    }
 
-  const handleVerify = async () => {
-    if (!bankName.trim() || String(accountNumber || '').replace(/\D/g, '').length < 10) {
-      setError('Select a bank and enter a valid account number.');
+    return allBanks
+      .filter((bank) => {
+        const name = String(bank?.name || bank?.bank_name || '').toLowerCase();
+        return name.includes(query);
+      })
+      .slice(0, 25);
+  }, [allBanks, bankSearch]);
+
+  useEffect(() => {
+    const loadBanks = async () => {
+      setLoadingBanks(true);
+      setFetchError('');
+
+      try {
+        const response = await getMechanicBankList();
+        const nextBanks = normalizeBankItems(response?.data || response);
+        setAllBanks(nextBanks);
+
+        const existingName = String(existing.bankName || '').trim().toLowerCase();
+        if (existingName && !selectedBank) {
+          const matched = nextBanks.find(
+            (bank) => String(bank?.name || bank?.bank_name || '').trim().toLowerCase() === existingName
+          );
+          if (matched) {
+            setSelectedBank(matched);
+          }
+        }
+      } catch (error) {
+        setFetchError(error?.message || 'Could not load bank list.');
+      } finally {
+        setLoadingBanks(false);
+      }
+    };
+
+    loadBanks();
+  }, [existing.bankName, selectedBank]);
+
+  const selectedBankName = String(selectedBank?.name || selectedBank?.bank_name || bankSearch || '').trim();
+  const selectedBankCode = String(selectedBank?.code || selectedBank?.bank_code || '').trim();
+
+  const runVerify = useCallback(async () => {
+    const cleanAccount = sanitizeDigits(accountNumber);
+
+    if (!selectedBankName || cleanAccount.length !== 10) {
       return;
     }
 
     setVerifying(true);
-    setError('');
+    setVerifyError('');
+    setSavingError('');
 
     try {
-      await verifyMechanicBank({
-        account_number: String(accountNumber || '').replace(/\D/g, ''),
-        bank_name: String(bankName || '').trim(),
+      const response = await verifyMechanicBank({
+        account_number: cleanAccount,
+        bank_name: selectedBankName,
       });
-      setVerified(true);
-    } catch (verifyError) {
-      setVerified(false);
-      setError(verifyError?.message || 'Bank verification failed.');
+
+      const payload = response?.data || response || {};
+      const resolvedName =
+        String(payload?.account_name || payload?.data?.account_name || payload?.accountName || payload?.name || '').trim();
+
+      if (!resolvedName) {
+        setAccountName('');
+        setVerifyError('Could not resolve account name for this bank account.');
+        return;
+      }
+
+      setAccountName(resolvedName);
+      setVerifyError('');
+    } catch (error) {
+      setAccountName('');
+      setVerifyError(error?.message || 'Account verification failed.');
     } finally {
       setVerifying(false);
     }
-  };
+  }, [accountNumber, selectedBankName]);
 
-  const handleSave = () => {
-    if (!isValid) {
-      Alert.alert('Invalid details', 'Enter account name, bank name and a valid account number (10+ digits).');
-      return;
-    }
-    if (!verified) {
-      Alert.alert('Verify details', 'Please verify your bank details before continuing.');
-      return;
+  useEffect(() => {
+    if (verifyDebounce.current) {
+      clearTimeout(verifyDebounce.current);
     }
 
-    const saveBank = async () => {
-      setSaving(true);
-      setError('');
+    const cleanAccount = sanitizeDigits(accountNumber);
+    if (!selectedBankName || cleanAccount.length !== 10) {
+      return undefined;
+    }
 
-      try {
-        await addMechanicBank({
-          account_name: String(accountName).trim(),
-          account_number: String(accountNumber).replace(/\D/g, ''),
-          bank_code: String(bankCode || '').trim(),
-          bank_name: String(bankName).trim(),
-        });
+    verifyDebounce.current = setTimeout(() => {
+      runVerify();
+    }, 350);
 
-        setBankDetails({
-          accountName: String(accountName).trim(),
-          accountNumber: String(accountNumber).replace(/\D/g, ''),
-          bankName: String(bankName).trim(),
-        });
-        await fetchBanks();
-
-        if (isOnboarding) {
-          const { nextRoute, nextSkipped } = getNextOnboardingRoute({
-            currentRoute: ROUTES.MECH_BANK_DETAILS,
-            completedSteps: { ...completedSteps, bank: true },
-            skippedSteps,
-          });
-          if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
-            navigation.navigate(nextRoute);
-            return;
-          }
-          navigation.replace(nextRoute, { onboarding: true, skippedSteps: nextSkipped });
-          return;
-        }
-
-        navigation.goBack();
-      } catch (saveError) {
-        setError(saveError?.message || 'Could not save bank details.');
-      } finally {
-        setSaving(false);
+    return () => {
+      if (verifyDebounce.current) {
+        clearTimeout(verifyDebounce.current);
       }
     };
+  }, [accountNumber, selectedBankName, runVerify]);
 
-    saveBank();
+  const handleSelectBank = (bank) => {
+    setSelectedBank(bank);
+    setBankSearch(String(bank?.name || bank?.bank_name || '').trim());
+    setAccountName('');
+    setVerifyError('');
+    setShowBankDropdown(false);
   };
 
-  const handleSetPrimary = (bank) => {
-    const bankId = getBankId(bank);
+  const handleContinue = async () => {
+    const cleanAccount = sanitizeDigits(accountNumber);
+    const cleanNin = sanitizeDigits(nin);
 
-    if (!bankId) {
-      Alert.alert('Action unavailable', 'Bank id is missing.');
+    if (!selectedBankName) {
+      setSavingError('Please select a bank.');
       return;
     }
 
-    const makePrimary = async () => {
-      setBankActionId(bankId);
-      try {
-        await setPrimaryMechanicBank(bankId);
-        Alert.alert('Success', 'Primary bank updated.');
-        await fetchBanks();
-      } catch (actionError) {
-        Alert.alert('Error', actionError?.message || 'Could not set primary bank.');
-      } finally {
-        setBankActionId('');
+    if (cleanAccount.length !== 10) {
+      setSavingError('Account number must be exactly 10 digits.');
+      return;
+    }
+
+    if (!String(accountName || '').trim()) {
+      setSavingError('Please verify your account number to resolve account name.');
+      return;
+    }
+
+    if (!cleanNin) {
+      setSavingError('NIN is required.');
+      return;
+    }
+
+    setSaving(true);
+    setSavingError('');
+
+    try {
+      await addMechanicBank({
+        account_name: String(accountName).trim(),
+        account_number: cleanAccount,
+        bank_code: selectedBankCode,
+        bank_name: selectedBankName,
+      });
+
+      setBankDetails({
+        accountName: String(accountName).trim(),
+        accountNumber: cleanAccount,
+        bankName: selectedBankName,
+      });
+
+      if (isOnboarding) {
+        navigation.replace(ROUTES.MECH_SERVICE_PRICING, { onboarding: true });
+        return;
       }
-    };
 
-    makePrimary();
-  };
-
-  const handleDeleteBank = (bank) => {
-    const bankId = getBankId(bank);
-
-    if (!bankId) {
-      Alert.alert('Action unavailable', 'Bank id is missing.');
-      return;
+      navigation.goBack();
+    } catch (error) {
+      setSavingError(error?.message || 'Could not save bank details.');
+    } finally {
+      setSaving(false);
     }
-
-    Alert.alert('Delete bank', 'Are you sure you want to delete this bank?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setBankActionId(bankId);
-          try {
-            await deleteMechanicBank(bankId);
-            Alert.alert('Deleted', 'Bank removed.');
-            await fetchBanks();
-          } catch (actionError) {
-            Alert.alert('Error', actionError?.message || 'Could not delete bank.');
-          } finally {
-            setBankActionId('');
-          }
-        },
-      },
-    ]);
   };
 
-  const handleSkipNext = () => {
-    const nextSkipped = Array.from(new Set([...skippedSteps, ROUTES.MECH_BANK_DETAILS]));
-    const { nextRoute, nextSkipped: resolvedSkipped } = getNextOnboardingRoute({
-      currentRoute: ROUTES.MECH_BANK_DETAILS,
-      completedSteps,
-      skippedSteps: nextSkipped,
+  const handleTemporarySkip = () => {
+    const cleanAccount = sanitizeDigits(accountNumber);
+
+    setBankDetails({
+      accountName: String(accountName || '').trim() || 'Pending verification',
+      accountNumber: cleanAccount || '0000000000',
+      bankName: selectedBankName || String(bankSearch || '').trim() || 'Pending bank',
     });
-    if (nextRoute === ROUTES.MECH_PROFILE_SETUP) {
-      navigation.navigate(nextRoute);
+
+    if (isOnboarding) {
+      navigation.replace(ROUTES.MECH_SERVICE_PRICING, { onboarding: true });
       return;
     }
-    navigation.replace(nextRoute, { onboarding: true, skippedSteps: resolvedSkipped });
-  };
 
-  const handleSkipAll = () => {
-    navigation.navigate(ROUTES.MECH_PROFILE_SETUP);
+    navigation.goBack();
   };
 
   return (
@@ -229,144 +265,140 @@ const BankDetailsScreen = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
           <AppText style={styles.helper}>Please upload a correct bank details</AppText>
-          <AppText style={styles.stepLabel}>Step {stepIndex} of 4</AppText>
+          <AppText style={styles.stepLabel}>Step 4 of 5</AppText>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+            <View style={styles.progressFill} />
           </View>
 
-          <AppInput
-            label="Account name"
-            value={accountName}
-            onChangeText={setAccountName}
-            placeholder="John Doe"
-            autoCapitalize="words"
-          />
+          <AppText style={styles.bankLabel}>Bank name</AppText>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.dropdownTrigger}
+            onPress={() => setShowBankDropdown((prev) => !prev)}
+          >
+            <AppText style={[styles.dropdownTriggerText, !selectedBankName ? styles.dropdownPlaceholder : null]}>
+              {selectedBankName || 'Select bank'}
+            </AppText>
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              size={18}
+              color={darkTheme.colors.muted}
+              strokeWidth={2.2}
+            />
+          </TouchableOpacity>
+
+          {loadingBanks ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            </View>
+          ) : null}
+
+          {fetchError ? <AppText style={styles.errorText}>{fetchError}</AppText> : null}
+
+          {showBankDropdown ? (
+            <View style={styles.dropdownPanel}>
+              <AppInput
+                value={bankSearch}
+                onChangeText={(value) => {
+                  setBankSearch(value);
+                  setSelectedBank(null);
+                  setAccountName('');
+                  setVerifyError('');
+                  setSavingError('');
+                }}
+                placeholder="Search bank"
+                autoCapitalize="words"
+                containerStyle={styles.dropdownSearchWrap}
+              />
+              <ScrollView style={styles.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                {filteredBanks.map((bank, index) => {
+                  const name = String(bank?.name || bank?.bank_name || '').trim();
+                  const code = String(bank?.code || bank?.bank_code || '').trim();
+                  const active =
+                    name.toLowerCase() === String(selectedBankName || '').trim().toLowerCase() &&
+                    (!selectedBankCode || !code || code === selectedBankCode);
+
+                  return (
+                    <TouchableOpacity
+                      key={`${name}-${code}-${index}`}
+                      activeOpacity={0.85}
+                      style={[styles.dropdownItem, active ? styles.dropdownItemActive : null]}
+                      onPress={() => handleSelectBank(bank)}
+                    >
+                      <AppText style={[styles.dropdownItemText, active ? styles.dropdownItemTextActive : null]}>{name}</AppText>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
 
           <AppInput
             label="Account number"
             value={accountNumber}
             onChangeText={(value) => {
-              setAccountNumber(value);
-              setVerified(false);
+              setAccountNumber(sanitizeDigits(value).slice(0, 10));
+              setAccountName('');
+              setVerifyError('');
+              setSavingError('');
             }}
             placeholder="0123456789"
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+
+          {verifying ? (
+            <View style={styles.inlineRow}>
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+              <AppText style={styles.inlineMuted}>Verifying account...</AppText>
+            </View>
+          ) : null}
+
+          {verifyError ? <AppText style={styles.errorText}>{verifyError}</AppText> : null}
+
+          <AppInput
+            label="Account name"
+            value={accountName}
+            onChangeText={() => {}}
+            placeholder="Resolved account name"
+            editable={false}
+            inputStyle={styles.readOnlyInput}
+          />
+
+          <AppInput
+            label="BVN (optional)"
+            value={bvn}
+            onChangeText={(value) => setBvn(sanitizeDigits(value))}
+            placeholder="Enter BVN"
             keyboardType="number-pad"
           />
 
           <AppInput
-            label="Bank name"
-            value={bankName}
+            label="NIN"
+            value={nin}
             onChangeText={(value) => {
-              setBankName(value);
-              setVerified(false);
+              setNin(sanitizeDigits(value));
+              setSavingError('');
             }}
-            placeholder="GTBank"
-            autoCapitalize="words"
+            placeholder="Enter NIN"
+            keyboardType="number-pad"
           />
 
-          {loadingBanks ? <ActivityIndicator size="small" color={darkTheme.colors.accent} /> : null}
-
-          {banks.length ? (
-            <View style={styles.bankList}>
-              {banks.slice(0, 8).map((bank, index) => {
-                const itemName = String(bank?.name || bank?.bank_name || '').trim();
-                const itemCode = String(bank?.code || bank?.bank_code || '').trim();
-                const key = `${itemName}-${itemCode}-${index}`;
-                const active = itemName.toLowerCase() === bankName.toLowerCase();
-
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    activeOpacity={0.85}
-                    style={[styles.bankChip, active ? styles.bankChipActive : null]}
-                    onPress={() => {
-                      setBankName(itemName);
-                      setBankCode(itemCode);
-                      setVerified(false);
-                    }}
-                  >
-                    <AppText style={[styles.bankChipText, active ? styles.bankChipTextActive : null]}>{itemName}</AppText>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : null}
-
-          {banks.length ? (
-            <View style={styles.savedBanksWrap}>
-              <AppText style={styles.savedBanksTitle}>Saved banks</AppText>
-              {banks.map((bank, index) => {
-                const bankId = getBankId(bank) || String(index);
-                const bankItemName = String(bank?.name || bank?.bank_name || bank?.bankName || 'Bank').trim();
-                const account = String(bank?.account_number || bank?.accountNumber || '').trim();
-                const accountNameValue = String(bank?.account_name || bank?.accountName || '').trim();
-                const isPrimary = Boolean(bank?.is_primary || bank?.primary || bank?.isPrimary);
-                const isActing = bankActionId === bankId;
-
-                return (
-                  <View key={`saved-${bankId}-${index}`} style={styles.savedBankItem}>
-                    <View style={styles.savedBankInfo}>
-                      <AppText style={styles.savedBankName}>{bankItemName}</AppText>
-                      <AppText style={styles.savedBankMeta}>{accountNameValue || 'Account name unavailable'}</AppText>
-                      <AppText style={styles.savedBankMeta}>{account || 'Account number unavailable'}</AppText>
-                      {isPrimary ? <AppText style={styles.primaryBadge}>Primary</AppText> : null}
-                    </View>
-                    <View style={styles.savedBankActions}>
-                      <TouchableOpacity
-                        style={styles.bankActionBtn}
-                        activeOpacity={0.85}
-                        onPress={() => handleSetPrimary(bank)}
-                        disabled={isActing || isPrimary}
-                      >
-                        {isActing ? (
-                          <ActivityIndicator size="small" color={darkTheme.colors.accent} />
-                        ) : (
-                          <AppText style={styles.bankActionText}>Set primary</AppText>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.bankActionBtn, styles.bankDeleteBtn]}
-                        activeOpacity={0.85}
-                        onPress={() => handleDeleteBank(bank)}
-                        disabled={isActing}
-                      >
-                        <AppText style={styles.bankDeleteText}>Delete</AppText>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          ) : null}
+          {savingError ? <AppText style={styles.errorText}>{savingError}</AppText> : null}
 
           <AppButton
-            label={verifying ? 'Verifying...' : verified ? 'Verified' : 'Verify account'}
-            onPress={handleVerify}
-            style={styles.verifyBtn}
-            disabled={verifying || verified}
-            left={verifying ? <ActivityIndicator size="small" color="#1A1A1A" /> : null}
-          />
-
-          <AppButton
-            label={saving ? 'Saving...' : 'Save & continue'}
-            onPress={handleSave}
+            label={saving ? 'Saving...' : 'Continue'}
+            onPress={handleContinue}
             style={styles.saveBtn}
-            disabled={saving}
+            disabled={saving || verifying}
             left={saving ? <ActivityIndicator size="small" color="#1A1A1A" /> : null}
           />
-
-          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
-
           {isOnboarding ? (
-            <View style={styles.skipRow}>
-              <TouchableOpacity activeOpacity={0.85} onPress={handleSkipNext}>
-                <AppText style={styles.skipText}>Skip next</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.85} onPress={handleSkipAll}>
-                <AppText style={styles.skipText}>Skip all</AppText>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity activeOpacity={0.85} onPress={handleTemporarySkip} style={styles.skipTempBtn}>
+              <AppText style={styles.skipTempText}>Skip for now</AppText>
+            </TouchableOpacity>
           ) : null}
+
         </ScrollView>
       </View>
     </ScreenContainer>
@@ -431,109 +463,99 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: darkTheme.colors.accent,
+    width: '80%',
   },
-  bankList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  loadingRow: {
     marginBottom: 10,
   },
-  savedBanksWrap: {
-    marginTop: 14,
-    rowGap: 8,
+  bankLabel: {
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    marginBottom: 6,
   },
-  savedBanksTitle: {
+  dropdownTrigger: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  dropdownTriggerText: {
     color: darkTheme.colors.text,
     fontSize: 14,
-    fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  savedBankItem: {
+  dropdownPlaceholder: {
+    color: darkTheme.colors.muted,
+  },
+  dropdownPanel: {
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 10,
     backgroundColor: 'rgba(255,255,255,0.04)',
-    rowGap: 10,
+    marginBottom: 12,
   },
-  savedBankInfo: {
-    rowGap: 2,
+  dropdownSearchWrap: {
+    marginBottom: 8,
   },
-  savedBankName: {
-    color: darkTheme.colors.text,
-    fontSize: 13,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
+  dropdownList: {
+    maxHeight: 180,
   },
-  savedBankMeta: {
-    color: darkTheme.colors.muted,
-    fontSize: 12,
-  },
-  primaryBadge: {
-    marginTop: 3,
-    alignSelf: 'flex-start',
-    color: darkTheme.colors.accent,
-    fontSize: 11,
-  },
-  savedBankActions: {
-    flexDirection: 'row',
-    columnGap: 8,
-  },
-  bankActionBtn: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
+  dropdownItem: {
+    minHeight: 40,
     borderRadius: 8,
-    minHeight: 32,
-    paddingHorizontal: 10,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  bankActionText: {
-    color: darkTheme.colors.accent,
-    fontSize: 12,
-  },
-  bankDeleteBtn: {
-    borderColor: '#FF7F7F',
-  },
-  bankDeleteText: {
-    color: '#FF7F7F',
-    fontSize: 12,
-  },
-  bankChip: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    marginBottom: 4,
   },
-  bankChipActive: {
-    borderColor: darkTheme.colors.accent,
+  dropdownItemActive: {
     backgroundColor: 'rgba(226,255,49,0.15)',
   },
-  bankChipText: {
+  dropdownItemText: {
     color: darkTheme.colors.text,
-    fontSize: 12,
+    fontSize: 13,
   },
-  bankChipTextActive: {
+  dropdownItemTextActive: {
     color: darkTheme.colors.accent,
   },
-  verifyBtn: {
-    marginTop: 4,
+  inlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -4,
+    marginBottom: 8,
   },
-  saveBtn: {
-    marginTop: 10,
+  inlineMuted: {
+    marginLeft: 8,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+  },
+  readOnlyInput: {
+    color: 'rgba(255,255,255,0.82)',
   },
   errorText: {
-    marginTop: 10,
+    marginTop: -6,
+    marginBottom: 10,
     color: '#FF7F7F',
+    fontSize: 12,
   },
-  skipRow: {
+  saveBtn: {
+    marginTop: 8,
+  },
+  skipTempBtn: {
+    alignSelf: 'center',
     marginTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
-  skipText: {
+  skipTempText: {
     color: darkTheme.colors.muted,
     fontSize: 13,
+    textDecorationLine: 'underline',
   },
 });
 
