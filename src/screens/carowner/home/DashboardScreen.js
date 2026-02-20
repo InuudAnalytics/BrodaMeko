@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Location06Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
@@ -66,7 +67,7 @@ const readAvatarUri = (user) =>
     ''
   );
 
-const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loading }) => {
+const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loading, locationEnabled }) => {
   return (
     <View style={styles.locationFallbackWrap}>
       <View style={styles.locationFallbackCard}>
@@ -75,7 +76,9 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
         </View>
         <AppText style={styles.locationFallbackTitle}>Location is off</AppText>
         <AppText style={styles.locationFallbackBody}>
-          Turn on location to find mechanics near you.
+          {locationEnabled
+            ? 'Turn on location to find mechanics near you.'
+            : 'Location is temporarily disabled while Google Maps SDK billing/key activation is pending.'}
         </AppText>
 
         <TouchableOpacity
@@ -87,7 +90,9 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
           {loading ? (
             <ActivityIndicator size="small" color="#1A1A1A" />
           ) : (
-            <AppText style={styles.locationActionBtnText}>Enable location</AppText>
+            <AppText style={styles.locationActionBtnText}>
+              {locationEnabled ? 'Enable location' : 'Location unavailable'}
+            </AppText>
           )}
         </TouchableOpacity>
 
@@ -110,11 +115,16 @@ const DashboardScreen = ({ navigation }) => {
   const greetingText = firstName ? `${greetingPrefix}, ${firstName}` : greetingPrefix;
   const avatarInitial = firstName.charAt(0).toUpperCase() || 'U';
   const avatarUri = readAvatarUri(user);
-  const hasLocationPermission = permissionStatus === 'granted';
-  const isLocationBlocked = permissionStatus === 'blocked';
+  const hasLocationPermission = LOCATION_ENABLED && permissionStatus === 'granted';
+  const isLocationBlocked = LOCATION_ENABLED && permissionStatus === 'blocked';
 
   useFocusEffect(
     useCallback(() => {
+      if (!LOCATION_ENABLED) {
+        // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
+        return undefined;
+      }
+
       if (!hasLocationPermission) {
         return undefined;
       }
@@ -144,6 +154,11 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   const handleEnableLocation = useCallback(async () => {
+    if (!LOCATION_ENABLED) {
+      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
+      return;
+    }
+
     const status = await requestPermission();
 
     if (status === 'granted') {
@@ -157,7 +172,7 @@ const DashboardScreen = ({ navigation }) => {
       <View style={styles.mapBackdrop}>
         {hasLocationPermission ? (
           <>
-            {/* GOOGLE MAPS RENDERING IS INTENTIONALLY DISABLED UNTIL BILLING IS ENABLED. */}
+            {/* TODO: ADD VALID API KEY. GOOGLE MAPS RENDERING IS INTENTIONALLY DISABLED UNTIL BILLING IS ENABLED. */}
             <View style={styles.mapMockWrap} ref={mapRef}>
               <View style={styles.mapLineA} />
               <View style={styles.mapLineB} />
@@ -183,6 +198,7 @@ const DashboardScreen = ({ navigation }) => {
             onEnableLocation={handleEnableLocation}
             onOpenSettings={openSettings}
             loading={loading}
+            locationEnabled={LOCATION_ENABLED}
           />
         )}
 

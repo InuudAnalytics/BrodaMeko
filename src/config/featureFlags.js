@@ -1,0 +1,6 @@
+// TODO: ADD VALID API KEY BEFORE RE-ENABLING LIVE LOCATION.
+export const LOCATION_ENABLED = false;
+
+export default {
+  LOCATION_ENABLED,
+};

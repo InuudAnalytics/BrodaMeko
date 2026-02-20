@@ -370,3 +370,21 @@
    - disable splits or use universal APK for direct sharing/testing.
 5. Signing:
    - Ensure `android/gradle.properties` and `android/app/build.gradle` release signing config is correctly set for your keystore.
+
+---
+
+## 8) Temporary Location Disable (Billing/API Key Pending)
+- Reason: Google Maps SDK usage requires active billing (minimum $10 setup). To prevent crashes/failed map initialization while billing/key activation is pending, live location calls are temporarily disabled but structure is fully preserved.
+- Current state:
+  - Location feature flag is OFF in `src/config/featureFlags.js` via `LOCATION_ENABLED = false`.
+  - Geolocation permission and watch calls are gated in `src/hooks/useUserLocation.js`.
+  - Car owner dashboard location/map flow is gated in `src/screens/carowner/home/DashboardScreen.js`.
+  - TODO markers were added in code:
+    - `// TODO: ADD VALID API KEY BEFORE RE-ENABLING LIVE LOCATION.`
+    - `// TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.`
+    - `// TODO: ADD VALID API KEY. GOOGLE MAPS RENDERING IS INTENTIONALLY DISABLED UNTIL BILLING IS ENABLED.`
+- How to bring live location back in no time:
+  1. Activate Google billing and ensure your Maps key is valid/restricted correctly.
+  2. Set `LOCATION_ENABLED = true` in `src/config/featureFlags.js`.
+  3. Keep the existing key wiring (`android/gradle.properties`, `android/app/build.gradle`, `android/app/src/main/AndroidManifest.xml`) as-is.
+  4. If desired, remove/cleanup TODO comments after confirming map/location works on device.

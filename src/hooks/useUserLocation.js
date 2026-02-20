@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import { check, PERMISSIONS, request, RESULTS } from 'react-native-permissions';
+import { LOCATION_ENABLED } from '../config/featureFlags';
 
 const LOCATION_PERMISSION =
   Platform.OS === 'ios'
@@ -66,7 +67,9 @@ const toLocation = (position) => {
 
 export const useUserLocation = () => {
   const [location, setLocation] = useState(null);
-  const [permissionStatus, setPermissionStatus] = useState(PERMISSION_STATE.unknown);
+  const [permissionStatus, setPermissionStatus] = useState(
+    LOCATION_ENABLED ? PERMISSION_STATE.unknown : PERMISSION_STATE.blocked
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const watchIdRef = useRef(null);
@@ -79,6 +82,11 @@ export const useUserLocation = () => {
   }, []);
 
   const refreshOnce = useCallback(async () => {
+    if (!LOCATION_ENABLED) {
+      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
+      return null;
+    }
+
     if (permissionStatus !== PERMISSION_STATE.granted) {
       return null;
     }
@@ -112,6 +120,11 @@ export const useUserLocation = () => {
   }, [permissionStatus]);
 
   const startWatching = useCallback(() => {
+    if (!LOCATION_ENABLED) {
+      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
+      return;
+    }
+
     if (permissionStatus !== PERMISSION_STATE.granted || watchIdRef.current !== null) {
       return;
     }
@@ -133,6 +146,13 @@ export const useUserLocation = () => {
   }, [permissionStatus]);
 
   const requestPermission = useCallback(async () => {
+    if (!LOCATION_ENABLED) {
+      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
+      setPermissionStatus(PERMISSION_STATE.blocked);
+      setError(null);
+      return PERMISSION_STATE.blocked;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -162,6 +182,10 @@ export const useUserLocation = () => {
   }, [refreshOnce]);
 
   useEffect(() => {
+    if (!LOCATION_ENABLED) {
+      setPermissionStatus(PERMISSION_STATE.blocked);
+      return;
+    }
     requestPermission();
   }, [requestPermission]);
 
