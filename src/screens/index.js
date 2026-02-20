@@ -2,6 +2,8 @@ export * from './auth';
 
 export { CarOwnerDashboardScreen } from './carowner/home';
 export { default as CarOwnerHistoryScreen } from './carowner/history/HistoryScreen';
+export { default as CarOwnerMechanicDetailsScreen } from './carowner/history/MechanicDetailsScreen';
+export { default as CarOwnerMechanicReviewsScreen } from './carowner/history/MechanicReviewsScreen';
 export { default as CarOwnerRewardsScreen } from './carowner/wallet/WalletScreen';
 export { default as CarOwnerFundWalletScreen } from './carowner/wallet/FundWalletScreen';
 export { default as CarOwnerTransactionDetailsScreen } from './carowner/wallet/TransactionDetailsScreen';
@@ -9,6 +11,7 @@ export { default as CarOwnerWithdrawScreen } from './carowner/wallet/WithdrawScr
 export { default as CarOwnerChatScreen } from './carowner/chat/ChatScreen';
 export { default as CarOwnerProfileScreen } from './carowner/profile/ProfileScreen';
 export { default as CarOwnerEditProfileScreen } from './carowner/profile/EditProfileScreen';
+export { default as CarOwnerAddContactSuccessScreen } from './carowner/profile/AddContactSuccessScreen';
 export { default as CarOwnerReportIssueScreen } from './carowner/assistance/ReportIssueScreen';
 export { default as CarOwnerRequestDiagnosticsScreen } from './carowner/assistance/RequestDiagnosticsScreen';
 export { default as CarOwnerDiagnosticExpertsScreen } from './carowner/diagnostics/DiagnosticExpertsListScreen';

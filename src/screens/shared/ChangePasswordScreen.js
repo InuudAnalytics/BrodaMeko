@@ -62,7 +62,7 @@ const ChangePasswordScreen = ({ navigation }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen} keyboardAware={false}>
       <KeyboardAvoidingView style={styles.keyboardContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.header}>

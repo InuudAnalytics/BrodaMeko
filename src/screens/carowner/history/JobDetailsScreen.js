@@ -1,6 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useJobs } from '../../../context';
 import { darkTheme } from '../../../theme';
@@ -9,6 +11,16 @@ import { ROUTES } from '../../../utils';
 const readImages = (job) => {
   const images = job?.images || job?.photos || job?.attachments || [];
   return Array.isArray(images) ? images : [];
+};
+
+const prettyLabel = (value) => {
+  return String(value || '')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 };
 
 const toImageUri = (image) => {
@@ -21,11 +33,36 @@ const toImageUri = (image) => {
   return String(image?.url || image?.uri || image?.path || '').trim();
 };
 
+const readJobPayload = (response) => {
+  const root = response?.data || response || {};
+
+  if (!root || typeof root !== 'object') {
+    return null;
+  }
+
+  if (root?.job && typeof root.job === 'object') {
+    return root.job;
+  }
+
+  if (root?.data && typeof root.data === 'object') {
+    if (root.data.job && typeof root.data.job === 'object') {
+      return root.data.job;
+    }
+
+    return root.data;
+  }
+
+  return root;
+};
+
 const JobDetailsScreen = ({ navigation, route }) => {
   const jobId = String(route?.params?.jobId || '').trim();
   const { fetchJob, deleteJob, loading } = useJobs();
   const [job, setJob] = useState(null);
   const [error, setError] = useState('');
+  const fetchJobRef = useRef(fetchJob);
+
+  fetchJobRef.current = fetchJob;
 
   const loadJob = useCallback(async () => {
     if (!jobId) {
@@ -34,15 +71,15 @@ const JobDetailsScreen = ({ navigation, route }) => {
     }
 
     setError('');
-    const response = await fetchJob(jobId);
+    const response = await fetchJobRef.current(jobId);
     if (!response) {
       setError('Could not load this job.');
       return;
     }
 
-    const payload = response?.data || response?.job || response || null;
+    const payload = readJobPayload(response);
     setJob(payload);
-  }, [fetchJob, jobId]);
+  }, [jobId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,10 +112,11 @@ const JobDetailsScreen = ({ navigation, route }) => {
     <ScreenContainer style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.goBack()}>
-            <AppText style={styles.backText}>Back</AppText>
+          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
           </TouchableOpacity>
           <AppText style={styles.title}>Job details</AppText>
+          <View style={styles.backButtonSpacer} />
         </View>
 
         {(loading.fetchJob || !job) && !error ? (
@@ -98,7 +136,7 @@ const JobDetailsScreen = ({ navigation, route }) => {
           <View style={styles.card}>
             <View style={styles.row}>
               <AppText style={styles.label}>Issue</AppText>
-              <AppText style={styles.value}>{String(job?.issue_type || 'N/A')}</AppText>
+              <AppText style={styles.value}>{prettyLabel(job?.issue_type || 'N/A')}</AppText>
             </View>
             <View style={styles.row}>
               <AppText style={styles.label}>Car make</AppText>
@@ -106,11 +144,11 @@ const JobDetailsScreen = ({ navigation, route }) => {
             </View>
             <View style={styles.row}>
               <AppText style={styles.label}>Description</AppText>
-              <AppText style={styles.value}>{String(job?.description || 'N/A')}</AppText>
+              <AppText style={styles.value}>{String(job?.description || 'No description')}</AppText>
             </View>
             <View style={styles.row}>
               <AppText style={styles.label}>Status</AppText>
-              <AppText style={styles.value}>{String(job?.status || 'N/A')}</AppText>
+              <AppText style={styles.value}>{prettyLabel(job?.status || 'N/A')}</AppText>
             </View>
 
             <AppText style={styles.imagesTitle}>Images</AppText>
@@ -147,53 +185,66 @@ const JobDetailsScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: '#010037',
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
     paddingBottom: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: 12,
-    marginBottom: 12,
+    justifyContent: 'center',
+    minHeight: 42,
+    marginBottom: 14,
   },
-  backText: {
-    color: darkTheme.colors.accent,
+  backButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonSpacer: {
+    width: 36,
+    height: 36,
   },
   title: {
     color: darkTheme.colors.text,
     fontSize: 18,
+    lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.semibold,
+    flex: 1,
+    textAlign: 'center',
   },
   card: {
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    padding: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    columnGap: 10,
-    marginBottom: 8,
+    columnGap: 12,
+    marginBottom: 10,
   },
   label: {
-    color: darkTheme.colors.muted,
+    color: '#AEB0CC',
     fontSize: 13,
   },
   value: {
-    color: darkTheme.colors.text,
+    color: '#FFFFFF',
     fontSize: 13,
     flex: 1,
     textAlign: 'right',
   },
   imagesTitle: {
-    marginTop: 8,
+    marginTop: 10,
     color: darkTheme.colors.text,
+    fontSize: 14,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   imagesRow: {

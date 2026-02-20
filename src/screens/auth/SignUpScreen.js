@@ -136,7 +136,7 @@ const SignUpScreen = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} keyboardAware={false}>
       <KeyboardAvoidingView style={styles.keyboardContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">

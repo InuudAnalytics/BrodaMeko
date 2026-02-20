@@ -38,6 +38,28 @@ const extractCreatedJob = (response) => {
   return root;
 };
 
+const extractSingleJob = (response) => {
+  const root = response?.data || response || {};
+
+  if (!root || typeof root !== 'object') {
+    return null;
+  }
+
+  if (root.job && typeof root.job === 'object') {
+    return root.job;
+  }
+
+  if (root.data && typeof root.data === 'object') {
+    if (root.data.job && typeof root.data.job === 'object') {
+      return root.data.job;
+    }
+
+    return root.data;
+  }
+
+  return root;
+};
+
 const extractJobs = (payload) => {
   if (Array.isArray(payload)) {
     return payload;
@@ -133,7 +155,7 @@ export const JobsProvider = ({ children }) => {
 
     try {
       const response = await getCarOwnerJob(jobId);
-      const job = response?.data || null;
+      const job = extractSingleJob(response);
 
       if (job && typeof job === 'object') {
         setSelectedJob(job);

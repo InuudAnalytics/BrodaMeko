@@ -1,18 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
-import {
-  resendOtp as resendOtpService,
-  verifyAddContact as verifyAddContactService,
-  verifyOtp as verifyOtpService,
-} from '../../../services/auth.service';
+import { verifyAddContact as verifyAddContactService } from '../../../services/auth.service';
 import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
 import { darkTheme } from '../../../theme';
-import { pickSingleImageFromGallery } from '../../../utils';
+import { isValidNigerianPhoneDigits, pickSingleImageFromGallery, ROUTES, withNigerianCountryCode } from '../../../utils';
 
 const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
   const raw = String(value || '').trim();
@@ -38,29 +35,32 @@ const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
   return absolute;
 };
 
+const isEmailValid = (value) => {
+  const email = String(value || '').trim();
+  return Boolean(email && email.includes('@') && email.includes('.'));
+};
+
 const EditProfileScreen = ({ navigation }) => {
   const { user, updateUserData } = useAuth();
+
   const profile = useMemo(() => {
     return {
-      name:
-        user?.full_name ||
-        user?.fullName ||
-        user?.name ||
-        '',
-      email: user?.email || '',
-      phone: user?.phone || user?.phoneNumber || user?.phone_number || '',
-      avatarUri: normalizeAvatarUri(
-        user?.avatar ||
-        user?.avatar_url ||
-        user?.avatarUrl ||
-        user?.avatarUri ||
-        user?.profile_photo ||
-        user?.profile_photo_url ||
-        user?.profile_picture ||
-        user?.image_url ||
-        user?.photo_url ||
-        ''
-      ) || null,
+      name: user?.full_name || user?.fullName || user?.name || '',
+      email: String(user?.email || '').trim(),
+      phone: String(user?.phone || user?.phoneNumber || user?.phone_number || '').trim(),
+      avatarUri:
+        normalizeAvatarUri(
+          user?.avatar ||
+            user?.avatar_url ||
+            user?.avatarUrl ||
+            user?.avatarUri ||
+            user?.profile_photo ||
+            user?.profile_photo_url ||
+            user?.profile_picture ||
+            user?.image_url ||
+            user?.photo_url ||
+            ''
+        ) || null,
     };
   }, [user]);
 
@@ -69,11 +69,27 @@ const EditProfileScreen = ({ navigation }) => {
   const [email, setEmail] = useState(profile.email);
   const [phone, setPhone] = useState(profile.phone);
   const [isSaving, setIsSaving] = useState(false);
-  const [pendingContactVerification, setPendingContactVerification] = useState(null);
-  const [otpCode, setOtpCode] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [isResendingOtp, setIsResendingOtp] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setAvatarUri(profile.avatarUri);
+      setName(profile.name);
+      setEmail(profile.email);
+      setPhone(profile.phone);
+    }, [profile.avatarUri, profile.name, profile.email, profile.phone])
+  );
+
+  const missingContactType = useMemo(() => {
+    if (!profile.email) {
+      return 'email';
+    }
+
+    if (!profile.phone) {
+      return 'phone';
+    }
+
+    return null;
+  }, [profile.email, profile.phone]);
 
   const handlePickAvatar = async () => {
     const { asset, cancelled } = await pickSingleImageFromGallery();
@@ -88,24 +104,24 @@ const EditProfileScreen = ({ navigation }) => {
 
     const avatarUrl = String(
       payload?.avatar ||
-      payload?.avatar_url ||
-      payload?.avatarUrl ||
-      payload?.url ||
-      payload?.profile_photo ||
-      payload?.profile_photo_url ||
-      payload?.profile_picture ||
-      payload?.photo_url ||
-      payload?.image_url ||
-      payloadUser?.avatar ||
-      payloadUser?.avatar_url ||
-      payloadUser?.avatarUrl ||
-      payloadUser?.profile_photo ||
-      payloadUser?.profile_photo_url ||
-      payloadUser?.profile_picture ||
-      payloadUser?.photo_url ||
-      payloadUser?.image_url ||
-      fallbackUri ||
-      ''
+        payload?.avatar_url ||
+        payload?.avatarUrl ||
+        payload?.url ||
+        payload?.profile_photo ||
+        payload?.profile_photo_url ||
+        payload?.profile_picture ||
+        payload?.photo_url ||
+        payload?.image_url ||
+        payloadUser?.avatar ||
+        payloadUser?.avatar_url ||
+        payloadUser?.avatarUrl ||
+        payloadUser?.profile_photo ||
+        payloadUser?.profile_photo_url ||
+        payloadUser?.profile_picture ||
+        payloadUser?.photo_url ||
+        payloadUser?.image_url ||
+        fallbackUri ||
+        ''
     ).trim();
 
     return normalizeAvatarUri(avatarUrl, { cacheBust: true });
@@ -131,21 +147,10 @@ const EditProfileScreen = ({ navigation }) => {
         nextAvatar = resolveUploadedAvatarUrl(uploadResponse, avatarUri);
       }
 
-      const trimmedEmail = email.trim();
-      const trimmedPhone = phone.trim();
-      const previousEmail = String(profile.email || '').trim();
-      const previousPhone = String(profile.phone || '').trim();
-      const emailChanged = trimmedEmail !== previousEmail;
-      const phoneChanged = trimmedPhone !== previousPhone;
-
       await updateUserData({
         full_name: name.trim(),
         fullName: name.trim(),
         name: name.trim(),
-        email: emailChanged ? '' : trimmedEmail,
-        phone: phoneChanged ? '' : trimmedPhone,
-        phoneNumber: phoneChanged ? '' : trimmedPhone,
-        phone_number: phoneChanged ? '' : trimmedPhone,
         avatar: nextAvatar,
         avatar_url: nextAvatar,
         avatarUrl: nextAvatar,
@@ -156,104 +161,46 @@ const EditProfileScreen = ({ navigation }) => {
         photo_url: nextAvatar,
       });
 
-      if (phoneChanged && trimmedPhone) {
-        await verifyAddContactService({ phoneNumber: trimmedPhone });
-        setPendingContactVerification({ type: 'phone', value: trimmedPhone });
-        setOtpCode('');
-        setOtpError('');
+      if (!missingContactType) {
+        navigation.goBack();
         return;
       }
 
-      if (emailChanged && trimmedEmail) {
-        await verifyAddContactService({ email: trimmedEmail });
-        setPendingContactVerification({ type: 'email', value: trimmedEmail });
-        setOtpCode('');
-        setOtpError('');
+      if (missingContactType === 'email') {
+        const nextEmail = String(email || '').trim();
+
+        if (!isEmailValid(nextEmail)) {
+          Alert.alert('Invalid email', 'Enter a valid email address to continue.');
+          return;
+        }
+
+        await verifyAddContactService({ email: nextEmail });
+        navigation.navigate(ROUTES.OTP_VERIFICATION, {
+          flow: 'add_contact',
+          contactType: 'email',
+          destination: nextEmail,
+          info: 'Enter the OTP sent to your email to complete contact update.',
+        });
         return;
       }
 
-      if ((phoneChanged && !trimmedPhone) || (emailChanged && !trimmedEmail)) {
-        setOtpError('Contact field left empty. Add a valid value and update to verify it.');
+      if (!isValidNigerianPhoneDigits(phone)) {
+        Alert.alert('Invalid phone number', 'Phone number must be exactly 10 digits.');
         return;
       }
 
-      navigation.goBack();
+      const phoneWithCountryCode = withNigerianCountryCode(phone);
+      await verifyAddContactService({ phoneNumber: phoneWithCountryCode });
+      navigation.navigate(ROUTES.OTP_VERIFICATION, {
+        flow: 'add_contact',
+        contactType: 'phone',
+        destination: phoneWithCountryCode,
+        info: 'Enter the OTP sent to your phone number to complete contact update.',
+      });
     } catch (updateError) {
       Alert.alert('Update failed', updateError?.message || 'Could not update profile.');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleVerifyContactOtp = async () => {
-    if (!pendingContactVerification || isVerifyingOtp || isResendingOtp) {
-      return;
-    }
-
-    const trimmedOtp = String(otpCode || '').trim();
-    if (!trimmedOtp) {
-      setOtpError('Please enter the OTP sent to your contact.');
-      return;
-    }
-
-    setIsVerifyingOtp(true);
-    setOtpError('');
-
-    try {
-      const response = await verifyOtpService({ otp: trimmedOtp });
-      const success = response?.success !== false;
-
-      if (!success) {
-        throw new Error(response?.message || 'OTP verification failed.');
-      }
-
-      if (pendingContactVerification.type === 'phone') {
-        await updateUserData({
-          phone: pendingContactVerification.value,
-          phoneNumber: pendingContactVerification.value,
-          phone_number: pendingContactVerification.value,
-        });
-      } else {
-        await updateUserData({
-          email: pendingContactVerification.value,
-        });
-      }
-
-      setPendingContactVerification(null);
-      setOtpCode('');
-      navigation.goBack();
-    } catch (verifyError) {
-      if (pendingContactVerification.type === 'phone') {
-        setPhone('');
-        await updateUserData({ phone: '', phoneNumber: '', phone_number: '' });
-      } else {
-        setEmail('');
-        await updateUserData({ email: '' });
-      }
-
-      setOtpError(verifyError?.message || 'Invalid OTP. Contact was not added.');
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  };
-
-  const handleResendContactOtp = async () => {
-    if (!pendingContactVerification || isResendingOtp || isVerifyingOtp) {
-      return;
-    }
-
-    setIsResendingOtp(true);
-    setOtpError('');
-
-    try {
-      await resendOtpService({
-        email: pendingContactVerification.type === 'email' ? pendingContactVerification.value : '',
-        phoneNumber: pendingContactVerification.type === 'phone' ? pendingContactVerification.value : '',
-      });
-    } catch (resendError) {
-      setOtpError(resendError?.message || 'Could not resend OTP.');
-    } finally {
-      setIsResendingOtp(false);
     }
   };
 
@@ -299,7 +246,7 @@ const EditProfileScreen = ({ navigation }) => {
             <LiftableTextInput
               value={email}
               onChangeText={setEmail}
-              editable={!isSaving}
+              editable={!isSaving && (missingContactType === 'email' || !missingContactType)}
               placeholder="Enter your email"
               placeholderTextColor={darkTheme.colors.muted}
               style={styles.input}
@@ -315,7 +262,7 @@ const EditProfileScreen = ({ navigation }) => {
             <LiftableTextInput
               value={phone}
               onChangeText={setPhone}
-              editable={!isSaving}
+              editable={!isSaving && (missingContactType === 'phone' || !missingContactType)}
               placeholder="Enter your phone number"
               placeholderTextColor={darkTheme.colors.muted}
               style={styles.input}
@@ -324,44 +271,10 @@ const EditProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {pendingContactVerification ? (
-          <View style={styles.otpSection}>
-            <AppText style={styles.otpTitle}>Verify {pendingContactVerification.type === 'phone' ? 'phone number' : 'email'}</AppText>
-            <AppText style={styles.otpSubtitle}>
-              Enter the OTP sent to {pendingContactVerification.value}
-            </AppText>
-            <View style={styles.inputWrap}>
-              <LiftableTextInput
-                value={otpCode}
-                onChangeText={setOtpCode}
-                editable={!isVerifyingOtp && !isResendingOtp}
-                placeholder="Enter OTP"
-                placeholderTextColor={darkTheme.colors.muted}
-                style={styles.input}
-                keyboardType="number-pad"
-              />
-            </View>
-            {otpError ? <AppText style={styles.otpError}>{otpError}</AppText> : null}
-            <View style={styles.otpActionsRow}>
-              <AppButton
-                label={isVerifyingOtp ? 'Verifying...' : 'Verify OTP'}
-                onPress={handleVerifyContactOtp}
-                disabled={isVerifyingOtp || isResendingOtp}
-                style={styles.otpVerifyBtn}
-                left={isVerifyingOtp ? <ActivityIndicator size="small" color="#000033" /> : null}
-              />
-              <TouchableOpacity
-                style={styles.otpResendBtn}
-                activeOpacity={0.85}
-                onPress={handleResendContactOtp}
-                disabled={isResendingOtp || isVerifyingOtp}
-              >
-                <AppText style={styles.otpResendText}>
-                  {isResendingOtp ? 'Resending...' : 'Resend OTP'}
-                </AppText>
-              </TouchableOpacity>
-            </View>
-          </View>
+        {missingContactType ? (
+          <AppText style={styles.helperText}>
+            Add your missing {missingContactType === 'email' ? 'email address' : 'phone number'} and tap Update to receive OTP.
+          </AppText>
         ) : null}
       </View>
 
@@ -457,50 +370,15 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.text,
     fontSize: 14,
   },
+  helperText: {
+    marginTop: 4,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   ctaWrap: {
     paddingHorizontal: darkTheme.spacing.lg,
     paddingBottom: darkTheme.spacing.xxl,
-  },
-  otpSection: {
-    marginTop: darkTheme.spacing.xs,
-    padding: darkTheme.spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  otpTitle: {
-    color: darkTheme.colors.text,
-    fontSize: 14,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  otpSubtitle: {
-    marginTop: 4,
-    marginBottom: darkTheme.spacing.sm,
-    color: darkTheme.colors.muted,
-    fontSize: 12,
-  },
-  otpError: {
-    marginTop: darkTheme.spacing.xs,
-    color: '#FF7B8A',
-    fontSize: 12,
-  },
-  otpActionsRow: {
-    marginTop: darkTheme.spacing.sm,
-  },
-  otpVerifyBtn: {
-    minHeight: 44,
-  },
-  otpResendBtn: {
-    marginTop: darkTheme.spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  otpResendText: {
-    color: darkTheme.colors.accent,
-    fontSize: 12,
-    fontWeight: darkTheme.typography.fontWeights.medium,
   },
 });
 

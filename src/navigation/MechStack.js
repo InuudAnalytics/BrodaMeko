@@ -6,6 +6,7 @@ import MechanicLiveTrackingScreen from '../screens/mech/assistance/MechanicLiveT
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
+import AddContactSuccessScreen from '../screens/carowner/profile/AddContactSuccessScreen';
 import {
   BankDetailsScreen,
   EditProfileScreen as MechanicEditProfileScreen,
@@ -104,6 +105,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.MECH_EDIT_PROFILE}
         component={MechanicEditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_ADD_CONTACT_SUCCESS}
+        component={AddContactSuccessScreen}
         options={{ headerShown: false }}
       />
       {isComplete ? (

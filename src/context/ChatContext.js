@@ -16,6 +16,7 @@ const ChatContext = createContext(undefined);
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_BASE_DELAY_MS = 800;
+const AUTH_CLOSE_CODES = new Set([1008, 4001, 4003, 4401, 4403]);
 
 const getConversationId = (conversation) => {
   if (!conversation || typeof conversation !== 'object') {
@@ -48,6 +49,10 @@ const extractConversations = (payload) => {
     return payload.results;
   }
 
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
   return [];
 };
 
@@ -72,27 +77,41 @@ const extractMessages = (payload) => {
     return payload.results;
   }
 
+  if (Array.isArray(payload.data)) {
+    return payload.data;
+  }
+
   return [];
 };
 
+const normalizeApiMessage = (item, fallbackConversationId = '') => {
+  const msgType = String(item?.msg_type || item?.message_type || item?.type || 'text').toLowerCase();
+  const senderRole = String(item?.sender_role || item?.sender || item?.sender_type || item?.role || '').toLowerCase();
+
+  return {
+    id: String(item?.id || item?._id || item?.message_id || `msg-${Date.now()}`),
+    conversation_id: String(
+      item?.conversation_id || item?.conversationId || item?.conversation || fallbackConversationId || ''
+    ).trim(),
+    type: msgType,
+    msg_type: msgType,
+    text: String(item?.content || item?.message || item?.text || '').trim(),
+    content: String(item?.content || item?.message || item?.text || '').trim(),
+    sender: senderRole,
+    sender_role: senderRole,
+    is_read: Boolean(item?.is_read),
+    created_at: item?.created_at || item?.createdAt || new Date().toISOString(),
+    status: item?.status || 'sent',
+  };
+};
+
 const normalizeIncomingMessage = (raw, fallbackConversationId) => {
-  const payload = raw?.message && typeof raw.message === 'object' ? raw.message : raw;
+  const payloadRoot = raw?.payload && typeof raw.payload === 'object' ? raw.payload : raw;
+  const payload = payloadRoot?.message && typeof payloadRoot.message === 'object' ? payloadRoot.message : payloadRoot;
   const conversationId = String(
     payload?.conversation_id || payload?.conversationId || payload?.conversation || fallbackConversationId || ''
   ).trim();
-
-  const text = String(payload?.content || payload?.message || payload?.text || '').trim();
-  const sender = String(payload?.sender || payload?.sender_type || payload?.role || 'other').trim().toLowerCase();
-
-  return {
-    id: String(payload?.id || payload?._id || payload?.message_id || `ws-${Date.now()}`),
-    conversation_id: conversationId,
-    type: String(payload?.type || payload?.message_type || 'text'),
-    text,
-    sender,
-    created_at: payload?.created_at || payload?.createdAt || new Date().toISOString(),
-    status: 'sent',
-  };
+  return normalizeApiMessage(payload, conversationId);
 };
 
 const isDuplicateMessage = (lastMessage, nextMessage) => {
@@ -130,12 +149,17 @@ export const ChatProvider = ({ children }) => {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [wsStatus, setWsStatus] = useState('idle');
   const [error, setError] = useState(null);
+  const messagesByConversationIdRef = useRef({});
 
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef(null);
   const manualDisconnectRef = useRef(false);
   const activeConversationIdRef = useRef('');
   const socketReadyRef = useRef(false);
+
+  useEffect(() => {
+    messagesByConversationIdRef.current = messagesByConversationId;
+  }, [messagesByConversationId]);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -177,6 +201,56 @@ export const ChatProvider = ({ children }) => {
     setWsStatus('disconnected');
   }, [clearReconnectTimer]);
 
+  const flushPendingMessages = useCallback((conversationId) => {
+    const safeConversationId = String(conversationId || '').trim();
+    if (!safeConversationId || !socketReadyRef.current) {
+      return;
+    }
+
+    const currentMessages = messagesByConversationIdRef.current[safeConversationId] || [];
+    const pending = currentMessages.filter(
+      (item) =>
+        String(item?.status || '').toLowerCase() === 'pending' &&
+        String(item?.text || item?.message || '').trim()
+    );
+
+    if (!pending.length) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const sentIds = new Set();
+
+    pending.forEach((item) => {
+      const didSend = send({
+        type: 'message',
+        conversation_id: safeConversationId,
+        content: String(item?.text || item?.message || '').trim(),
+      });
+
+      if (didSend) {
+        sentIds.add(String(item?.id || ''));
+      }
+    });
+
+    if (!sentIds.size) {
+      return;
+    }
+
+    setMessagesByConversationId((prev) => {
+      const nextConversationMessages = (prev[safeConversationId] || []).map((item) =>
+        sentIds.has(String(item?.id || ''))
+          ? { ...item, status: 'sent', created_at: nowIso }
+          : item
+      );
+
+      return {
+        ...prev,
+        [safeConversationId]: nextConversationMessages,
+      };
+    });
+  }, []);
+
   const connectChatSocket = useCallback((conversationId) => {
     const safeConversationId = String(conversationId || '').trim();
     const safeToken = String(token || '').trim();
@@ -184,6 +258,13 @@ export const ChatProvider = ({ children }) => {
     if (!safeConversationId || !safeToken) {
       setWsStatus('error');
       return false;
+    }
+
+    if (
+      activeConversationIdRef.current === safeConversationId &&
+      (wsStatus === 'connected' || wsStatus === 'connecting')
+    ) {
+      return true;
     }
 
     if (activeConversationIdRef.current !== safeConversationId) {
@@ -200,9 +281,14 @@ export const ChatProvider = ({ children }) => {
       (event) => {
         try {
           const parsed = JSON.parse(event?.data || '{}');
+          const eventType = String(parsed?.type || '').toLowerCase();
           const normalized = normalizeIncomingMessage(parsed, safeConversationId);
 
           if (!normalized.conversation_id || normalized.conversation_id !== activeConversationIdRef.current) {
+            return;
+          }
+
+          if (eventType === 'typing' || eventType === 'read' || eventType === 'error') {
             return;
           }
 
@@ -215,12 +301,20 @@ export const ChatProvider = ({ children }) => {
         socketReadyRef.current = true;
         reconnectAttemptsRef.current = 0;
         setWsStatus('connected');
+        flushPendingMessages(safeConversationId);
       },
-      () => {
+      (event) => {
         socketReadyRef.current = false;
         setWsStatus('disconnected');
 
         if (manualDisconnectRef.current) {
+          return;
+        }
+
+        const closeCode = Number(event?.code || 0);
+        if (AUTH_CLOSE_CODES.has(closeCode)) {
+          setWsStatus('error');
+          setError('Chat authorization expired. Please sign in again.');
           return;
         }
 
@@ -246,7 +340,7 @@ export const ChatProvider = ({ children }) => {
     );
 
     return true;
-  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, token]);
+  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, token, wsStatus]);
 
   const clearActiveConversation = useCallback(() => {
     disconnectChatSocket();
@@ -294,11 +388,14 @@ export const ChatProvider = ({ children }) => {
 
     try {
       const response = await getMessages(safeConversationId, { limit, offset });
-      const incomingMessages = extractMessages(response?.data);
+      const incomingMessages = extractMessages(response?.data).map((item) =>
+        normalizeApiMessage(item, safeConversationId)
+      );
+      const orderedMessages = [...incomingMessages].reverse();
 
       setMessagesByConversationId((prev) => {
         const existing = prev[safeConversationId] || [];
-        const next = Number(offset) > 0 ? [...existing, ...incomingMessages] : incomingMessages;
+        const next = Number(offset) > 0 ? [...orderedMessages, ...existing] : orderedMessages;
 
         return {
           ...prev,
@@ -356,6 +453,13 @@ export const ChatProvider = ({ children }) => {
       const conversationId = getConversationId(conversation);
 
       if (conversation && conversationId) {
+        setConversations((prev) => {
+          const exists = prev.some((item) => getConversationId(item) === conversationId);
+          if (exists) {
+            return prev;
+          }
+          return [conversation, ...prev];
+        });
         setActiveConversation(conversation);
         activeConversationIdRef.current = conversationId;
         await fetchMessages(conversationId, { limit: 50, offset: 0 });
@@ -526,20 +630,34 @@ export const ChatProvider = ({ children }) => {
       });
       return true;
     }
-
-    appendMessage(safeConversationId, {
-      id: `local-sent-${Date.now()}`,
-      conversation_id: safeConversationId,
-      type: 'text',
-      text: safeContent,
-      sender: 'me',
-      mocked: true,
-      created_at: new Date().toISOString(),
-      status: 'sent',
-    });
-
     return true;
-  }, [appendMessage, wsStatus]);
+  }, [wsStatus]);
+
+  const sendTypingEvent = useCallback((conversationId) => {
+    const safeConversationId = String(conversationId || '').trim();
+
+    if (!safeConversationId || !socketReadyRef.current || wsStatus !== 'connected') {
+      return false;
+    }
+
+    return send({
+      type: 'typing',
+      conversation_id: safeConversationId,
+    });
+  }, [wsStatus]);
+
+  const sendReadEvent = useCallback((conversationId) => {
+    const safeConversationId = String(conversationId || '').trim();
+
+    if (!safeConversationId || !socketReadyRef.current || wsStatus !== 'connected') {
+      return false;
+    }
+
+    return send({
+      type: 'read',
+      conversation_id: safeConversationId,
+    });
+  }, [wsStatus]);
 
   const retryPendingMessage = useCallback((conversationId, messageId) => {
     const safeConversationId = String(conversationId || '').trim();
@@ -596,7 +714,6 @@ export const ChatProvider = ({ children }) => {
 
     try {
       const response = await uploadConversationImages(safeConversationId, files);
-      const uploadedMessages = extractMessages(response?.data);
 
       setMessagesByConversationId((prev) => {
         const withoutPlaceholders = (prev[safeConversationId] || []).filter(
@@ -605,9 +722,7 @@ export const ChatProvider = ({ children }) => {
 
         return {
           ...prev,
-          [safeConversationId]: uploadedMessages.length
-            ? [...withoutPlaceholders, ...uploadedMessages]
-            : withoutPlaceholders,
+          [safeConversationId]: withoutPlaceholders,
         };
       });
 
@@ -659,6 +774,8 @@ export const ChatProvider = ({ children }) => {
       connectChatSocket,
       disconnectChatSocket,
       sendSocketMessage,
+      sendTypingEvent,
+      sendReadEvent,
       retryPendingMessage,
       addPendingSocketMessage,
       addMockTextMessage,
@@ -689,6 +806,8 @@ export const ChatProvider = ({ children }) => {
       connectChatSocket,
       disconnectChatSocket,
       sendSocketMessage,
+      sendTypingEvent,
+      sendReadEvent,
       retryPendingMessage,
       addPendingSocketMessage,
       addMockTextMessage,

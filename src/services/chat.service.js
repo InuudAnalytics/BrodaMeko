@@ -89,14 +89,37 @@ export const getConversations = async () => {
 
 export const getMessages = async (conversationId, { limit = 50, offset = 0 } = {}) => {
   const endpoint = buildMessagesEndpoint(conversationId, { limit, offset });
-  const response = await api.get(endpoint);
-  return response.data;
+  try {
+    const response = await api.get(endpoint);
+    return response.data;
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 0);
+    if (statusCode !== 404) {
+      throw error;
+    }
+
+    const fallbackEndpoint = endpoint.replace('/conversations/', '/conversation/');
+    const response = await api.get(fallbackEndpoint);
+    return response.data;
+  }
 };
 
 export const markAsRead = async (conversationId) => {
   const safeConversationId = assertConversationId(conversationId);
-  const response = await api.post(ENDPOINTS.chat.markConversationRead(safeConversationId), {});
-  return response.data;
+  const endpoint = ENDPOINTS.chat.markConversationRead(safeConversationId);
+
+  try {
+    const response = await api.patch(endpoint);
+    return response.data;
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 0);
+    if (statusCode !== 404 && statusCode !== 405) {
+      throw error;
+    }
+
+    const response = await api.post(endpoint, {});
+    return response.data;
+  }
 };
 
 export const uploadConversationImages = async (conversationId, images) => {
@@ -117,9 +140,22 @@ export const uploadConversationImages = async (conversationId, images) => {
     }
   });
 
-  const response = await api.post(ENDPOINTS.chat.uploadConversationImages(safeConversationId), formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  let response;
+  try {
+    response = await api.post(ENDPOINTS.chat.uploadConversationImages(safeConversationId), formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 0);
+    if (statusCode !== 404) {
+      throw error;
+    }
+
+    const fallbackEndpoint = `/api/v1/chat/conversation/${encodeURIComponent(String(safeConversationId || ''))}/images`;
+    response = await api.post(fallbackEndpoint, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  }
 
   return response.data;
 };

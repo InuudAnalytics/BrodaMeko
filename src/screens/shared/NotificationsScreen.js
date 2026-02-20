@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   Alert01Icon,
@@ -10,7 +11,9 @@ import {
   Wallet01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../components';
+import { useAuth, useChat } from '../../context';
 import { darkTheme } from '../../theme';
+import { ROLES, ROUTES } from '../../utils';
 
 const TABS = [
   { key: 'all', label: 'All notifications' },
@@ -86,20 +89,84 @@ const TYPE_UI = {
 };
 
 const NotificationsScreen = ({ navigation }) => {
+  const { role } = useAuth();
+  const { conversations, fetchConversations } = useChat();
   const [activeTab, setActiveTab] = useState('all');
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchConversations();
+    }, [fetchConversations])
+  );
+
+  const conversationNotifications = useMemo(() => {
+    if (role !== ROLES.MECH) {
+      return [];
+    }
+
+    return (Array.isArray(conversations) ? conversations : [])
+      .filter((item) => Number(item?.unread_count || item?.unreadCount || 0) > 0)
+      .slice(0, 5)
+      .map((item) => {
+        const conversationId = String(
+          item?.id || item?._id || item?.conversation_id || item?.conversationId || ''
+        ).trim();
+        const customerName =
+          item?.user?.name ||
+          item?.other_user?.name ||
+          item?.car_owner?.name ||
+          item?.participant_name ||
+          'Car owner';
+        const latestText =
+          item?.last_message?.text ||
+          item?.lastMessage?.text ||
+          item?.last_message ||
+          'New hire request';
+
+        return {
+          id: `conv-${conversationId}`,
+          type: 'jobs',
+          title: 'New hire request',
+          message: `${customerName}: ${latestText}`,
+          time: 'now',
+          read: false,
+          conversation: item,
+          conversationId,
+          kind: 'chat_request',
+        };
+      });
+  }, [conversations, role]);
+
+  const allNotifications = useMemo(
+    () => [...conversationNotifications, ...notifications],
+    [conversationNotifications, notifications]
+  );
+
   const filteredNotifications = useMemo(() => {
     if (activeTab === 'all') {
-      return notifications;
+      return allNotifications;
     }
-    return notifications.filter((item) => item.type === activeTab);
-  }, [activeTab, notifications]);
+    return allNotifications.filter((item) => item.type === activeTab);
+  }, [activeTab, allNotifications]);
 
   const markAsRead = (id) => {
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item))
     );
+  };
+
+  const handlePressNotification = (item) => {
+    if (item?.kind === 'chat_request' && item?.conversationId) {
+      navigation.navigate(ROUTES.MECH_CHAT, {
+        conversationId: item.conversationId,
+        conversation: item.conversation,
+        jobId: item?.conversation?.job_id || item?.conversation?.jobId || '',
+      });
+      return;
+    }
+
+    markAsRead(item.id);
   };
 
   return (
@@ -141,7 +208,7 @@ const NotificationsScreen = ({ navigation }) => {
                 key={item.id}
                 activeOpacity={0.88}
                 style={styles.card}
-                onPress={() => markAsRead(item.id)}
+                onPress={() => handlePressNotification(item)}
               >
                 <View style={[styles.iconWrap, { backgroundColor: ui.bg }]}>
                   <HugeiconsIcon icon={ui.icon} size={18} color={ui.color} strokeWidth={2} />

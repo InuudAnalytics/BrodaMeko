@@ -1,8 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, ArrowRight01Icon, StarIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
 import { getCarOwnerJobs } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
@@ -12,26 +12,35 @@ const MOCK_COMPLETED_JOBS = [
   {
     id: 'mock_1',
     jobId: 'mock_1',
-    mechanicName: 'Shittu Hassan',
-    issueSummary: 'Engine misfire - Toyota Camry',
-    rating: 4.9,
-    amount: 19980,
+    mechanicName: 'Emeka Nwosu',
+    issueSummary: 'Flat Tire Replacement - Toyota',
+    rating: 4.6,
+    amount: 8500,
+    hasAmount: true,
+    status: 'completed',
+    avatarUrl: 'https://i.pravatar.cc/100?img=12',
   },
   {
     id: 'mock_2',
     jobId: 'mock_2',
-    mechanicName: 'Emeka Okafor',
-    issueSummary: 'Battery problem - Honda Accord',
-    rating: 4.7,
-    amount: 8400,
+    mechanicName: 'Tunde Bakare',
+    issueSummary: 'Battery Jump Start - Toyota',
+    rating: 4.6,
+    amount: 5000,
+    hasAmount: true,
+    status: 'pending',
+    avatarUrl: 'https://i.pravatar.cc/100?img=15',
   },
   {
     id: 'mock_3',
     jobId: 'mock_3',
-    mechanicName: 'Chidi Nwosu',
-    issueSummary: 'Brake service - Nissan Altima',
-    rating: 4.8,
-    amount: 9300,
+    mechanicName: 'Chidi Okafor',
+    issueSummary: 'Engine Diagnostics - Mercedes AMG 2025',
+    rating: 4.6,
+    amount: 8900,
+    hasAmount: true,
+    status: 'cancelled',
+    avatarUrl: 'https://i.pravatar.cc/100?img=65',
   },
 ];
 
@@ -41,14 +50,33 @@ const toCurrency = (amount) => {
   return `₦${value.toLocaleString('en-NG')}`;
 };
 
+const toTitleCaseWords = (value) => {
+  return String(value || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+const normalizeIssueType = (value) => {
+  const safe = String(value || '').trim();
+  if (!safe) {
+    return 'Car service';
+  }
+
+  return toTitleCaseWords(safe.replace(/[_-]+/g, ' '));
+};
+
 const normalizeJob = (job, index) => {
-  const amount =
-    job?.amount ||
-    job?.price ||
-    job?.total_fee ||
-    job?.total ||
-    job?.quoted_price ||
-    0;
+  const amountRaw =
+    job?.amount ??
+    job?.price ??
+    job?.total_fee ??
+    job?.total ??
+    job?.quoted_price;
+  const hasAmount = amountRaw !== undefined && amountRaw !== null && String(amountRaw).trim() !== '';
+  const amount = hasAmount ? Number(amountRaw) || 0 : 0;
 
   const issue =
     job?.issue ||
@@ -58,25 +86,28 @@ const normalizeJob = (job, index) => {
     'Car service';
 
   const vehicle = job?.car_make || job?.vehicle || '';
+  const safeStatus = String(job?.status || 'pending').toLowerCase();
 
   const mechanicName =
     job?.mechanic?.name ||
     job?.mechanic_name ||
     job?.provider?.name ||
-    'Assigned mechanic';
+    (safeStatus === 'pending' ? 'Awaiting assignment' : 'Assigned mechanic');
 
-  const rating =
-    Number(job?.rating || job?.mechanic?.rating || job?.provider?.rating || 4.8);
-
+  const rating = Number(job?.rating || job?.mechanic?.rating || job?.provider?.rating || 4.6);
   const jobId = String(job?.id || job?._id || job?.job_id || `job-${index}`);
+  const avatarUrl = job?.mechanic?.avatar || job?.mechanic_avatar || job?.provider?.avatar || null;
 
   return {
     id: jobId,
     jobId,
     mechanicName,
-    issueSummary: vehicle ? `${issue} - ${vehicle}` : issue,
-    rating: Number.isFinite(rating) ? rating : 4.8,
-    amount: Number(amount) || 0,
+    issueSummary: vehicle ? `${normalizeIssueType(issue)} - ${vehicle}` : normalizeIssueType(issue),
+    rating: Number.isFinite(rating) ? rating : 4.6,
+    amount,
+    hasAmount,
+    status: safeStatus,
+    avatarUrl,
   };
 };
 
@@ -121,38 +152,65 @@ const HistorySkeleton = () => {
   );
 };
 
-const JobHistoryCard = ({ item, onViewDetails }) => {
+const JobHistoryCard = ({ item, onViewDetails, onRate }) => {
+  const isCancelled = item.status === 'cancelled';
+  const isCompleted = item.status === 'completed';
+  const statusLabel = isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : 'Pending';
+  const statusTextColor = isCancelled ? '#E85578' : isCompleted ? '#4CC968' : '#C8CCD8';
+
   return (
     <View style={styles.card}>
-      <View style={styles.cardTopRow}>
-        <View style={styles.cardTopLeft}>
-          <AppText style={styles.mechanicName}>{item.mechanicName}</AppText>
-          <AppText style={styles.issueSummary}>{item.issueSummary}</AppText>
-        </View>
-        <AppText style={styles.amount}>{toCurrency(item.amount)}</AppText>
-      </View>
+      <View style={styles.cardHeaderRow}>
+        <View style={styles.profileBlock}>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarFallback} />
+          )}
 
-      <View style={styles.ratingRow}>
-        <HugeiconsIcon icon={StarIcon} size={14} color={darkTheme.colors.accent} strokeWidth={2} />
-        <AppText style={styles.ratingText}>{item.rating.toFixed(1)}</AppText>
+          <View style={styles.profileTextWrap}>
+            <AppText style={styles.mechanicName}>{item.mechanicName}</AppText>
+            <AppText style={styles.issueSummary} numberOfLines={1}>
+              {item.issueSummary}
+            </AppText>
+
+            <View style={styles.ratingRow}>
+              {[1, 2, 3, 4].map((star) => (
+                <HugeiconsIcon key={star} icon={StarIcon} size={12} color="#FFB800" strokeWidth={2} />
+              ))}
+              <AppText style={styles.ratingText}>{item.rating.toFixed(1)}</AppText>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.cardRight}>
+          <View
+            style={[
+              styles.statusBadge,
+              isCancelled
+                ? styles.statusBadgeCancelled
+                : isCompleted
+                  ? styles.statusBadgeCompleted
+                  : styles.statusBadgePending,
+            ]}
+          >
+            <AppText style={[styles.statusText, { color: statusTextColor }]}>{statusLabel}</AppText>
+          </View>
+          <AppText style={styles.amount}>{item.hasAmount ? toCurrency(item.amount) : '--'}</AppText>
+        </View>
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.actionBtn, styles.actionBtnOutline]}
-          onPress={onViewDetails}
-        >
-          <AppText style={styles.actionBtnOutlineText}>View details</AppText>
+        <TouchableOpacity activeOpacity={0.85} style={[styles.actionBtn, styles.actionBtnView]} onPress={onViewDetails}>
+          <AppText style={styles.actionBtnViewText}>View details</AppText>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[styles.actionBtn, styles.actionBtnFilled]}
-          onPress={() => Alert.alert('Rebook', 'Rebook flow coming soon.')}
+          style={[styles.actionBtn, styles.actionBtnRate]}
+          onPress={onRate}
         >
-          <AppText style={styles.actionBtnFilledText}>Rebook</AppText>
-          <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="#1A1A1A" strokeWidth={2} />
+          <AppText style={styles.actionBtnRateText}>Rate</AppText>
         </TouchableOpacity>
       </View>
     </View>
@@ -173,12 +231,7 @@ const HistoryScreen = ({ navigation }) => {
     try {
       const response = await getCarOwnerJobs({ limit: 10, page: 1 });
       const rawJobs = pickJobsFromResponse(response?.data);
-      const hasStatusField = rawJobs.some((job) => Object.prototype.hasOwnProperty.call(job || {}, 'status'));
-      const filteredJobs = hasStatusField
-        ? rawJobs.filter((job) => String(job?.status || '').toLowerCase() === 'completed')
-        : rawJobs;
-
-      setJobs(filteredJobs.map(normalizeJob));
+      setJobs(rawJobs.map(normalizeJob));
     } catch (requestError) {
       const statusCode = Number(requestError?.statusCode || 0);
       const shouldUseMockFallback = statusCode === 0 || statusCode === 401;
@@ -218,8 +271,8 @@ const HistoryScreen = ({ navigation }) => {
     if (!jobs.length) {
       return (
         <View style={styles.stateWrap}>
-          <AppText style={styles.stateTitle}>No completed jobs yet</AppText>
-          <AppText style={styles.stateText}>Completed bookings will appear here once they are done.</AppText>
+          <AppText style={styles.stateTitle}>No history yet</AppText>
+          <AppText style={styles.stateText}>Your completed, pending, or cancelled bookings will appear here.</AppText>
         </View>
       );
     }
@@ -234,6 +287,16 @@ const HistoryScreen = ({ navigation }) => {
             key={item.id}
             item={item}
             onViewDetails={() => navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, { jobId: item.jobId })}
+            onRate={() =>
+              navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DETAILS, {
+                jobId: item.jobId,
+                preview: {
+                  mechanicName: item.mechanicName,
+                  rating: item.rating,
+                  avatarUrl: item.avatarUrl,
+                },
+              })
+            }
           />
         ))}
       </View>
@@ -250,7 +313,6 @@ const HistoryScreen = ({ navigation }) => {
           <AppText style={styles.heading}>History</AppText>
           <View style={styles.backButtonSpacer} />
         </View>
-        <AppText style={styles.subText}>Completed jobs</AppText>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {content}
@@ -265,19 +327,19 @@ const HistoryScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: '#010037',
   },
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: 14,
+    paddingTop: 10,
   },
   header: {
     minHeight: 42,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    marginBottom: 2,
+    marginBottom: 12,
   },
   backButton: {
     width: 36,
@@ -297,18 +359,11 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  subText: {
-    marginBottom: 10,
-    color: darkTheme.colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
   content: {
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   list: {
-    rowGap: 10,
+    rowGap: 12,
   },
   fallbackHint: {
     color: darkTheme.colors.muted,
@@ -317,79 +372,121 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   card: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    padding: 12,
+    borderRadius: 18,
+    backgroundColor: '#2A2B66',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
-  cardTopRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    columnGap: 10,
+    columnGap: 12,
   },
-  cardTopLeft: {
+  profileBlock: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginRight: 10,
+  },
+  avatarFallback: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    marginRight: 10,
+    backgroundColor: '#575A86',
+  },
+  profileTextWrap: {
     flex: 1,
   },
   mechanicName: {
-    color: darkTheme.colors.text,
-    fontSize: 15,
+    color: '#FFFFFF',
+    fontSize: 17,
     lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   issueSummary: {
-    marginTop: 2,
-    color: darkTheme.colors.muted,
-    fontSize: 12,
+    marginTop: 1,
+    color: '#AEB0CC',
+    fontSize: 14,
     lineHeight: 16,
   },
+  cardRight: {
+    alignItems: 'flex-end',
+    minWidth: 90,
+  },
+  statusBadge: {
+    minHeight: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  statusBadgeCompleted: {
+    backgroundColor: 'rgba(36, 182, 85, 0.24)',
+  },
+  statusBadgeCancelled: {
+    backgroundColor: 'rgba(232, 77, 111, 0.24)',
+  },
+  statusBadgePending: {
+    backgroundColor: 'rgba(154, 161, 181, 0.28)',
+  },
+  statusText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
   amount: {
-    color: darkTheme.colors.accent,
-    fontSize: 16,
-    lineHeight: 20,
+    marginTop: 18,
+    color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   ratingRow: {
-    marginTop: 8,
+    marginTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: 4,
+    columnGap: 2,
   },
   ratingText: {
-    color: darkTheme.colors.text,
+    marginLeft: 3,
+    color: '#B7B9D1',
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 14,
   },
   actionsRow: {
-    marginTop: 10,
+    marginTop: 14,
     flexDirection: 'row',
-    columnGap: 8,
+    columnGap: 12,
   },
   actionBtn: {
     flex: 1,
     minHeight: 38,
-    borderRadius: 10,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    columnGap: 6,
   },
-  actionBtnOutline: {
+  actionBtnView: {
+    backgroundColor: '#8C8EAD',
+  },
+  actionBtnViewText: {
+    color: '#D6D8E9',
+    fontSize: 15,
+  },
+  actionBtnRate: {
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
+    borderColor: '#A0C21F',
     backgroundColor: 'transparent',
   },
-  actionBtnOutlineText: {
-    color: darkTheme.colors.muted,
-    fontSize: 13,
-  },
-  actionBtnFilled: {
-    backgroundColor: darkTheme.colors.accent,
-  },
-  actionBtnFilledText: {
-    color: '#1A1A1A',
-    fontSize: 13,
+  actionBtnRateText: {
+    color: '#B6D62D',
+    fontSize: 15,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   stateWrap: {
@@ -416,14 +513,12 @@ const styles = StyleSheet.create({
     minWidth: 140,
   },
   skeletonWrap: {
-    rowGap: 10,
+    rowGap: 12,
   },
   skeletonCard: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    padding: 12,
+    borderRadius: 18,
+    backgroundColor: '#2A2B66',
+    padding: 14,
   },
   skeletonLineWide: {
     width: '70%',
@@ -457,7 +552,7 @@ const styles = StyleSheet.create({
   skeletonBtn: {
     flex: 1,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
 });

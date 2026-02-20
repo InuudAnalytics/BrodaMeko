@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Animated,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -72,16 +74,6 @@ const isSenderMe = (item, currentUserRole) => {
 };
 
 const getMessageText = (item) => {
-  if (item?.type === 'image') {
-    if (item?.status === 'uploading') {
-      return 'Uploading image...';
-    }
-    if (item?.status === 'upload-failed') {
-      return 'Image upload failed';
-    }
-    return 'Image sent';
-  }
-
   const baseText = item?.text || item?.message || '';
   return item?.status === 'pending' ? `${baseText} (pending)` : baseText;
 };
@@ -121,6 +113,33 @@ const MessageBubble = ({ item, currentUserRole, onAcceptPrice, onDeclinePrice, o
 
   const isMe = isSenderMe(item, currentUserRole);
   const isPendingMine = isMe && item?.status === 'pending';
+  const isImageMessage = String(item?.type || item?.msg_type || '').toLowerCase() === 'image';
+
+  if (isImageMessage) {
+    const imageUri = String(item?.content || item?.text || item?.uri || '').trim();
+
+    return (
+      <Pressable
+        style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowOther]}
+        onPress={() => {
+          if (isPendingMine) {
+            onRetryPending?.(item);
+          }
+        }}
+      >
+        <View style={[styles.bubble, isMe ? styles.meBubble : styles.otherBubble]}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.messageImage} />
+          ) : (
+            <AppText style={[styles.messageText, isMe ? styles.meMessageText : styles.otherMessageText]}>
+              Image unavailable
+            </AppText>
+          )}
+        </View>
+        <AppText style={styles.timestamp}>{item?.timestamp || formatTime(item?.created_at)}</AppText>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -152,14 +171,15 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     messagesByConversationId,
     fetchMessages,
     markConversationRead,
-    openConversation,
     connectChatSocket,
     disconnectChatSocket,
     sendSocketMessage,
+    sendReadEvent,
     retryPendingMessage,
     addPendingSocketMessage,
     addMockTextMessage,
     addLocalMessage,
+    sendTypingEvent,
     sendQuotation,
     respondQuotation,
     initiatePaymentForJob,
@@ -180,6 +200,16 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [selectedQuoteMessage, setSelectedQuoteMessage] = useState(null);
   const [paying, setPaying] = useState(false);
+  const typingLastSentAtRef = useRef(0);
+
+  const syncReadState = useCallback(async () => {
+    if (!hasRealConversation) {
+      return;
+    }
+
+    await markConversationRead(conversationId);
+    sendReadEvent(conversationId);
+  }, [conversationId, hasRealConversation, markConversationRead, sendReadEvent]);
 
   useEffect(() => {
     let mounted = true;
@@ -189,15 +219,13 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
         return;
       }
 
-      if (route?.params?.conversation) {
-        await openConversation(route.params.conversation);
-      } else {
-        await fetchMessages(conversationId, { limit: 50, offset: 0 });
-      }
+      await fetchMessages(conversationId, { limit: 50, offset: 0 });
 
       if (mounted) {
-        await markConversationRead(conversationId);
-        connectChatSocket(conversationId);
+        await syncReadState();
+        if (wsStatus !== 'connected' && wsStatus !== 'connecting') {
+          connectChatSocket(conversationId);
+        }
       }
     };
 
@@ -213,10 +241,27 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     disconnectChatSocket,
     fetchMessages,
     hasRealConversation,
-    markConversationRead,
-    openConversation,
-    route?.params?.conversation,
+    syncReadState,
+    wsStatus,
   ]);
+
+  useEffect(() => {
+    if (!hasRealConversation) {
+      return undefined;
+    }
+
+    const sub = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        await fetchMessages(conversationId, { limit: 50, offset: 0 });
+        await syncReadState();
+        if (wsStatus !== 'connected' && wsStatus !== 'connecting') {
+          connectChatSocket(conversationId);
+        }
+      }
+    });
+
+    return () => sub.remove();
+  }, [connectChatSocket, conversationId, fetchMessages, hasRealConversation, syncReadState, wsStatus]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -363,8 +408,10 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
       navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
         jobId: route?.params?.jobId,
         mechanicId: route?.params?.mechanicId,
+        conversationId,
         agreedPrice: message?.amount || null,
         mechanic: route?.params?.mechanic,
+        issueSummary: route?.params?.issueSummary,
       });
     } finally {
       setPaying(false);
@@ -469,6 +516,11 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
             ListHeaderComponent={<AppText style={styles.todayLabel}>Today</AppText>}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            onMomentumScrollEnd={() => {
+              if (hasRealConversation) {
+                syncReadState();
+              }
+            }}
           />
         ) : (
           <View style={styles.emptyStateWrap}>
@@ -500,6 +552,16 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
               if (isSettingPrice) {
                 setInputValue(String(value || '').replace(/\D/g, ''));
                 return;
+              }
+
+              const now = Date.now();
+              if (
+                hasRealConversation &&
+                String(value || '').trim().length > 0 &&
+                now - typingLastSentAtRef.current >= 1000
+              ) {
+                sendTypingEvent(conversationId);
+                typingLastSentAtRef.current = now;
               }
               setInputValue(value);
             }}
@@ -640,6 +702,12 @@ const styles = StyleSheet.create({
   otherBubble: { backgroundColor: '#F3F4F6', borderBottomLeftRadius: 6 },
   meBubble: { backgroundColor: darkTheme.colors.accent, borderBottomRightRadius: 6 },
   messageText: { fontSize: darkTheme.typography.fontSizes.sm, lineHeight: 20 },
+  messageImage: {
+    width: 190,
+    height: 170,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
   otherMessageText: { color: '#303030' },
   meMessageText: { color: '#1A1A1A' },
   timestamp: { marginTop: 4, color: darkTheme.colors.muted, fontSize: 12, lineHeight: 16 },

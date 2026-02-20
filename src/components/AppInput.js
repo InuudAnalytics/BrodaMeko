@@ -1,7 +1,6 @@
 import React from 'react';
-import { Animated, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { darkTheme } from '../theme';
-import useKeyboardLift from '../utils/useKeyboardLift';
 import AppText from './AppText';
 
 const radius = darkTheme.radius || { md: 12, lg: 16, xl: 20 };
@@ -24,21 +23,13 @@ const AppInput = ({
   onBlur,
   ...rest
 }) => {
-  const [isFocused, setIsFocused] = React.useState(false);
-  const { targetRef, animatedStyle } = useKeyboardLift({
-    enabled: isFocused,
-    extraOffset: 16,
-    anchor: 'center',
-  });
-
   return (
-    <Animated.View style={[styles.container, containerStyle, animatedStyle]}>
+    <View style={[styles.container, containerStyle]}>
       {label ? <AppText variant="muted" style={[styles.label, labelStyle]}>{label}</AppText> : null}
 
       <View style={styles.inputWrap}>
         {left ? <View style={styles.left}>{left}</View> : null}
         <TextInput
-          ref={targetRef}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -47,24 +38,14 @@ const AppInput = ({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={autoCorrect}
-          onFocus={(event) => {
-            setIsFocused(true);
-            if (typeof onFocus === 'function') {
-              onFocus(event);
-            }
-          }}
-          onBlur={(event) => {
-            setIsFocused(false);
-            if (typeof onBlur === 'function') {
-              onBlur(event);
-            }
-          }}
+          onFocus={onFocus}
+          onBlur={onBlur}
           style={[styles.input, inputStyle]}
           {...rest}
         />
         {right ? <View style={styles.right}>{right}</View> : null}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 

@@ -183,9 +183,9 @@ const ServicePricingScreen = ({ navigation, route }) => {
   const [rows, setRows] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [rowLoadingId, setRowLoadingId] = useState('');
+  const [rowLoadingMap, setRowLoadingMap] = useState({});
   const [globalErrorText, setGlobalErrorText] = useState('');
-  const [rowError, setRowError] = useState({ rowId: '', message: '' });
+  const [rowErrors, setRowErrors] = useState({});
   React.useEffect(() => {
     if (!isOnboarding) {
       return;
@@ -203,7 +203,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
     const fetchServices = async () => {
       setLoadingServices(true);
       setGlobalErrorText('');
-      setRowError({ rowId: '', message: '' });
+      setRowErrors({});
 
       try {
         const response = await getMyMechanicServices();
@@ -220,9 +220,8 @@ const ServicePricingScreen = ({ navigation, route }) => {
         }
         const fallbackRow = makeRow();
         setRows([fallbackRow]);
-        setRowError({
-          rowId: fallbackRow.id,
-          message: fetchError?.message || 'Could not load current services.',
+        setRowErrors({
+          [fallbackRow.id]: fetchError?.message || 'Could not load current services.',
         });
       } finally {
         if (active) {
@@ -255,7 +254,14 @@ const ServicePricingScreen = ({ navigation, route }) => {
   const updateRow = (rowId, patch) => {
     setRows((prev) => prev.map((row) => (row.id === rowId ? { ...row, ...patch } : row)));
     setGlobalErrorText('');
-    setRowError((prev) => (prev.rowId === rowId ? { rowId: '', message: '' } : prev));
+    setRowErrors((prev) => {
+      if (!prev[rowId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[rowId];
+      return next;
+    });
   };
 
   const addRow = () => {
@@ -271,7 +277,14 @@ const ServicePricingScreen = ({ navigation, route }) => {
       return next.length ? next : [makeRow()];
     });
     setGlobalErrorText('');
-    setRowError((prev) => (prev.rowId === rowId ? { rowId: '', message: '' } : prev));
+    setRowErrors((prev) => {
+      if (!prev[rowId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[rowId];
+      return next;
+    });
   };
 
   const validateRow = (row) => {
@@ -296,13 +309,20 @@ const ServicePricingScreen = ({ navigation, route }) => {
   const upsertRow = async (row) => {
     const validationError = validateRow(row);
     if (validationError) {
-      setRowError({ rowId: row.id, message: validationError });
+      setRowErrors((prev) => ({ ...prev, [row.id]: validationError }));
       return false;
     }
 
-    setRowLoadingId(row.id);
+    setRowLoadingMap((prev) => ({ ...prev, [row.id]: true }));
     setGlobalErrorText('');
-    setRowError({ rowId: '', message: '' });
+    setRowErrors((prev) => {
+      if (!prev[row.id]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[row.id];
+      return next;
+    });
 
     try {
       if (row.isExisting && row.serviceId) {
@@ -316,29 +336,74 @@ const ServicePricingScreen = ({ navigation, route }) => {
         return true;
       }
 
-      await addMechanicService({
+      const response = await addMechanicService({
         issue_type: row.issue_type,
         min_price: Number(row.min_price),
         max_price: Number(row.max_price),
       });
 
-      const response = await getMyMechanicServices();
-      const nextRows = readServices(response).map(mapServiceToRow);
-      setRows(nextRows.length ? nextRows : [makeRow()]);
+      const createdService =
+        response?.data?.service ||
+        response?.service ||
+        response?.data?.data?.service ||
+        response?.data?.data ||
+        response?.data ||
+        null;
+      const createdServiceId = String(
+        createdService?.id || createdService?._id || createdService?.service_id || ''
+      ).trim();
+
+      if (createdServiceId) {
+        setRows((prev) =>
+          prev.map((item) =>
+            item.id === row.id
+              ? {
+                  ...item,
+                  serviceId: createdServiceId,
+                  isExisting: true,
+                  isEditing: false,
+                }
+              : item
+          )
+        );
+        return true;
+      }
+
+      const refreshResponse = await getMyMechanicServices();
+      const persistedRows = readServices(refreshResponse).map(mapServiceToRow);
+      setRows((prev) => {
+        const remainingUnsavedRows = prev.filter((item) => !item.isExisting && item.id !== row.id);
+        const nextRows = [...persistedRows, ...remainingUnsavedRows];
+        return nextRows.length ? nextRows : [makeRow()];
+      });
       return true;
     } catch (serviceError) {
-      setRowError({ rowId: row.id, message: serviceError?.message || 'Could not save service.' });
+      setRowErrors((prev) => ({
+        ...prev,
+        [row.id]: serviceError?.message || 'Could not save service.',
+      }));
       return false;
     } finally {
-      setRowLoadingId('');
+      setRowLoadingMap((prev) => {
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
     }
   };
 
   const handleDeleteRow = async (row) => {
     if (row.isExisting && row.serviceId) {
-      setRowLoadingId(row.id);
+      setRowLoadingMap((prev) => ({ ...prev, [row.id]: true }));
       setGlobalErrorText('');
-      setRowError({ rowId: '', message: '' });
+      setRowErrors((prev) => {
+        if (!prev[row.id]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[row.id];
+        return next;
+      });
       try {
         await deleteMechanicService(row.serviceId);
         setRows((prev) => {
@@ -346,9 +411,16 @@ const ServicePricingScreen = ({ navigation, route }) => {
           return next.length ? next : [makeRow()];
         });
       } catch (deleteError) {
-        setRowError({ rowId: row.id, message: deleteError?.message || 'Could not remove service.' });
+        setRowErrors((prev) => ({
+          ...prev,
+          [row.id]: deleteError?.message || 'Could not remove service.',
+        }));
       } finally {
-        setRowLoadingId('');
+        setRowLoadingMap((prev) => {
+          const next = { ...prev };
+          delete next[row.id];
+          return next;
+        });
       }
       return;
     }
@@ -356,19 +428,47 @@ const ServicePricingScreen = ({ navigation, route }) => {
     removeRow(row.id);
   };
 
+  const handleAddMore = async (row) => {
+    if (!row || saving) {
+      return;
+    }
+
+    const hasAnyInput = Boolean(row.issue_type || row.min_price || row.max_price);
+    if (row.isExisting || !hasAnyInput) {
+      addRow();
+      return;
+    }
+
+    const ok = await upsertRow(row);
+    if (!ok) {
+      return;
+    }
+
+    addRow();
+  };
+
   const handleDone = async () => {
     setSaving(true);
     setGlobalErrorText('');
-    setRowError({ rowId: '', message: '' });
+    setRowErrors({});
 
     try {
-      const pendingRows = rows.filter((row) => !row.isExisting && row.issue_type && row.min_price && row.max_price);
+      const pendingRows = rows.filter(
+        (row) => !row.isExisting && (row.issue_type || row.min_price || row.max_price)
+      );
+      const failedRowIds = [];
+
       for (let index = 0; index < pendingRows.length; index += 1) {
         const ok = await upsertRow(pendingRows[index]);
         if (!ok) {
-          setSaving(false);
-          return;
+          failedRowIds.push(pendingRows[index].id);
         }
+      }
+
+      if (failedRowIds.length) {
+        setGlobalErrorText('Some services could not be saved. Review the highlighted rows.');
+        setSaving(false);
+        return;
       }
 
       const persistedResponse = await getMyMechanicServices();
@@ -380,7 +480,10 @@ const ServicePricingScreen = ({ navigation, route }) => {
 
       if (!Object.keys(pricingMap).length) {
         const firstRowId = rows?.[0]?.id || '';
-        setRowError({ rowId: firstRowId, message: 'Add at least one service estimate before continuing.' });
+        setRowErrors((prev) => ({
+          ...prev,
+          [firstRowId]: 'Add at least one service estimate before continuing.',
+        }));
         setSaving(false);
         return;
       }
@@ -427,7 +530,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen} keyboardAware={false}>
       <KeyboardAvoidingView
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -466,7 +569,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
           {globalErrorText ? <AppText style={styles.errorText}>{globalErrorText}</AppText> : null}
           {rows.map((row, index) => {
             const rowOptions = availableOptionsForRow(row.id);
-            const busy = rowLoadingId === row.id || saving;
+            const busy = Boolean(rowLoadingMap[row.id]) || saving;
 
             return (
               <View key={row.id} style={styles.rowCard} onLayout={(event) => handleRowLayout(row.id, event)}>
@@ -553,15 +656,15 @@ const ServicePricingScreen = ({ navigation, route }) => {
                       activeOpacity={0.85}
                       style={styles.rowAction}
                       disabled={busy}
-                      onPress={addRow}
+                      onPress={() => handleAddMore(row)}
                     >
                       <AppText style={styles.rowActionText}>Add more</AppText>
                     </TouchableOpacity>
                   ) : null}
                 </View>
 
-                {rowError.rowId === row.id && rowError.message ? (
-                  <AppText style={styles.errorText}>{rowError.message}</AppText>
+                {rowErrors[row.id] ? (
+                  <AppText style={styles.errorText}>{rowErrors[row.id]}</AppText>
                 ) : null}
               </View>
             );

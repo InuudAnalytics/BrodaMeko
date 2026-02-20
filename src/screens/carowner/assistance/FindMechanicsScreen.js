@@ -172,17 +172,6 @@ const normalizeIssueSummary = (job) => {
   };
 };
 
-const formatIssueSummaryForMessage = (summary) => {
-  const parts = [
-    summary?.issueType ? `Issue: ${summary.issueType}` : '',
-    summary?.description ? `Description: ${summary.description}` : '',
-    summary?.carMake ? `Car make: ${summary.carMake}` : '',
-    Array.isArray(summary?.images) && summary.images.length ? `Images: ${summary.images.length}` : '',
-  ].filter(Boolean);
-
-  return parts.length ? parts.join(' | ') : 'New service request created.';
-};
-
 const HireButton = ({ onPress, loading }) => {
   return (
     <Pressable onPress={onPress} disabled={loading} style={[styles.hireButton, loading ? styles.hireButtonBusy : null]}>
@@ -243,7 +232,7 @@ const MechanicCard = ({ item, loading, onHire }) => {
 };
 
 const FindMechanicsScreen = ({ navigation, route }) => {
-  const { startConversation, addLocalMessage } = useChat();
+  const { startConversation } = useChat();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadingMechanicId, setLoadingMechanicId] = useState(null);
@@ -295,21 +284,12 @@ const FindMechanicsScreen = ({ navigation, route }) => {
         conversation?.id || conversation?._id || conversation?.conversation_id || conversation?.conversationId || ''
       ).trim();
 
-      if (conversationId) {
-        addLocalMessage(conversationId, {
-          type: 'system',
-          text: formatIssueSummaryForMessage(issueSummary),
-          sender: 'user',
-        });
-      }
-
-      navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
+      navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
         mechanic,
         jobId,
         mechanicId: mechanic.id,
         conversationId,
         conversation,
-        trackingStatus: 'waiting_acceptance',
         issueSummary,
       });
     } catch (hireError) {

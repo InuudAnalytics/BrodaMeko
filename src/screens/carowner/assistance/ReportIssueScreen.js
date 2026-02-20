@@ -273,10 +273,7 @@ const ReportIssueScreen = ({ navigation }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [descriptionY, setDescriptionY] = useState(0);
-  const [carMakeY, setCarMakeY] = useState(0);
   const isCreatingJob = Boolean(jobsContext?.loading?.createJob);
-  const scrollRef = React.useRef(null);
 
   const activeGroup = useMemo(
     () => ISSUE_GROUPS.find((group) => group.key === activeGroupKey) || ISSUE_GROUPS[0],
@@ -440,22 +437,10 @@ const ReportIssueScreen = ({ navigation }) => {
     }
   };
 
-  const focusInputAtCenter = (yPosition) => {
-    if (!scrollRef.current || !Number.isFinite(yPosition)) {
-      return;
-    }
-
-    const targetY = Math.max(0, yPosition - 140);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: targetY, animated: true });
-    });
-  };
-
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} keyboardAware={false}>
       <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
-        ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -503,7 +488,7 @@ const ReportIssueScreen = ({ navigation }) => {
 
         {errors.issue ? <AppText style={styles.errorText}>{errors.issue}</AppText> : null}
 
-        <View onLayout={(event) => setDescriptionY(event.nativeEvent.layout.y)}>
+        <View>
           <AppInput
             label={selectedIssueType === 'other' ? 'Description (required)' : 'Description (optional)'}
             placeholder={
@@ -518,7 +503,6 @@ const ReportIssueScreen = ({ navigation }) => {
               setDescription(text);
               setErrors((prev) => ({ ...prev, description: '', submit: '' }));
             }}
-            onFocus={() => focusInputAtCenter(descriptionY)}
             multiline
             textAlignVertical="top"
             inputStyle={styles.descriptionInput}
@@ -526,7 +510,7 @@ const ReportIssueScreen = ({ navigation }) => {
         </View>
         {errors.description ? <AppText style={styles.errorText}>{errors.description}</AppText> : null}
 
-        <View onLayout={(event) => setCarMakeY(event.nativeEvent.layout.y)}>
+        <View>
           <AppInput
             label="Car make"
             placeholder="Toyota Corolla"
@@ -535,7 +519,6 @@ const ReportIssueScreen = ({ navigation }) => {
               setCarMake(text);
               setErrors((prev) => ({ ...prev, carMake: '', submit: '' }));
             }}
-            onFocus={() => focusInputAtCenter(carMakeY)}
             autoCapitalize="words"
           />
         </View>

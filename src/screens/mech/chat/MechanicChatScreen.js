@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppText } from '../../../components';
@@ -7,7 +7,8 @@ import { ROLES, ROUTES } from '../../../utils';
 const MechanicChatScreen = ({ navigation, route }) => {
     const jobId = route?.params?.jobId;
     const mechanicId = route?.params?.mechanicId;
-    const hasValidParams = Boolean(jobId && mechanicId);
+    const conversationId = String(route?.params?.conversationId || '').trim();
+    const hasValidParams = Boolean(conversationId || (jobId && mechanicId));
 
     useEffect(() => {
         if (hasValidParams) {
@@ -28,7 +29,7 @@ const MechanicChatScreen = ({ navigation, route }) => {
     const { conversation, interaction } = route.params || {};
 
     // Resolve recipient from conversation participants or interaction details
-    const recipient = useMemo(() => {
+    const recipient = (() => {
         if (route?.params?.customer) {
             return {
                 name: route.params.customer.name || 'Customer',
@@ -62,7 +63,7 @@ const MechanicChatScreen = ({ navigation, route }) => {
             name: route.params?.name || 'Customer',
             initials: 'C',
         };
-    }, [conversation, interaction, route.params]);
+    })();
 
     const issueSummary = route?.params?.issueSummary || {};
     const summaryLines = [

@@ -8,6 +8,8 @@ import {
   CarOwnerEditProfileScreen,
   CarOwnerDiagnosticExpertsScreen,
   CarOwnerHistoryScreen,
+  CarOwnerMechanicDetailsScreen,
+  CarOwnerMechanicReviewsScreen,
   CarOwnerLiveTrackingScreen,
   CarOwnerMechanicDiscoveryScreen,
   CarOwnerProfileScreen,
@@ -15,6 +17,7 @@ import {
   CarOwnerRequestDiagnosticsScreen,
   CarOwnerRewardsScreen,
   CarOwnerWithdrawScreen,
+  CarOwnerAddContactSuccessScreen,
 } from '../screens';
 import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
 import EditJobScreen from '../screens/carowner/history/EditJobScreen';
@@ -62,7 +65,7 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_FUND_WALLET}
         component={CarOwnerFundWalletScreen}
-        options={{ title: 'Fund Wallet' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_VERIFY_TOP_UP}
@@ -73,6 +76,16 @@ const CarOwnerStack = () => {
         name={ROUTES.CAR_OWNER_TRANSACTION_DETAILS}
         component={CarOwnerTransactionDetailsScreen}
         options={{ title: 'Transaction details' }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_MECHANIC_DETAILS}
+        component={CarOwnerMechanicDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_MECHANIC_REVIEWS}
+        component={CarOwnerMechanicReviewsScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_JOB_DETAILS}
@@ -102,6 +115,11 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_EDIT_PROFILE}
         component={CarOwnerEditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_ADD_CONTACT_SUCCESS}
+        component={CarOwnerAddContactSuccessScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

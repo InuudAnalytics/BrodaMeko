@@ -1,16 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Clock01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
-import { getMechanicAssignedJob, getMechanicAssignedJobs, updateJobStatus } from '../../../services/jobs.service';
+import { getMechanicAssignedJobs } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const TABS = [
-  { key: 'available', label: 'Available jobs' },
-  { key: 'active', label: 'Active' },
+  { key: 'ongoing', label: 'Ongoing' },
   { key: 'completed', label: 'Completed' },
 ];
 
@@ -57,35 +56,6 @@ const normalizeJob = (item, index) => ({
   status: String(item?.status || '').toLowerCase(),
 });
 
-const normalizeIssueSummary = (job) => {
-  const source = job && typeof job === 'object' ? job : {};
-  const rawImages = Array.isArray(source?.images) ? source.images : [];
-  const images = rawImages
-    .map((image) => {
-      if (typeof image === 'string') {
-        return image;
-      }
-      return String(image?.url || image?.uri || image?.path || '').trim();
-    })
-    .filter(Boolean);
-
-  return {
-    issueType: String(source?.issue_type || source?.title || '').trim(),
-    description: String(source?.description || '').trim(),
-    carMake: String(source?.car_make || '').trim(),
-    images,
-  };
-};
-
-const readJobPayload = (response) => {
-  const root = response?.data || response || {};
-  if (root?.job && typeof root.job === 'object') {
-    return root.job;
-  }
-  return root;
-};
-
-const ACTIVE_STATUSES = new Set(['accepted', 'en_route', 'arrived', 'repairing', 'in_progress', 'active']);
 const COMPLETED_STATUSES = new Set(['completed', 'done']);
 
 const filterJobsForTab = (jobs, tabKey) => {
@@ -93,18 +63,16 @@ const filterJobsForTab = (jobs, tabKey) => {
     return jobs.filter((job) => COMPLETED_STATUSES.has(job.status));
   }
 
-  if (tabKey === 'active') {
-    return jobs.filter((job) => ACTIVE_STATUSES.has(job.status));
+  if (tabKey === 'ongoing') {
+    return jobs.filter((job) => !COMPLETED_STATUSES.has(job.status));
   }
 
-  return jobs.filter((job) => !ACTIVE_STATUSES.has(job.status) && !COMPLETED_STATUSES.has(job.status));
+  return [];
 };
 
-const JobCard = ({ item, tab, loadingAction, onAccept, onViewDetails }) => {
-  const isAvailable = tab === 'available';
-  const isActive = tab === 'active';
+const JobCard = ({ item, tab, onViewDetails }) => {
+  const isOngoing = tab === 'ongoing';
   const isCompleted = tab === 'completed';
-  const isBusy = loadingAction === item.id;
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => onViewDetails(item)}>
@@ -143,18 +111,7 @@ const JobCard = ({ item, tab, loadingAction, onAccept, onViewDetails }) => {
         </View>
       </View>
 
-      {isAvailable ? (
-        <AppButton
-          label={isBusy ? 'Accepting...' : 'Accept job'}
-          onPress={() => onAccept(item)}
-          style={styles.ctaBtn}
-          textStyle={styles.ctaBtnText}
-          disabled={isBusy}
-          left={isBusy ? <ActivityIndicator size="small" color="#1A1A1A" /> : null}
-        />
-      ) : null}
-
-      {isActive ? (
+      {isOngoing ? (
         <AppButton
           label="View details"
           onPress={() => onViewDetails(item)}
@@ -173,13 +130,11 @@ const JobCard = ({ item, tab, loadingAction, onAccept, onViewDetails }) => {
 };
 
 const MechanicJobsScreen = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('available');
+  const [activeTab, setActiveTab] = useState('ongoing');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [loadingAction, setLoadingAction] = useState('');
   const [jobsByTab, setJobsByTab] = useState({
-    available: [],
-    active: [],
+    ongoing: [],
     completed: [],
   });
 
@@ -192,15 +147,13 @@ const MechanicJobsScreen = ({ navigation }) => {
       const normalized = readJobs(response).map(normalizeJob);
 
       setJobsByTab({
-        available: filterJobsForTab(normalized, 'available'),
-        active: filterJobsForTab(normalized, 'active'),
+        ongoing: filterJobsForTab(normalized, 'ongoing'),
         completed: filterJobsForTab(normalized, 'completed'),
       });
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load jobs.');
       setJobsByTab({
-        available: [],
-        active: [],
+        ongoing: [],
         completed: [],
       });
     } finally {
@@ -215,63 +168,6 @@ const MechanicJobsScreen = ({ navigation }) => {
   );
 
   const currentList = useMemo(() => jobsByTab[activeTab] || [], [activeTab, jobsByTab]);
-
-  const handleAccept = async (job) => {
-    setLoadingAction(job.id);
-    try {
-      await updateJobStatus(job.id, 'accepted');
-      await fetchTabJobs();
-
-      const detailsResponse = await getMechanicAssignedJob(job.id).catch(() => null);
-      const detailedJob = detailsResponse ? readJobPayload(detailsResponse) : null;
-      const source = detailedJob || job?.raw || {};
-      const customerName =
-        source?.car_owner?.name ||
-        source?.user?.name ||
-        source?.owner?.name ||
-        job?.name ||
-        'Customer';
-      const customerInitials = initialsFromName(customerName) || 'C';
-      const conversationId = String(
-        source?.conversation_id ||
-        source?.conversationId ||
-        source?.conversation?.id ||
-        source?.conversation?._id ||
-        ''
-      ).trim();
-      const mechanicId = String(
-        source?.mechanic_id ||
-        source?.mechanic?.id ||
-        source?.assigned_mechanic_id ||
-        'self'
-      ).trim();
-      const carOwnerId = String(
-        source?.car_owner_id ||
-        source?.car_owner?.id ||
-        source?.user_id ||
-        source?.user?.id ||
-        ''
-      ).trim();
-
-      navigation.navigate(ROUTES.MECH_CHAT, {
-        jobId: job.id,
-        mechanicId: mechanicId || 'self',
-        carOwnerId,
-        conversationId,
-        issueSummary: normalizeIssueSummary(source),
-        customer: {
-          id: carOwnerId,
-          name: customerName,
-          initials: customerInitials,
-          rating: String(source?.car_owner?.rating || source?.user?.rating || ''),
-        },
-      });
-    } catch (updateError) {
-      Alert.alert('Error', updateError?.message || 'Could not accept this job.');
-    } finally {
-      setLoadingAction('');
-    }
-  };
 
   const handleViewDetails = (job) => {
     navigation.navigate(ROUTES.MECH_JOB_DETAILS, { jobId: job.id });
@@ -318,8 +214,6 @@ const MechanicJobsScreen = ({ navigation }) => {
                 key={`${activeTab}-${item.id}`}
                 item={item}
                 tab={activeTab}
-                loadingAction={loadingAction}
-                onAccept={handleAccept}
                 onViewDetails={handleViewDetails}
               />
             ))}

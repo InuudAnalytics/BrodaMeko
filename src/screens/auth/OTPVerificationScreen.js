@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { UserSettings01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../components';
 import { useAuth } from '../../context';
+import { resendOtp as resendOtpService, verifyOtp as verifyOtpService } from '../../services/auth.service';
 import { darkTheme } from '../../theme';
 import { ROUTES, useKeyboardLift } from '../../utils';
 
@@ -11,11 +12,15 @@ const OTP_LENGTH = 4;
 const MAX_OTP_ATTEMPTS = 3;
 
 const OTPVerificationScreen = ({ route, navigation }) => {
-  const { verifyOtp, resendOtp, error, clearError, pendingVerification } = useAuth();
+  const { verifyOtp, resendOtp, updateUserData, error, clearError, pendingVerification } = useAuth();
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
   const routeParams = route.params || {};
-  const method = routeParams.method || pendingVerification?.method || 'phone';
+  const flow = String(routeParams.flow || 'signup').trim();
+  const isAddContactFlow = flow === 'add_contact';
+  const method = isAddContactFlow
+    ? (routeParams.contactType === 'email' ? 'email' : 'phone')
+    : (routeParams.method || pendingVerification?.method || 'phone');
   const destination = routeParams.destination || pendingVerification?.email || pendingVerification?.phoneNumber || '';
   const initialInfo = String(routeParams.info || '').trim();
 
@@ -126,6 +131,34 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     setIsVerifying(true);
 
     try {
+      if (isAddContactFlow) {
+        const response = await verifyOtpService({ otp: otpValue });
+        const ok = response?.success !== false;
+
+        if (!ok) {
+          const nextAttempts = failedAttempts + 1;
+          setFailedAttempts(nextAttempts);
+          setLocalError(`Incorrect OTP. Attempt ${nextAttempts} of ${MAX_OTP_ATTEMPTS}.`);
+          return;
+        }
+
+        if (method === 'email') {
+          await updateUserData({ email: destination });
+        } else {
+          await updateUserData({
+            phone: destination,
+            phoneNumber: destination,
+            phone_number: destination,
+          });
+        }
+
+        navigation.replace(ROUTES.CAR_OWNER_ADD_CONTACT_SUCCESS, {
+          contactType: method,
+          contactValue: destination,
+        });
+        return;
+      }
+
       const ok = await verifyOtp({ otp: otpValue });
 
       if (!ok) {
@@ -166,7 +199,15 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     setIsResending(true);
 
     try {
-      const ok = await resendOtp();
+      const ok = isAddContactFlow
+        ? await (async () => {
+            await resendOtpService({
+              email: method === 'email' ? destination : '',
+              phoneNumber: method === 'phone' ? destination : '',
+            });
+            return true;
+          })()
+        : await resendOtp();
 
       if (ok) {
         setInfo('OTP resent successfully.');
@@ -180,6 +221,11 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   };
 
   const handleCancel = () => {
+    if (isAddContactFlow) {
+      navigation.goBack();
+      return;
+    }
+
     navigation.navigate(ROUTES.SIGN_UP, pendingVerification?.role ? { role: pendingVerification.role } : undefined);
   };
 
