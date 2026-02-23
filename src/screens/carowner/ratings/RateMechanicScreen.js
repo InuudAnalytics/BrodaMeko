@@ -1,84 +1,143 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
 
+const TAGS = ['Arrived on time', 'Professional', 'Friendly', 'Resolved issue quickly'];
+
+const pad2 = (value) => String(value).padStart(2, '0');
+
+const makeBmId = (date = new Date()) => `#BM-${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}`;
+
 const Star = ({ filled }) => {
   return (
-    <Svg width={34} height={34} viewBox="0 0 24 24" fill="none">
+    <Svg width={52} height={52} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
-        fill={filled ? darkTheme.colors.accent : 'transparent'}
-        stroke={filled ? darkTheme.colors.accent : 'rgba(255,255,255,0.65)'}
-        strokeWidth={1.4}
+        fill={filled ? '#E6C714' : 'transparent'}
+        stroke={filled ? '#E6C714' : 'rgba(245,245,245,0.8)'}
+        strokeWidth={1.25}
       />
     </Svg>
   );
 };
 
 const RateMechanicScreen = ({ navigation, route }) => {
-  const { mechanicId, jobId } = route?.params || {};
   const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
 
-  const handleConfirm = () => {
+  const mechanicName =
+    route?.params?.mechanic?.name ||
+    route?.params?.mechanicName ||
+    route?.params?.mechanic_id ||
+    'Emeka Nwosu';
+  const issueName =
+    route?.params?.issueName ||
+    route?.params?.issue ||
+    route?.params?.job?.issue ||
+    route?.params?.job?.issue_name ||
+    'Flat tire replacement';
+  const displayId = route?.params?.displayId || makeBmId();
+
+  const profileLines = useMemo(
+    () => [
+      { key: 'name', text: mechanicName, style: styles.profileName },
+      { key: 'issue', text: issueName, style: styles.profileIssue },
+      { key: 'id', text: `ID: ${displayId}`, style: styles.profileId },
+    ],
+    [displayId, issueName, mechanicName]
+  );
+
+  const initials = useMemo(() => {
+    const parts = String(mechanicName || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    return (parts[0]?.[0] || 'M').toUpperCase();
+  }, [mechanicName]);
+
+  const toggleTag = (tag) => {
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]));
+  };
+
+  const handleSubmit = () => {
     if (!rating) {
-      setError('Please select a star rating before confirming.');
+      Alert.alert('Select rating', 'Please choose a star rating before submitting.');
       return;
     }
 
-    setError('');
-    Alert.alert('Rating submitted', 'Thanks for your feedback.', [
-      {
-        text: 'OK',
-        onPress: () => navigation.goBack(),
-      },
-    ]);
+    Alert.alert('Rating submitted', 'Thanks for your feedback.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
   };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.content}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
-          </TouchableOpacity>
-          <AppText style={styles.headerTitle}>Rate mechanic</AppText>
+        <View style={styles.profileCard}>
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatarCircle}>
+              <AppText style={styles.avatarText}>{initials}</AppText>
+            </View>
+          </View>
+
+          <View style={styles.profileInfo}>
+            {profileLines.map((line) => (
+              <AppText key={line.key} style={line.style}>
+                {line.text}
+              </AppText>
+            ))}
+          </View>
         </View>
 
-        <View style={styles.body}>
-          <AppText style={styles.question}>How was your experience with the mechanic?</AppText>
-
-          <View style={styles.starsRow}>
+        <View style={styles.section}>
+          <AppText style={styles.sectionTitle}>Service rating</AppText>
+          <View style={styles.starRow}>
             {[1, 2, 3, 4, 5].map((value) => (
-              <Pressable key={value} onPress={() => setRating(value)} hitSlop={6} style={styles.starPressable}>
+              <Pressable key={value} onPress={() => setRating(value)} hitSlop={8}>
                 <Star filled={value <= rating} />
               </Pressable>
             ))}
           </View>
-
-          {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
-
-          <View style={styles.inputWrap}>
-            <LiftableTextInput
-              value={comment}
-              onChangeText={setComment}
-              style={styles.input}
-              placeholder="Write a comment"
-              placeholderTextColor={darkTheme.colors.muted}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          <AppText style={styles.metaText}>Mechanic: {mechanicId || 'N/A'} | Job: {jobId || 'N/A'}</AppText>
         </View>
 
-        <AppButton label="Confirm rating" onPress={handleConfirm} style={styles.cta} />
+        <View style={styles.section}>
+          <AppText style={styles.sectionTitle}>What stood out?</AppText>
+          <View style={styles.tagsWrap}>
+            {TAGS.map((tag) => {
+              const isSelected = selectedTags.includes(tag);
+              return (
+                <TouchableOpacity
+                  key={tag}
+                  activeOpacity={0.9}
+                  style={[styles.tag, isSelected ? styles.tagSelected : null]}
+                  onPress={() => toggleTag(tag)}
+                >
+                  <AppText style={[styles.tagText, isSelected ? styles.tagTextSelected : null]}>{tag}</AppText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <AppText style={styles.sectionTitle}>Detailed feedback</AppText>
+          <View style={styles.feedbackWrap}>
+            <LiftableTextInput
+              value={feedback}
+              onChangeText={setFeedback}
+              style={styles.feedbackInput}
+              multiline
+              textAlignVertical="top"
+              placeholder="Tell us more about your experience"
+              placeholderTextColor="rgba(255,255,255,0.36)"
+            />
+          </View>
+        </View>
+
+        <View style={styles.ctaWrap}>
+          <AppButton label="Submit" onPress={handleSubmit} />
+        </View>
       </View>
     </ScreenContainer>
   );
@@ -86,82 +145,128 @@ const RateMechanicScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
-    backgroundColor: darkTheme.colors.background,
+    backgroundColor: '#000033',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 22,
+    paddingHorizontal: 16,
+    paddingTop: 84,
+    paddingBottom: 28,
   },
-  header: {
-    minHeight: 40,
-    justifyContent: 'center',
+  profileCard: {
+    backgroundColor: 'rgba(245,245,245,0.18)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
   },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    width: 36,
-    height: 36,
+  avatarWrap: {
+    marginRight: 10,
+  },
+  avatarCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#F28C28',
+    borderWidth: 4,
+    borderColor: '#E6C714',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    color: darkTheme.colors.text,
-    fontSize: 18,
-    lineHeight: 24,
-    fontWeight: darkTheme.typography.fontWeights.medium,
+  avatarText: {
+    color: '#111133',
+    fontSize: 24,
+    fontWeight: darkTheme.typography.fontWeights.bold,
   },
-  body: {
+  profileInfo: {
     flex: 1,
-    paddingTop: 28,
   },
-  question: {
-    color: darkTheme.colors.text,
-    fontSize: 22,
-    lineHeight: 30,
+  profileName: {
+    color: '#F5F5F5',
+    fontSize: 30,
+    lineHeight: 34,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
-  starsRow: {
-    marginTop: 26,
+  profileIssue: {
+    marginTop: 2,
+    color: 'rgba(245,245,245,0.72)',
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.regular,
+  },
+  profileId: {
+    marginTop: 2,
+    color: 'rgba(245,245,245,0.45)',
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.regular,
+  },
+  section: {
+    marginTop: 22,
+  },
+  sectionTitle: {
+    color: '#F5F5F5',
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  starRow: {
+    marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    maxWidth: 240,
+    width: 304,
+    maxWidth: '100%',
   },
-  starPressable: {
-    padding: 2,
-  },
-  errorText: {
+  tagsWrap: {
     marginTop: 10,
-    color: '#FF6B6B',
-    fontSize: 13,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  inputWrap: {
-    marginTop: 24,
+  tag: {
+    minHeight: 40,
+    borderRadius: 11,
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 14,
-    minHeight: 120,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: 'rgba(245,245,245,0.35)',
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  input: {
-    color: darkTheme.colors.text,
-    fontSize: 15,
-    lineHeight: 22,
-    minHeight: 94,
+  tagSelected: {
+    backgroundColor: '#E6C714',
+    borderColor: '#E6C714',
   },
-  metaText: {
-    marginTop: 12,
-    color: darkTheme.colors.muted,
-    fontSize: 12,
+  tagText: {
+    color: 'rgba(245,245,245,0.9)',
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.regular,
   },
-  cta: {
-    minHeight: 52,
+  tagTextSelected: {
+    color: '#111133',
+  },
+  feedbackWrap: {
+    marginTop: 10,
+    borderRadius: 4,
+    backgroundColor: 'rgba(245,245,245,0.24)',
+    minHeight: 186,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  feedbackInput: {
+    minHeight: 160,
+    color: '#F5F5F5',
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.regular,
+  },
+  ctaWrap: {
+    marginTop: 'auto',
+    paddingTop: 24,
+    paddingHorizontal: 32,
   },
 });
 

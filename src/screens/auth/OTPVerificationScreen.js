@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { UserSettings01Icon } from '@hugeicons/core-free-icons';
+import { CancelCircleIcon, UserSettings01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../components';
 import { useAuth } from '../../context';
 import { resendOtp as resendOtpService, verifyOtp as verifyOtpService } from '../../services/auth.service';
 import { darkTheme } from '../../theme';
 import { ROUTES, useKeyboardLift } from '../../utils';
 
-const OTP_LENGTH = 4;
+const OTP_LENGTH = 6;
 const MAX_OTP_ATTEMPTS = 3;
 
 const OTPVerificationScreen = ({ route, navigation }) => {
@@ -123,7 +123,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     }
 
     if (otpValue.length !== OTP_LENGTH || otp.some((digit) => !digit)) {
-      setLocalError('Please enter the 4-digit verification code.');
+      setLocalError('Please enter the 6-digit verification code.');
       return;
     }
 
@@ -229,11 +229,15 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     navigation.navigate(ROUTES.SIGN_UP, pendingVerification?.role ? { role: pendingVerification.role } : undefined);
   };
 
-  const destinationLabel = destination ? ` (${destination})` : '';
+  const destinationLabel = destination || `your ${method}`;
 
   return (
     <ScreenContainer style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
       <Animated.View style={[styles.card, animatedStyle]}>
+        <TouchableOpacity style={styles.closeButton} onPress={handleCancel} disabled={isVerifying || isResending}>
+          <HugeiconsIcon icon={CancelCircleIcon} size={26} color="rgba(17,17,51,0.45)" strokeWidth={1.8} />
+        </TouchableOpacity>
+
         <View style={styles.iconBadge}>
           <HugeiconsIcon icon={UserSettings01Icon} size={20} color="rgba(17,17,51,0.7)" strokeWidth={1.9} />
         </View>
@@ -243,8 +247,10 @@ const OTPVerificationScreen = ({ route, navigation }) => {
         </AppText>
 
         <AppText variant="muted" style={styles.subtitle}>
-          Verification code has been sent to your {method}
-          {destinationLabel}
+          Verification code has been sent
+        </AppText>
+        <AppText variant="muted" style={styles.subtitle}>
+          to {destinationLabel}
         </AppText>
 
         <View ref={targetRef} style={styles.otpRow}>
@@ -269,7 +275,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
         </View>
 
         {mergedError ? <AppText style={styles.errorText}>{mergedError}</AppText> : null}
-        {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
+        {/* {info ? <AppText style={styles.infoText}>{info}</AppText> : null} */}
 
         <View style={styles.verifyButtonWrap}>
           <AppButton
@@ -289,10 +295,6 @@ const OTPVerificationScreen = ({ route, navigation }) => {
             </AppText>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={isVerifying || isResending}>
-          <AppText style={styles.cancelButtonText}>Cancel</AppText>
-        </TouchableOpacity>
       </Animated.View>
     </ScreenContainer>
   );
@@ -307,17 +309,24 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: darkTheme.radius.lg,
+    backgroundColor: '#F3F3F3',
+    borderRadius: 14,
     paddingHorizontal: darkTheme.spacing.lg,
-    paddingVertical: darkTheme.spacing.xl,
+    paddingTop: darkTheme.spacing.xl,
+    paddingBottom: darkTheme.spacing.lg,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: darkTheme.spacing.sm,
+    right: darkTheme.spacing.sm,
+    zIndex: 2,
   },
   iconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignSelf: 'center',
-    backgroundColor: 'rgba(17,17,51,0.12)',
+    backgroundColor: 'rgba(17,17,51,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: darkTheme.spacing.sm,
@@ -326,24 +335,27 @@ const styles = StyleSheet.create({
     color: '#111133',
     marginBottom: darkTheme.spacing.xs,
     textAlign: 'center',
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
   subtitle: {
     color: 'rgba(17,17,51,0.75)',
     textAlign: 'center',
+    lineHeight: 24,
   },
   otpRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    columnGap: darkTheme.spacing.xs,
     marginTop: darkTheme.spacing.lg,
   },
   otpInput: {
-    width: 56,
-    height: 56,
+    width: 38,
+    height: 38,
     borderWidth: 1,
     borderColor: 'rgba(17,17,51,0.18)',
-    borderRadius: darkTheme.radius.md,
+    borderRadius: 6,
     textAlign: 'center',
-    fontSize: 22,
+    fontSize: 18,
     color: '#111133',
     fontWeight: darkTheme.typography.fontWeights.semibold,
     paddingVertical: 0,
@@ -372,19 +384,6 @@ const styles = StyleSheet.create({
     color: 'rgba(17,17,51,0.7)',
   },
   resendLink: {
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  cancelButton: {
-    marginTop: darkTheme.spacing.md,
-    backgroundColor: '#D94B59',
-    borderRadius: darkTheme.radius.md,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: darkTheme.spacing.md,
-  },
-  cancelButtonText: {
-    color: '#FFFFFF',
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
 });
