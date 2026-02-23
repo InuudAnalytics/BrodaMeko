@@ -121,7 +121,7 @@ const LoginScreen = ({ navigation, route }) => {
                   Signing in as {effectiveRoleLabel}
                 </AppText>
                 {!token ? (
-                  <TouchableOpacity onPress={() => navigation.navigate(ROUTES.ROLE_SELECTION, { returnToLogin: true })}>
+                  <TouchableOpacity onPress={() => navigation.navigate(ROUTES.ONBOARDING_CAROUSEL, { returnToLogin: true })}>
                     <AppText variant="muted" color={darkTheme.colors.accent}>
                       Change role
                     </AppText>

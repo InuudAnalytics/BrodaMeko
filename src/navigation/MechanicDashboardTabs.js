@@ -5,6 +5,7 @@ import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
 import MechanicJobsScreen from '../screens/mech/jobs/MechanicJobsScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
+import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
 const MechanicDashboardTabs = ({ navigation, route }) => {

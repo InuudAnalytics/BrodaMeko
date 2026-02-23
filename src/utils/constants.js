@@ -6,6 +6,7 @@ export const ROLES = {
 
 export const ROUTES = {
   SPLASH: 'Splash',
+  ONBOARDING_CAROUSEL: 'OnboardingCarousel',
   ROLE_SELECTION: 'RoleSelection',
   LOGIN: 'Login',
   SIGN_UP: 'SignUp',

@@ -1,4 +1,5 @@
 export { default as SplashScreen } from './SplashScreen';
+export { default as OnboardingCarouselScreen } from './OnboardingCarouselScreen';
 export { default as RoleSelectionScreen } from './RoleSelectionScreen';
 export { default as LoginScreen } from './LoginScreen';
 export { default as SignUpScreen } from './SignUpScreen';

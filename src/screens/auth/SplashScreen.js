@@ -9,9 +9,9 @@ import { ROUTES } from '../../utils';
 const SPLASH_DURATION_MS = 3000;
 
 const SplashScreen = ({ navigation }) => {
-  const { selectedRole, hasSeenRoleSelection, skipRoleSelectionOnNextLaunch } = useAuth();
+  const { selectedRole, hasSeenOnboarding } = useAuth();
   const hasNavigated = useRef(false);
-  const shouldSkipRoleSelection = Boolean(skipRoleSelectionOnNextLaunch || selectedRole || hasSeenRoleSelection);
+  const shouldSkipOnboarding = Boolean(selectedRole || hasSeenOnboarding);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -20,18 +20,18 @@ const SplashScreen = ({ navigation }) => {
       }
 
       hasNavigated.current = true;
-      if (shouldSkipRoleSelection) {
+      if (shouldSkipOnboarding) {
         navigation.replace(ROUTES.LOGIN, selectedRole ? { role: selectedRole } : undefined);
         return;
       }
 
-      navigation.replace(ROUTES.ROLE_SELECTION, { animateIntro: true });
-    }, shouldSkipRoleSelection ? 300 : SPLASH_DURATION_MS);
+      navigation.replace(ROUTES.ONBOARDING_CAROUSEL);
+    }, shouldSkipOnboarding ? 300 : SPLASH_DURATION_MS);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [navigation, selectedRole, shouldSkipRoleSelection]);
+  }, [navigation, selectedRole, shouldSkipOnboarding]);
 
   return (
     <ScreenContainer padded={false} style={styles.container}>

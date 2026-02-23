@@ -3,9 +3,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   ForgotPasswordScreen,
   LoginScreen,
+  OnboardingCarouselScreen,
   OTPVerificationScreen,
   ResetPasswordScreen,
-  RoleSelectionScreen,
   SignUpScreen,
   SplashScreen,
 } from '../screens';
@@ -25,7 +25,7 @@ const AuthStack = () => {
       }}
     >
       <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
-      <Stack.Screen name={ROUTES.ROLE_SELECTION} component={RoleSelectionScreen} />
+      <Stack.Screen name={ROUTES.ONBOARDING_CAROUSEL} component={OnboardingCarouselScreen} />
       <Stack.Screen name={ROUTES.SIGN_UP} component={SignUpScreen} />
       <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
       <Stack.Screen name={ROUTES.OTP_VERIFICATION} component={OTPVerificationScreen} />

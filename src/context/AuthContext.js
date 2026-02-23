@@ -26,8 +26,8 @@ const STORAGE_KEYS = {
   user: '@brodameko/user',
   role: '@brodameko/role',
   selectedRole: '@brodameko:selectedRole',
-  hasSeenRoleSelection: '@brodameko:hasSeenRoleSelection',
-  skipRoleSelectionOnNextLaunch: '@brodameko:skipRoleSelectionOnNextLaunch',
+  hasSeenOnboarding: '@brodameko:hasSeenOnboarding',
+  hasSeenRoleSelectionLegacy: '@brodameko:hasSeenRoleSelection',
 };
 
 const GOOGLE_STATUS = {
@@ -161,8 +161,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
   const [selectedRole, setSelectedRoleState] = useState(null);
-  const [hasSeenRoleSelection, setHasSeenRoleSelection] = useState(false);
-  const [skipRoleSelectionOnNextLaunch, setSkipRoleSelectionOnNextLaunch] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [error, setError] = useState(null);
@@ -192,11 +191,11 @@ export const AuthProvider = ({ children }) => {
     ]);
   };
 
-  const persistRoleSelection = async (nextSelectedRole, { skip = false } = {}) => {
+  const persistRoleSelection = async (nextSelectedRole) => {
     await AsyncStorage.multiSet([
       [STORAGE_KEYS.selectedRole, nextSelectedRole || ''],
-      [STORAGE_KEYS.hasSeenRoleSelection, nextSelectedRole ? 'true' : 'false'],
-      [STORAGE_KEYS.skipRoleSelectionOnNextLaunch, skip ? 'true' : 'false'],
+      [STORAGE_KEYS.hasSeenOnboarding, nextSelectedRole ? 'true' : 'false'],
+      [STORAGE_KEYS.hasSeenRoleSelectionLegacy, nextSelectedRole ? 'true' : 'false'],
     ]);
   };
 
@@ -213,9 +212,8 @@ export const AuthProvider = ({ children }) => {
     const normalizedNextRole = normalizeRole(nextRole);
     if (normalizedNextRole) {
       setSelectedRoleState(normalizedNextRole);
-      setHasSeenRoleSelection(true);
-      setSkipRoleSelectionOnNextLaunch(false);
-      await persistRoleSelection(normalizedNextRole, { skip: false });
+      setHasSeenOnboarding(true);
+      await persistRoleSelection(normalizedNextRole);
     }
   };
 
@@ -253,8 +251,8 @@ export const AuthProvider = ({ children }) => {
     const normalizedNextRole = normalizeRole(nextRole);
     if (normalizedNextRole) {
       setSelectedRoleState(normalizedNextRole);
-      setHasSeenRoleSelection(true);
-      await persistRoleSelection(normalizedNextRole, { skip: skipRoleSelectionOnNextLaunch });
+      setHasSeenOnboarding(true);
+      await persistRoleSelection(normalizedNextRole);
     }
     return nextUser;
   };
@@ -288,22 +286,20 @@ export const AuthProvider = ({ children }) => {
         STORAGE_KEYS.user,
         STORAGE_KEYS.role,
         STORAGE_KEYS.selectedRole,
-        STORAGE_KEYS.hasSeenRoleSelection,
-        STORAGE_KEYS.skipRoleSelectionOnNextLaunch,
+        STORAGE_KEYS.hasSeenOnboarding,
+        STORAGE_KEYS.hasSeenRoleSelectionLegacy,
       ]);
       const map = Object.fromEntries(entries);
       const nextToken = map?.[STORAGE_KEYS.token] || null;
       const storedUser = parseStoredUser(map?.[STORAGE_KEYS.user]);
       const storedRole = normalizeRole(map?.[STORAGE_KEYS.role]);
       const storedSelectedRole = normalizeRole(map?.[STORAGE_KEYS.selectedRole]);
-      const seenRoleSelection =
-        String(map?.[STORAGE_KEYS.hasSeenRoleSelection] || '').toLowerCase() === 'true' || Boolean(storedSelectedRole);
-      const skipRoleSelection =
-        String(map?.[STORAGE_KEYS.skipRoleSelectionOnNextLaunch] || '').toLowerCase() === 'true';
+      const seenOnboarding =
+        String(map?.[STORAGE_KEYS.hasSeenOnboarding] || map?.[STORAGE_KEYS.hasSeenRoleSelectionLegacy] || '').toLowerCase() === 'true' ||
+        Boolean(storedSelectedRole);
 
       setSelectedRoleState(storedSelectedRole);
-      setHasSeenRoleSelection(seenRoleSelection);
-      setSkipRoleSelectionOnNextLaunch(skipRoleSelection);
+      setHasSeenOnboarding(seenOnboarding);
 
       if (!nextToken) {
         setToken(null);
@@ -330,9 +326,8 @@ export const AuthProvider = ({ children }) => {
         const normalizedNextRole = normalizeRole(nextRole);
         if (normalizedNextRole) {
           setSelectedRoleState(normalizedNextRole);
-          setHasSeenRoleSelection(true);
-          setSkipRoleSelectionOnNextLaunch(false);
-          await persistRoleSelection(normalizedNextRole, { skip: false });
+          setHasSeenOnboarding(true);
+          await persistRoleSelection(normalizedNextRole);
         }
       } catch (meError) {
         const isUnauthorized = Number(meError?.statusCode || 0) === 401;
@@ -373,15 +368,9 @@ export const AuthProvider = ({ children }) => {
     }
 
     setSelectedRoleState(normalized);
-    setHasSeenRoleSelection(true);
-    setSkipRoleSelectionOnNextLaunch(false);
-    await persistRoleSelection(normalized, { skip: false });
+    setHasSeenOnboarding(true);
+    await persistRoleSelection(normalized);
     return true;
-  };
-
-  const clearSkipRoleSelection = async () => {
-    setSkipRoleSelectionOnNextLaunch(false);
-    await AsyncStorage.setItem(STORAGE_KEYS.skipRoleSelectionOnNextLaunch, 'false');
   };
 
   const signUp = async ({ fullName, email, phoneNumber, password, role: selectedRoleInput }) => {
@@ -666,20 +655,18 @@ export const AuthProvider = ({ children }) => {
       // Even when API logout fails, clear local auth state.
     } finally {
       const currentSelectedRole = normalizeRole(selectedRole) || null;
-      const hasSelectedRole = Boolean(currentSelectedRole);
 
       await clearPersistedAuthState();
       await AsyncStorage.multiSet([
-        [STORAGE_KEYS.skipRoleSelectionOnNextLaunch, 'true'],
         [STORAGE_KEYS.selectedRole, currentSelectedRole || ''],
-        [STORAGE_KEYS.hasSeenRoleSelection, hasSelectedRole ? 'true' : 'false'],
+        [STORAGE_KEYS.hasSeenOnboarding, 'true'],
+        [STORAGE_KEYS.hasSeenRoleSelectionLegacy, 'true'],
       ]);
       setToken(null);
       setUser(null);
       setRole(null);
       setSelectedRoleState(currentSelectedRole);
-      setHasSeenRoleSelection(hasSelectedRole);
-      setSkipRoleSelectionOnNextLaunch(true);
+      setHasSeenOnboarding(true);
       setPendingVerification(null);
       setIsLoading(false);
     }
@@ -692,8 +679,7 @@ export const AuthProvider = ({ children }) => {
         token,
         role,
         selectedRole,
-        hasSeenRoleSelection,
-        skipRoleSelectionOnNextLaunch,
+        hasSeenOnboarding,
         isLoading,
         isBootstrapped,
         error,
@@ -708,7 +694,6 @@ export const AuthProvider = ({ children }) => {
         updatePassword,
         signOut,
         setSelectedRole,
-        clearSkipRoleSelection,
         bootstrapAuth,
         updateUserData,
         refreshUserProfile,
