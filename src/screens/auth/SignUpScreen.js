@@ -4,11 +4,14 @@ import {
   Animated,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -40,6 +43,7 @@ const ERROR_COLOR = '#FF7B8A';
 const SUCCESS_COLOR = '#40C67A';
 const NEUTRAL_COLOR = 'rgba(255,255,255,0.45)';
 const METHODS = { PHONE: 'phone', EMAIL: 'email' };
+const TERMS_SHEET_HEIGHT_RATIO = 0.7;
 
 const maskEmail = (value) => {
   const email = String(value || '').trim();
@@ -54,6 +58,7 @@ const SignUpScreen = ({ navigation, route }) => {
   const { selectedRole: persistedSelectedRole, signUp, signInWithGoogle: signUpWithGoogle, isLoading, error, clearError } = useAuth();
   const selectedRole = roleParam || persistedSelectedRole || ROLES.CAR_OWNER;
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
+  const { height: screenHeight } = useWindowDimensions();
 
   const [method, setMethod] = useState(METHODS.PHONE);
   const [fullName, setFullName] = useState('');
@@ -64,6 +69,8 @@ const SignUpScreen = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [isTermsVisible, setIsTermsVisible] = useState(false);
+  const termsTranslateY = useState(new Animated.Value(screenHeight * TERMS_SHEET_HEIGHT_RATIO))[0];
 
   const destinationPreview = useMemo(() => {
     return method === METHODS.PHONE ? maskNigerianPhone(phone) : maskEmail(email);
@@ -78,6 +85,30 @@ const SignUpScreen = ({ navigation, route }) => {
   const resetError = () => {
     if (localError) setLocalError('');
     if (error) clearError();
+  };
+
+  const openTermsSheet = () => {
+    const sheetHeight = screenHeight * TERMS_SHEET_HEIGHT_RATIO;
+    setIsTermsVisible(true);
+    termsTranslateY.setValue(sheetHeight);
+    Animated.timing(termsTranslateY, {
+      toValue: 0,
+      duration: 240,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeTermsSheet = () => {
+    const sheetHeight = screenHeight * TERMS_SHEET_HEIGHT_RATIO;
+    Animated.timing(termsTranslateY, {
+      toValue: sheetHeight,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setIsTermsVisible(false);
+      }
+    });
   };
 
   const handleSignUp = async () => {
@@ -236,6 +267,24 @@ const SignUpScreen = ({ navigation, route }) => {
                   onPress={() => signUpWithGoogle({ role: selectedRole })}
                   disabled={isLoading}
                 />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={isLoading}
+                  onPress={() => {}}
+                  style={[styles.appleButton, isLoading ? styles.appleButtonDisabled : null]}
+                >
+                  <AppText style={styles.appleIcon}></AppText>
+                  <AppText style={styles.appleLabel}>Sign up with Apple</AppText>
+                </TouchableOpacity>
+
+                <View style={styles.termsRow}>
+                  <AppText variant="muted">Read our </AppText>
+                  <TouchableOpacity onPress={openTermsSheet}>
+                    <AppText variant="muted" style={styles.termsLink}>
+                      terms and conditions
+                    </AppText>
+                  </TouchableOpacity>
+                </View>
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Have an account? </AppText>
@@ -248,6 +297,32 @@ const SignUpScreen = ({ navigation, route }) => {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      <Modal visible={isTermsVisible} transparent animationType="none" onRequestClose={closeTermsSheet}>
+        <Pressable style={styles.termsBackdrop} onPress={closeTermsSheet}>
+          <Pressable onPress={() => {}} style={styles.termsSheetWrap}>
+            <Animated.View
+              style={[
+                styles.termsSheet,
+                {
+                  height: screenHeight * TERMS_SHEET_HEIGHT_RATIO,
+                  transform: [{ translateY: termsTranslateY }],
+                },
+              ]}
+            >
+              <View style={styles.termsHeader}>
+                <View />
+                <TouchableOpacity onPress={closeTermsSheet} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
+                  <AppText style={styles.closeText}>x</AppText>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.termsBody}>
+                <AppText style={styles.termsComingSoon}>Terms and condition coming soon</AppText>
+              </View>
+            </Animated.View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -267,7 +342,80 @@ const styles = StyleSheet.create({
   ruleTextError: { color: ERROR_COLOR },
   errorText: { color: ERROR_COLOR, fontSize: darkTheme.typography.fontSizes.xs, lineHeight: 16, marginTop: darkTheme.spacing.xs, marginBottom: darkTheme.spacing.sm },
   primaryCta: { marginTop: darkTheme.spacing.md },
+  appleButton: {
+    minHeight: 52,
+    borderRadius: darkTheme.radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: darkTheme.spacing.sm,
+    marginTop: darkTheme.spacing.sm,
+  },
+  appleButtonDisabled: {
+    opacity: 0.45,
+  },
+  appleIcon: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  appleLabel: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.md,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  termsRow: {
+    marginTop: darkTheme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  termsLink: {
+    color: darkTheme.colors.accent,
+    textDecorationLine: 'none',
+  },
   footer: { marginTop: darkTheme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  termsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  termsSheetWrap: {
+    width: '100%',
+  },
+  termsSheet: {
+    width: '100%',
+    backgroundColor: darkTheme.colors.background,
+    borderTopLeftRadius: darkTheme.radius.xl,
+    borderTopRightRadius: darkTheme.radius.xl,
+    paddingHorizontal: darkTheme.spacing.xl,
+    paddingTop: darkTheme.spacing.md,
+    paddingBottom: darkTheme.spacing.lg,
+  },
+  termsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  closeText: {
+    color: darkTheme.colors.text,
+    fontSize: 24,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.regular,
+  },
+  termsBody: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  termsComingSoon: {
+    color: darkTheme.colors.text,
+    textAlign: 'center',
+    fontSize: darkTheme.typography.fontSizes.md,
+  },
 });
 
 export default SignUpScreen;

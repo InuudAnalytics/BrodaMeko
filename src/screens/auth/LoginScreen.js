@@ -116,7 +116,7 @@ const LoginScreen = ({ navigation, route }) => {
               <AppText variant="muted" style={styles.subtitle}>
                 Are you ready for the road?
               </AppText>
-              <View style={styles.roleRow}>
+              {/* <View style={styles.roleRow}>
                 <AppText variant="muted" style={styles.roleText}>
                   Signing in as {effectiveRoleLabel}
                 </AppText>
@@ -127,7 +127,7 @@ const LoginScreen = ({ navigation, route }) => {
                     </AppText>
                   </TouchableOpacity>
                 ) : null}
-              </View>
+              </View> */}
 
               <View style={styles.form}>
                 <AuthMethodToggle
@@ -209,6 +209,15 @@ const LoginScreen = ({ navigation, route }) => {
                   onPress={() => signInWithGoogle({ role: effectiveRole })}
                   disabled={isLoading}
                 />
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={isLoading}
+                  onPress={() => {}}
+                  style={[styles.appleButton, isLoading ? styles.appleButtonDisabled : null]}
+                >
+                  <AppText style={styles.appleIcon}></AppText>
+                  <AppText style={styles.appleLabel}>Sign in with Apple</AppText>
+                </TouchableOpacity>
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Dont have an account? </AppText>
@@ -252,6 +261,31 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#FF7B8A', fontSize: darkTheme.typography.fontSizes.xs, lineHeight: 16, marginTop: darkTheme.spacing.xs, marginBottom: darkTheme.spacing.sm },
   primaryCta: { marginTop: darkTheme.spacing.md },
+  appleButton: {
+    minHeight: 52,
+    borderRadius: darkTheme.radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: darkTheme.spacing.sm,
+    marginTop: darkTheme.spacing.sm,
+  },
+  appleButtonDisabled: {
+    opacity: 0.45,
+  },
+  appleIcon: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  appleLabel: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.md,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
   footer: { marginTop: darkTheme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 });
 
