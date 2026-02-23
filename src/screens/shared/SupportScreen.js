@@ -4,7 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../components';
-import { darkTheme } from '../../theme';
+import { darkTheme, withAlpha } from '../../theme';
 import { pickSingleImageFromGallery } from '../../utils';
 
 const UploadImageGlyph = ({ color }) => (
@@ -116,7 +116,7 @@ const SupportScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     flex: 1,
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     minHeight: 200,
     borderWidth: 1.2,
     borderStyle: 'dashed',
-    borderColor: 'rgba(226,255,49,0.6)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.6),
     borderRadius: 8,
     backgroundColor: 'rgba(152,154,190,0.7)',
     overflow: 'hidden',

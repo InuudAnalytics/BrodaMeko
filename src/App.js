@@ -8,6 +8,7 @@ import {
   ThemeProvider,
 } from './context';
 import { RootNavigator } from './navigation';
+import { darkTheme } from './theme';
 
 export default function App() {
   return (
@@ -17,7 +18,7 @@ export default function App() {
           <JobsProvider>
             <MechanicProfileProvider>
               <MechanicServicesProvider>
-                <StatusBar barStyle="light-content" backgroundColor="#000033" />
+                <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
                 <RootNavigator />
               </MechanicServicesProvider>
             </MechanicProfileProvider>

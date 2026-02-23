@@ -117,7 +117,7 @@ const TransactionDetailsScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
     paddingHorizontal: 16,
     paddingTop: 14,
   },

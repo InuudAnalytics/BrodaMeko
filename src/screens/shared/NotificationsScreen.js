@@ -12,7 +12,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../components';
 import { useAuth, useChat } from '../../context';
-import { darkTheme } from '../../theme';
+import { darkTheme, withAlpha } from '../../theme';
 import { ROLES, ROUTES } from '../../utils';
 
 const TABS = [
@@ -68,7 +68,7 @@ const MOCK_NOTIFICATIONS = [
 const TYPE_UI = {
   jobs: {
     icon: Briefcase01Icon,
-    bg: 'rgba(226,255,49,0.18)',
+    bg: withAlpha(darkTheme.colors.accent, 0.18),
     color: darkTheme.colors.accent,
   },
   payments: {
@@ -234,7 +234,7 @@ const NotificationsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   container: {
     flex: 1,

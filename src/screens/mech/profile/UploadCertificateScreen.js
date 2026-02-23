@@ -4,7 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const UploadCertificateScreen = ({ navigation, route }) => {
@@ -117,7 +117,7 @@ const UploadCertificateScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   container: {
     flex: 1,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   uploadCard: {
     borderWidth: 1.2,
-    borderColor: 'rgba(226,255,49,0.5)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.5),
     borderStyle: 'dashed',
     borderRadius: 10,
     backgroundColor: '#727497',

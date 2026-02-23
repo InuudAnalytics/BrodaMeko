@@ -31,7 +31,7 @@ const PlaceholderScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     flex: 1,

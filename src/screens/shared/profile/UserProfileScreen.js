@@ -326,7 +326,7 @@ const UserProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     paddingHorizontal: 12,

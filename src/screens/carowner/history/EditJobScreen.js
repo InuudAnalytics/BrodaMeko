@@ -4,7 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { MinusSignIcon, PlusSignIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { useJobs } from '../../../context';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const toImageItem = (image) => {
@@ -185,7 +185,7 @@ const EditJobScreen = ({ navigation, route }) => {
           label={loading.updateJob ? 'Saving...' : 'Save changes'}
           onPress={handleSubmit}
           disabled={loading.updateJob}
-          left={loading.updateJob ? <ActivityIndicator size="small" color="#000033" /> : null}
+          left={loading.updateJob ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
           style={styles.submitBtn}
         />
 
@@ -198,7 +198,7 @@ const EditJobScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     paddingHorizontal: 16,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     borderColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(226,255,49,0.08)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.08),
   },
   submitBtn: {
     marginTop: 14,

@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     borderTopWidth: 1,
     borderTopColor: darkTheme.colors.inputBorder,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
     paddingTop: 10,
     paddingBottom: 14,
     paddingHorizontal: 10,

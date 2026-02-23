@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Clock01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { getMechanicAssignedJobs } from '../../../services/jobs.service';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const TABS = [
@@ -233,7 +233,7 @@ const MechanicJobsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   container: {
     flex: 1,
@@ -297,9 +297,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(226,255,49,0.2)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.2),
     borderWidth: 1,
-    borderColor: 'rgba(226,255,49,0.42)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.42),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   urgentBadge: {
     borderWidth: 1,
     borderColor: darkTheme.colors.accent,
-    backgroundColor: 'rgba(226,255,49,0.14)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.14),
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,

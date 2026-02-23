@@ -9,7 +9,7 @@ import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { getWATGreeting, ROUTES } from '../../../utils';
 
 const extractFirstName = (user) => {
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: darkTheme.colors.accent,
-    backgroundColor: 'rgba(226,255,49,0.16)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.16),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: darkTheme.spacing.sm,

@@ -141,7 +141,7 @@ const FundWalletScreen = ({ navigation }) => {
           label={loadingTopUp ? 'Processing...' : 'Top up'}
           onPress={handleTopUp}
           disabled={!canSubmit || loadingTopUp || loadingVerify}
-          left={loadingTopUp ? <ActivityIndicator size="small" color="#000033" /> : null}
+          left={loadingTopUp ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
           style={styles.primaryBtn}
         />
 
@@ -169,7 +169,7 @@ const FundWalletScreen = ({ navigation }) => {
           label={loadingVerify ? 'Verifying...' : 'Verify payment'}
           onPress={handleVerify}
           disabled={!canVerify || loadingVerify || loadingTopUp}
-          left={loadingVerify ? <ActivityIndicator size="small" color="#000033" /> : null}
+          left={loadingVerify ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
           style={styles.verifyBtn}
         />
 
@@ -275,7 +275,7 @@ const FundWalletScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     flex: 1,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   checkoutScreen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   checkoutHeader: {
     minHeight: 48,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   checkoutErrorWrap: {
     paddingHorizontal: 16,

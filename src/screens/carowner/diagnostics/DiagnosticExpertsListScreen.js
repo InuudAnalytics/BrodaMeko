@@ -158,7 +158,7 @@ const DiagnosticExpertsListScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     minWidth: 98,
     minHeight: 42,
     borderRadius: 14,
-    backgroundColor: '#E2FF31',
+    backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,

@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#E2FF31',
+    backgroundColor: darkTheme.colors.accent,
     borderWidth: 4,
     borderColor: '#2B2B31',
   },

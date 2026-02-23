@@ -205,7 +205,7 @@ const EscrowFundingScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
     paddingHorizontal: darkTheme.spacing.lg,
     paddingTop: darkTheme.spacing.sm,
   },

@@ -284,7 +284,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
             Didn't receive the code?{' '}
           </AppText>
           <TouchableOpacity onPress={handleResend} disabled={isResending || isVerifying || isLockedOut}>
-            <AppText variant="muted" color="#000033" style={styles.resendLink}>
+            <AppText variant="muted" color={darkTheme.colors.background} style={styles.resendLink}>
               {isResending ? 'Resending...' : 'Resend code'}
             </AppText>
           </TouchableOpacity>

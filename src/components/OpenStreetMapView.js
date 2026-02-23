@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { darkTheme } from '../theme';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -13,7 +14,7 @@ const toNumber = (value, fallback) => {
 const DEFAULT_LAT = 6.5244;
 const DEFAULT_LNG = 3.3792;
 
-const buildHtml = (latitude, longitude) => {
+const buildHtml = (latitude, longitude, accentColor, baselineColor) => {
   const lat = latitude.toFixed(6);
   const lng = longitude.toFixed(6);
 
@@ -50,7 +51,7 @@ const buildHtml = (latitude, longitude) => {
 
       var markerIcon = L.divIcon({
         className: '',
-        html: '<div style="width:18px;height:18px;border-radius:50%;background:#E2FF31;border:3px solid #000033;box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>',
+        html: '<div style="width:18px;height:18px;border-radius:50%;background:${accentColor};border:3px solid ${baselineColor};box-shadow:0 0 6px rgba(0,0,0,0.5);"></div>',
         iconSize: [18, 18],
         iconAnchor: [9, 9]
       });
@@ -67,7 +68,7 @@ const OpenStreetMapView = ({ latitude, longitude }) => {
   const safeLongitude = clamp(toNumber(longitude, DEFAULT_LNG), -180, 180);
 
   const html = useMemo(
-    () => buildHtml(safeLatitude, safeLongitude),
+    () => buildHtml(safeLatitude, safeLongitude, darkTheme.colors.accent, darkTheme.colors.background),
     [safeLatitude, safeLongitude]
   );
 

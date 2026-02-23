@@ -26,7 +26,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import JobsContext from '../../../context/JobsContext';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const ISSUE_GROUPS = [
@@ -538,7 +538,7 @@ const ReportIssueScreen = ({ navigation }) => {
           disabled={isSubmitting || isCreatingJob}
           left={
             isSubmitting || isCreatingJob ? (
-              <ActivityIndicator size="small" color="#000033" />
+              <ActivityIndicator size="small" color={darkTheme.colors.background} />
             ) : null
           }
         />
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   },
   groupTabActive: {
     borderColor: darkTheme.colors.accent,
-    backgroundColor: 'rgba(226,255,49,0.16)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.16),
   },
   groupTabText: {
     color: darkTheme.colors.text,
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   },
   issueCardSelected: {
     borderColor: darkTheme.colors.accent,
-    backgroundColor: 'rgba(226,255,49,0.14)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.14),
   },
   issueIconWrap: {
     width: 38,
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   issueIconWrapSelected: {
-    backgroundColor: 'rgba(226,255,49,0.22)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.22),
   },
   issueText: {
     color: darkTheme.colors.text,
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
   uploadWrap: {
     borderWidth: 1.2,
     borderStyle: 'dashed',
-    borderColor: 'rgba(226,255,49,0.45)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.45),
     borderRadius: darkTheme.radius.lg,
     backgroundColor: 'rgba(152,154,190,0.7)',
     paddingHorizontal: darkTheme.spacing.sm,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
   uploadWrapEmpty: {
     borderWidth: 1.2,
     borderStyle: 'dashed',
-    borderColor: 'rgba(226,255,49,0.45)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.45),
     borderRadius: darkTheme.radius.lg,
     backgroundColor: 'rgba(152,154,190,0.7)',
     alignItems: 'center',
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: 'rgba(226,255,49,0.95)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.95),
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -8,7 +8,7 @@ import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { verifyAddContact as verifyAddContactService } from '../../../services/auth.service';
 import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { isValidNigerianPhoneDigits, pickSingleImageFromGallery, ROUTES, withNigerianCountryCode } from '../../../utils';
 
 const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
@@ -283,7 +283,7 @@ const EditProfileScreen = ({ navigation }) => {
           label={isSaving ? 'Updating...' : 'Update'}
           onPress={handleUpdate}
           disabled={isSaving}
-          left={isSaving ? <ActivityIndicator size="small" color="#000033" /> : null}
+          left={isSaving ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
         />
       </View>
     </ScreenContainer>
@@ -293,7 +293,7 @@ const EditProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   header: {
     paddingHorizontal: darkTheme.spacing.lg,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     borderRadius: 42,
     borderWidth: 1.4,
     borderColor: darkTheme.colors.accent,
-    backgroundColor: 'rgba(226,255,49,0.12)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.12),
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

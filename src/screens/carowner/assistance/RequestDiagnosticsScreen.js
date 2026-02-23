@@ -4,7 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const CHECKLIST_ITEMS = [
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.4,
     borderColor: darkTheme.colors.accent,
     borderRadius: darkTheme.radius.lg,
-    backgroundColor: 'rgba(226,255,49,0.08)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.08),
     padding: darkTheme.spacing.lg,
     marginBottom: darkTheme.spacing.xl,
   },

@@ -21,6 +21,17 @@ import { useChat } from '../../context/ChatContext';
 import { darkTheme } from '../../theme';
 import { pickSingleImageFromGallery, ROLES, ROUTES, useKeyboardLift } from '../../utils';
 
+const hexToRgba = (hex, alpha) => {
+  const cleaned = String(hex || '').replace('#', '').trim();
+  if (cleaned.length !== 6) {
+    return `rgba(230,199,20,${alpha})`;
+  }
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
 const BackIcon = ({ color }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
     <Path d="M15 6L9 12L15 18" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -676,7 +687,7 @@ const styles = StyleSheet.create({
   },
   socketDot: { width: 6, height: 6, borderRadius: 3 },
   socketDotConnected: { backgroundColor: '#00D64F' },
-  socketDotConnecting: { backgroundColor: '#E2FF31' },
+  socketDotConnecting: { backgroundColor: darkTheme.colors.accent },
   socketDotDisconnected: { backgroundColor: '#FF7F7F' },
   socketStatusText: { color: darkTheme.colors.muted, fontSize: 11, lineHeight: 14 },
   todayLabel: { textAlign: 'center', color: darkTheme.colors.muted, fontSize: darkTheme.typography.fontSizes.md, marginVertical: darkTheme.spacing.sm },
@@ -691,7 +702,7 @@ const styles = StyleSheet.create({
     paddingVertical: darkTheme.spacing.xs,
     borderRadius: 999,
     marginBottom: darkTheme.spacing.sm,
-    backgroundColor: 'rgba(226,255,49,0.08)',
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.08),
   },
   setPricePillActive: { backgroundColor: 'rgba(255,90,0,0.15)', borderColor: '#FF8A3D' },
   setPricePillText: { color: darkTheme.colors.accent, fontSize: 12, fontWeight: darkTheme.typography.fontWeights.medium },
@@ -713,7 +724,7 @@ const styles = StyleSheet.create({
   timestamp: { marginTop: 4, color: darkTheme.colors.muted, fontSize: 12, lineHeight: 16 },
   systemWrap: {
     alignSelf: 'center',
-    backgroundColor: 'rgba(226,255,49,0.13)',
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.13),
     borderRadius: darkTheme.radius.md,
     paddingHorizontal: darkTheme.spacing.md,
     paddingVertical: darkTheme.spacing.xs,
@@ -725,9 +736,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: darkTheme.spacing.lg,
     paddingVertical: darkTheme.spacing.md,
-    backgroundColor: 'rgba(226,255,49,0.16)',
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.16),
     borderWidth: 1,
-    borderColor: 'rgba(226,255,49,0.45)',
+    borderColor: hexToRgba(darkTheme.colors.accent, 0.45),
     alignItems: 'center',
   },
   priceQuoteTitle: { color: darkTheme.colors.muted, fontSize: 12, marginBottom: 4 },
@@ -752,10 +763,10 @@ const styles = StyleSheet.create({
     marginBottom: darkTheme.spacing.xs,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(226,255,49,0.5)',
+    borderColor: hexToRgba(darkTheme.colors.accent, 0.5),
     paddingVertical: 6,
     alignItems: 'center',
-    backgroundColor: 'rgba(226,255,49,0.12)',
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.12),
   },
   priceBannerText: { color: darkTheme.colors.accent, fontSize: 12, fontWeight: darkTheme.typography.fontWeights.medium },
   composerWrap: {

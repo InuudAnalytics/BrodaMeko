@@ -58,7 +58,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: darkTheme.spacing.lg,

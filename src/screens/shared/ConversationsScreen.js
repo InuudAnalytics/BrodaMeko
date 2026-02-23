@@ -2,7 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { AppText, ScreenContainer } from '../../components';
 import { useChat } from '../../context/ChatContext';
-import { darkTheme } from '../../theme';
+import { darkTheme, withAlpha } from '../../theme';
 
 const getConversationId = (item) =>
     String(item?.id || item?._id || item?.conversation_id || item?.conversationId || '').trim();
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(226,255,49,0.22)',
+        backgroundColor: withAlpha(darkTheme.colors.accent, 0.22),
         alignItems: 'center',
         justifyContent: 'center',
     },

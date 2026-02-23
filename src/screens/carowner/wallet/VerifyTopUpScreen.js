@@ -63,7 +63,7 @@ const VerifyTopUpScreen = ({ navigation, route }) => {
           label={loading ? 'Verifying...' : 'Verify Payment'}
           onPress={handleVerify}
           disabled={!canVerify || loading}
-          left={loading ? <ActivityIndicator size="small" color="#000033" /> : null}
+          left={loading ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
           style={styles.verifyBtn}
         />
 
@@ -77,7 +77,7 @@ const VerifyTopUpScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     flex: 1,

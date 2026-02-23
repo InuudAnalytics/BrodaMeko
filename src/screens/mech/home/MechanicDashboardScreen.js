@@ -8,7 +8,7 @@ import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { getAvailableJobs } from '../../../services/jobs.service';
 import { getWalletBalance } from '../../../services/wallet.service';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 
 const FILTERS = [
   { key: 'all', label: 'All jobs' },
@@ -277,7 +277,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     paddingHorizontal: 16,
@@ -471,9 +471,9 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(226,255,49,0.22)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.22),
     borderWidth: 1,
-    borderColor: 'rgba(226,255,49,0.45)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.45),
   },
   jobAvatarText: {
     color: darkTheme.colors.accent,
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   urgentPill: {
-    backgroundColor: 'rgba(226,255,49,0.15)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.15),
     borderWidth: 1,
     borderColor: darkTheme.colors.accent,
     borderRadius: 999,

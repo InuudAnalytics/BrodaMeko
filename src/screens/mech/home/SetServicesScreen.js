@@ -11,6 +11,17 @@ import {
 } from '../../../services/mechanic.services.service';
 import { darkTheme } from '../../../theme';
 
+const hexToRgba = (hex, alpha) => {
+  const cleaned = String(hex || '').replace('#', '').trim();
+  if (cleaned.length !== 6) {
+    return `rgba(230,199,20,${alpha})`;
+  }
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
 const formatIssueType = (value) =>
   String(value || '')
     .split('_')
@@ -443,7 +454,7 @@ const SetServicesScreen = () => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     paddingHorizontal: darkTheme.spacing.xl,
@@ -477,15 +488,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   issuePillSelected: {
-    borderColor: '#E2FF31',
-    backgroundColor: 'rgba(226,255,49,0.12)',
+    borderColor: darkTheme.colors.accent,
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.12),
   },
   issuePillText: {
     color: darkTheme.colors.text,
     fontSize: darkTheme.typography.fontSizes.sm,
   },
   issuePillTextSelected: {
-    color: '#E2FF31',
+    color: darkTheme.colors.accent,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   errorText: {

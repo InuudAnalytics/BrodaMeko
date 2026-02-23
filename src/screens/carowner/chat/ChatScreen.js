@@ -2,7 +2,19 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppBottomNav, AppText } from '../../../components';
+import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
+
+const hexToRgba = (hex, alpha) => {
+  const cleaned = String(hex || '').replace('#', '').trim();
+  if (cleaned.length !== 6) {
+    return `rgba(230,199,20,${alpha})`;
+  }
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
 
 const ChatScreen = ({ navigation, route }) => {
   const jobId = route?.params?.jobId;
@@ -85,15 +97,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: 'rgba(226,255,49,0.45)',
+    borderColor: hexToRgba(darkTheme.colors.accent, 0.45),
     borderRadius: 12,
-    backgroundColor: 'rgba(226,255,49,0.12)',
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.12),
     paddingHorizontal: 12,
     paddingVertical: 10,
     rowGap: 2,
   },
   summaryTitle: {
-    color: '#E2FF31',
+    color: darkTheme.colors.accent,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '600',

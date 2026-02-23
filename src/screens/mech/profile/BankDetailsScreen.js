@@ -5,7 +5,7 @@ import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { addMechanicBank, getMechanicBankList, verifyMechanicBank } from '../../../services/mechanic.service';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const normalizeBankItems = (payload) => {
@@ -408,7 +408,7 @@ const BankDetailsScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     flex: 1,
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dropdownItemActive: {
-    backgroundColor: 'rgba(226,255,49,0.15)',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.15),
   },
   dropdownItemText: {
     color: darkTheme.colors.text,

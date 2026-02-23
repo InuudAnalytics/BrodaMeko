@@ -7,7 +7,7 @@ import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { useMechanicProfile } from '../../../context';
 import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
-import { darkTheme } from '../../../theme';
+import { darkTheme, withAlpha } from '../../../theme';
 import { getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
@@ -177,7 +177,7 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#000033',
+    backgroundColor: darkTheme.colors.background,
   },
   content: {
     flex: 1,
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 225,
     borderWidth: 1.2,
-    borderColor: 'rgba(226,255,49,0.5)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.5),
     borderStyle: 'dashed',
     borderRadius: 10,
     backgroundColor: '#727497',
