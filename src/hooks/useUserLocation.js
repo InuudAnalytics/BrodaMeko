@@ -16,15 +16,6 @@ const PERMISSION_STATE = {
   blocked: 'blocked',
 };
 
-const WATCH_OPTIONS = {
-  enableHighAccuracy: true,
-  distanceFilter: 10,
-  interval: 4000,
-  fastestInterval: 3000,
-  forceRequestLocation: true,
-  showLocationDialog: true,
-};
-
 const CURRENT_POSITION_OPTIONS = {
   enableHighAccuracy: true,
   timeout: 15000,
@@ -83,7 +74,6 @@ export const useUserLocation = () => {
 
   const refreshOnce = useCallback(async () => {
     if (!LOCATION_ENABLED) {
-      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
       return null;
     }
 
@@ -120,34 +110,19 @@ export const useUserLocation = () => {
   }, [permissionStatus]);
 
   const startWatching = useCallback(() => {
-    if (!LOCATION_ENABLED) {
-      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
-      return;
-    }
-
-    if (permissionStatus !== PERMISSION_STATE.granted || watchIdRef.current !== null) {
-      return;
-    }
-
-    setError(null);
-    watchIdRef.current = Geolocation.watchPosition(
-      (position) => {
-        const next = toLocation(position);
-        if (!next) {
-          return;
-        }
-        setLocation(next);
-      },
-      (geoError) => {
-        setError(geoError?.message || 'Could not update your location.');
-      },
-      WATCH_OPTIONS
-    );
-  }, [permissionStatus]);
+    // NOTE: watchPosition is intentionally disabled on this build.
+    // android.location.FusedLocationProviderClient throws a native-level
+    // java.lang.IncompatibleClassChangeError from RNFusedLocation when
+    // startObserving/watchPosition is called. This is a JVM Error (not an
+    // Exception) so it cannot be caught in JS and crashes the native thread.
+    // Root cause: Play Services location library version mismatch in the build.
+    // Safe path: use the one-shot refreshOnce() read, called from useFocusEffect
+    // in DashboardScreen whenever the screen gains focus.
+    // TODO: RE-ENABLE watchPosition once Play Services location version is aligned.
+  }, []);
 
   const requestPermission = useCallback(async () => {
     if (!LOCATION_ENABLED) {
-      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
       setPermissionStatus(PERMISSION_STATE.blocked);
       setError(null);
       return PERMISSION_STATE.blocked;

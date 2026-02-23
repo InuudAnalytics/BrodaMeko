@@ -156,10 +156,19 @@ export const ChatProvider = ({ children }) => {
   const manualDisconnectRef = useRef(false);
   const activeConversationIdRef = useRef('');
   const socketReadyRef = useRef(false);
+  // Mirrors wsStatus so connectChatSocket can read the current value without
+  // adding wsStatus to its useCallback dependency array (which caused stale
+  // closures and spurious reconnect loops).
+  const wsStatusRef = useRef('idle');
 
   useEffect(() => {
     messagesByConversationIdRef.current = messagesByConversationId;
   }, [messagesByConversationId]);
+
+  // Keep wsStatusRef in sync with wsStatus state.
+  useEffect(() => {
+    wsStatusRef.current = wsStatus;
+  }, [wsStatus]);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -262,7 +271,7 @@ export const ChatProvider = ({ children }) => {
 
     if (
       activeConversationIdRef.current === safeConversationId &&
-      (wsStatus === 'connected' || wsStatus === 'connecting')
+      (wsStatusRef.current === 'connected' || wsStatusRef.current === 'connecting')
     ) {
       return true;
     }
@@ -340,7 +349,10 @@ export const ChatProvider = ({ children }) => {
     );
 
     return true;
-  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, token, wsStatus]);
+    // wsStatus intentionally omitted — read via wsStatusRef.current to avoid
+    // stale closure captures and spurious reconnect loops on status transitions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, token]);
 
   const clearActiveConversation = useCallback(() => {
     disconnectChatSocket();
@@ -747,6 +759,35 @@ export const ChatProvider = ({ children }) => {
     clearReconnectTimer();
     close();
   }, [clearReconnectTimer]);
+
+  // When the auth token changes (logout, login as different user, role switch),
+  // fully tear down the existing socket and reset all chat state so the new
+  // session starts clean. Without this the old authenticated socket leaks into
+  // the new session and stays permanently disconnected.
+  const prevTokenRef = useRef(token);
+  useEffect(() => {
+    if (prevTokenRef.current === token) {
+      prevTokenRef.current = token;
+      return;
+    }
+    prevTokenRef.current = token;
+
+    // Tear down.
+    manualDisconnectRef.current = true;
+    socketReadyRef.current = false;
+    clearReconnectTimer();
+    close();
+    wsStatusRef.current = 'idle';
+    setWsStatus('idle');
+
+    // Reset all chat state so the next session starts fresh.
+    setConversations([]);
+    setActiveConversation(null);
+    setMessagesByConversationId({});
+    activeConversationIdRef.current = '';
+    reconnectAttemptsRef.current = 0;
+    setError(null);
+  }, [token, clearReconnectTimer]);
 
   const value = useMemo(
     () => ({

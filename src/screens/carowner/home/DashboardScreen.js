@@ -1,10 +1,10 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Location06Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
-import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
@@ -78,7 +78,7 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
         <AppText style={styles.locationFallbackBody}>
           {locationEnabled
             ? 'Turn on location to find mechanics near you.'
-            : 'Location is temporarily disabled while Google Maps SDK billing/key activation is pending.'}
+            : 'Location is temporarily disabled while map setup is pending.'}
         </AppText>
 
         <TouchableOpacity
@@ -108,8 +108,9 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
 
 const DashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const mapRef = useRef(null);
-  const { location, permissionStatus, loading, requestPermission, startWatching, stopWatching, refreshOnce } = useUserLocation();
+  const { location, permissionStatus, loading, requestPermission, refreshOnce } =
+    useUserLocation();
+
   const firstName = extractFirstName(user);
   const greetingPrefix = getWATGreeting();
   const greetingText = firstName ? `${greetingPrefix}, ${firstName}` : greetingPrefix;
@@ -120,21 +121,16 @@ const DashboardScreen = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      if (!LOCATION_ENABLED) {
-        // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
+      if (!LOCATION_ENABLED || !hasLocationPermission) {
         return undefined;
       }
 
-      if (!hasLocationPermission) {
-        return undefined;
-      }
+      // watchPosition is disabled on this build (Play Services version mismatch).
+      // Refresh location with a single reading whenever the screen gains focus.
+      refreshOnce();
 
-      startWatching();
-
-      return () => {
-        stopWatching();
-      };
-    }, [hasLocationPermission, startWatching, stopWatching])
+      return undefined;
+    }, [hasLocationPermission, refreshOnce])
   );
 
   const locationBadgeText = useMemo(() => {
@@ -142,7 +138,7 @@ const DashboardScreen = ({ navigation }) => {
       return 'Detecting location...';
     }
 
-    return `Lat ${location.latitude.toFixed(4)} • Lng ${location.longitude.toFixed(4)}`;
+    return `Lat ${location.latitude.toFixed(4)} - Lng ${location.longitude.toFixed(4)}`;
   }, [location]);
 
   const handleTabPress = (routeName) => {
@@ -163,23 +159,15 @@ const DashboardScreen = ({ navigation }) => {
 
     if (status === 'granted') {
       await refreshOnce();
-      startWatching();
     }
-  }, [refreshOnce, requestPermission, startWatching]);
+  }, [refreshOnce, requestPermission]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.mapBackdrop}>
         {hasLocationPermission ? (
           <>
-            {/* TODO: ADD VALID API KEY. GOOGLE MAPS RENDERING IS INTENTIONALLY DISABLED UNTIL BILLING IS ENABLED. */}
-            <View style={styles.mapMockWrap} ref={mapRef}>
-              <View style={styles.mapLineA} />
-              <View style={styles.mapLineB} />
-              <View style={styles.mapLineC} />
-              <View style={styles.routeLine} />
-              <View style={styles.pin} />
-            </View>
+            <OpenStreetMapView latitude={location?.latitude} longitude={location?.longitude} />
 
             {!location ? (
               <View style={styles.locationLoadingOverlay}>
@@ -190,6 +178,10 @@ const DashboardScreen = ({ navigation }) => {
 
             <View style={styles.locationLiveBadge}>
               <AppText style={styles.locationLiveBadgeText}>{locationBadgeText}</AppText>
+            </View>
+
+            <View style={styles.osmAttribution}>
+              <AppText style={styles.osmAttributionText}>Map data © OpenStreetMap contributors</AppText>
             </View>
           </>
         ) : (
@@ -268,59 +260,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#2B2B31',
     overflow: 'hidden',
   },
-  mapMockWrap: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapLineA: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    width: 420,
-    height: 6,
-    backgroundColor: '#505057',
-    transform: [{ rotate: '-35deg' }],
-    opacity: 0.45,
-  },
-  mapLineB: {
-    position: 'absolute',
-    top: 180,
-    left: -40,
-    width: 460,
-    height: 6,
-    backgroundColor: '#4A4A51',
-    transform: [{ rotate: '12deg' }],
-    opacity: 0.4,
-  },
-  mapLineC: {
-    position: 'absolute',
-    bottom: 180,
-    left: 70,
-    width: 340,
-    height: 6,
-    backgroundColor: '#48484F',
-    transform: [{ rotate: '-22deg' }],
-    opacity: 0.35,
-  },
-  routeLine: {
-    position: 'absolute',
-    top: 210,
-    left: 58,
-    width: 16,
-    height: 300,
-    borderRadius: 8,
-    backgroundColor: '#2FAEFC',
-  },
-  pin: {
-    position: 'absolute',
-    top: 190,
-    left: 49,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#FF2D2D',
-    borderWidth: 4,
-    borderColor: '#2B2B31',
-  },
   topBar: {
     marginTop: darkTheme.spacing.xl,
     paddingHorizontal: darkTheme.spacing.lg,
@@ -360,6 +299,17 @@ const styles = StyleSheet.create({
   locationLiveBadgeText: {
     color: darkTheme.colors.accent,
     fontSize: darkTheme.typography.fontSizes.xs,
+  },
+  osmAttribution: {
+    position: 'absolute',
+    left: darkTheme.spacing.sm,
+    right: darkTheme.spacing.sm,
+    bottom: 6,
+    alignItems: 'center',
+  },
+  osmAttributionText: {
+    color: '#AAB0C2',
+    fontSize: 10,
   },
   locationLoadingText: {
     color: darkTheme.colors.text,

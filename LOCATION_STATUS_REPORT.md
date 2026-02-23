@@ -32,3 +32,33 @@ To fully restore live location:
 3. Verify on device.
 
 After this, app should return to live location behavior quickly without major rework.
+
+## OpenStreetMap (Quick Start Option)
+If we want to avoid waiting on Google billing right now, we can use OpenStreetMap tiles as a quick start.
+
+What this means:
+1. Keep our current location permission system.
+2. Replace Google map display with OpenStreetMap tile display.
+3. Show real map background without Google API billing dependency for now.
+
+Important note:
+- This quick start is good for testing and early usage.
+- It is not best for heavy production traffic.
+
+### Current Status
+- Quick start OpenStreetMap view is now integrated on the Car Owner dashboard.
+- Live device location + OSM map now work together in current build flow.
+
+## Production-Grade Option (Add Under Quick Start)
+For stable long-term use, we should move from public free tiles to a proper map tile provider or managed service.
+
+Recommended production path:
+1. Use a provider (for example MapTiler, Stadia, or self-hosted tile service).
+2. Get API access, SLA, better speed, and traffic reliability.
+3. Keep OpenStreetMap data attribution in app.
+4. Add caching, monitoring, and usage limits for smooth scale.
+
+Expected result:
+- Better reliability.
+- Better performance.
+- Lower risk of map outages as users grow.
