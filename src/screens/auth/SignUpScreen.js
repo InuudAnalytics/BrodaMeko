@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { CancelCircleIcon, CheckmarkCircle02Icon, RadioButtonIcon, ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
+import { CancelCircleIcon, CheckmarkCircle02Icon, ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
 import {
   AppButton,
   AppInput,
@@ -127,7 +127,7 @@ const SignUpScreen = ({ navigation, route }) => {
 
     return (
       <View style={styles.ruleRow} key={label}>
-        <HugeiconsIcon icon={isSuccess ? CheckmarkCircle02Icon : isError ? CancelCircleIcon : RadioButtonIcon} size={18} color={iconColor} strokeWidth={1.9} />
+        <HugeiconsIcon icon={isSuccess ? CheckmarkCircle02Icon : isError ? CancelCircleIcon : CheckmarkCircle02Icon} size={18} color={iconColor} strokeWidth={1.9} />
         <AppText variant="muted" style={[styles.ruleText, isSuccess ? styles.ruleTextSuccess : null, isError ? styles.ruleTextError : null]}>
           {label}
         </AppText>

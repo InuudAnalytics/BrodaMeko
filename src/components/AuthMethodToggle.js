@@ -88,8 +88,8 @@ const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', on
 
 const styles = StyleSheet.create({
   wrap: {
-    minHeight: 48,
-    borderRadius: darkTheme.radius.lg,
+    height: 60,
+    borderRadius: 26,
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,
     backgroundColor: 'transparent',
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     top: 2,
     left: 2,
     bottom: 2,
-    borderRadius: darkTheme.radius.md,
+    borderRadius: 24,
     backgroundColor: darkTheme.colors.accent,
   },
   option: {

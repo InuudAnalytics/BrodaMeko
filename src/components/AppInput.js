@@ -55,7 +55,12 @@ const styles = StyleSheet.create({
     marginBottom: darkTheme.spacing.md,
   },
   label: {
-    marginBottom: darkTheme.spacing.xs,
+    marginBottom: 8,
+    fontFamily: 'Raleway-Regular',
+    fontSize: 18,
+    lineHeight: 30,
+    fontWeight: '400',
+    color: darkTheme.colors.text,
   },
   inputWrap: {
     minHeight: 52,
@@ -70,7 +75,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.md,
+    fontFamily: 'Raleway-Light',
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '300',
     paddingVertical: darkTheme.spacing.sm,
   },
   left: {
