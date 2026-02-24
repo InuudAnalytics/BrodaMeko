@@ -6,6 +6,8 @@ import MechanicLiveTrackingScreen from '../screens/mech/assistance/MechanicLiveT
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
+import SupportChatMockScreen from '../screens/shared/SupportChatMockScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import AddContactSuccessScreen from '../screens/carowner/profile/AddContactSuccessScreen';
 import {
   BankDetailsScreen,
@@ -97,6 +99,8 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT_CHAT_MOCK} component={SupportChatMockScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.USER_PROFILE}

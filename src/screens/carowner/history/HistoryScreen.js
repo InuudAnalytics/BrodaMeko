@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
@@ -13,7 +13,7 @@ const MOCK_COMPLETED_JOBS = [
     id: 'mock_1',
     jobId: 'mock_1',
     mechanicName: 'Emeka Nwosu',
-    issueSummary: 'Flat Tire Replacement - Toyota',
+    issueSummary: 'Flat Tire Replacement',
     rating: 4.6,
     amount: 8500,
     hasAmount: true,
@@ -24,7 +24,7 @@ const MOCK_COMPLETED_JOBS = [
     id: 'mock_2',
     jobId: 'mock_2',
     mechanicName: 'Tunde Bakare',
-    issueSummary: 'Battery Jump Start - Toyota',
+    issueSummary: 'Battery Jump Start',
     rating: 4.6,
     amount: 5000,
     hasAmount: true,
@@ -35,7 +35,7 @@ const MOCK_COMPLETED_JOBS = [
     id: 'mock_3',
     jobId: 'mock_3',
     mechanicName: 'Chidi Okafor',
-    issueSummary: 'Engine Diagnostics - Mercedes AMG 2025',
+    issueSummary: 'Engine Diagnostics',
     rating: 4.6,
     amount: 8900,
     hasAmount: true,
@@ -85,7 +85,6 @@ const normalizeJob = (job, index) => {
     job?.title ||
     'Car service';
 
-  const vehicle = job?.car_make || job?.vehicle || '';
   const safeStatus = String(job?.status || 'pending').toLowerCase();
 
   const mechanicName =
@@ -102,7 +101,7 @@ const normalizeJob = (job, index) => {
     id: jobId,
     jobId,
     mechanicName,
-    issueSummary: vehicle ? `${normalizeIssueType(issue)} - ${vehicle}` : normalizeIssueType(issue),
+    issueSummary: normalizeIssueType(issue),
     rating: Number.isFinite(rating) ? rating : 4.6,
     amount,
     hasAmount,
@@ -110,6 +109,13 @@ const normalizeJob = (job, index) => {
     avatarUrl,
   };
 };
+
+const HISTORY_TABS = [
+  { key: 'all', label: 'All' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
 
 const pickJobsFromResponse = (responseData) => {
   if (Array.isArray(responseData)) {
@@ -219,6 +225,7 @@ const JobHistoryCard = ({ item, onViewDetails, onRate }) => {
 
 const HistoryScreen = ({ navigation }) => {
   const [jobs, setJobs] = useState([]);
+  const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [usingFallback, setUsingFallback] = useState(false);
@@ -253,6 +260,13 @@ const HistoryScreen = ({ navigation }) => {
     }, [fetchHistory])
   );
 
+  const filteredJobs = useMemo(() => {
+    if (activeTab === 'all') {
+      return jobs;
+    }
+    return jobs.filter((item) => String(item?.status || '').toLowerCase() === activeTab);
+  }, [activeTab, jobs]);
+
   const content = useMemo(() => {
     if (loading) {
       return <HistorySkeleton />;
@@ -268,7 +282,7 @@ const HistoryScreen = ({ navigation }) => {
       );
     }
 
-    if (!jobs.length) {
+    if (!filteredJobs.length) {
       return (
         <View style={styles.stateWrap}>
           <AppText style={styles.stateTitle}>No history yet</AppText>
@@ -282,7 +296,7 @@ const HistoryScreen = ({ navigation }) => {
         {usingFallback ? (
           <AppText style={styles.fallbackHint}>Showing recent mock history while connection is unavailable.</AppText>
         ) : null}
-        {jobs.map((item) => (
+        {filteredJobs.map((item) => (
           <JobHistoryCard
             key={item.id}
             item={item}
@@ -301,7 +315,7 @@ const HistoryScreen = ({ navigation }) => {
         ))}
       </View>
     );
-  }, [loading, error, jobs, usingFallback, fetchHistory, navigation]);
+  }, [loading, error, filteredJobs, usingFallback, fetchHistory, navigation]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -315,6 +329,21 @@ const HistoryScreen = ({ navigation }) => {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.tabsWrap}>
+            {HISTORY_TABS.map((tab) => {
+              const isActive = tab.key === activeTab;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.tabBtn, isActive ? styles.tabBtnActive : null]}
+                  activeOpacity={0.85}
+                  onPress={() => setActiveTab(tab.key)}
+                >
+                  <AppText style={[styles.tabText, isActive ? styles.tabTextActive : null]}>{tab.label}</AppText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
           {content}
         </ScrollView>
       </View>
@@ -362,6 +391,35 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 20,
   },
+  tabsWrap: {
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 8,
+    padding: 5,
+    columnGap: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    minHeight: 30,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+  tabBtnActive: {
+    backgroundColor: darkTheme.colors.accent,
+  },
+  tabText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  tabTextActive: {
+    color: 'rgba(26,26,26,0.92)',
+  },
   list: {
     rowGap: 12,
   },
@@ -372,8 +430,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   card: {
-    borderRadius: 18,
-    backgroundColor: '#2A2B66',
+    borderRadius: 14,
+    backgroundColor: 'rgba(125,128,173,0.26)',
     paddingVertical: 14,
     paddingHorizontal: 14,
   },
@@ -468,24 +526,25 @@ const styles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     minHeight: 38,
-    borderRadius: 19,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionBtnView: {
-    backgroundColor: '#8C8EAD',
+    backgroundColor: 'rgba(255,255,255,0.36)',
   },
   actionBtnViewText: {
     color: '#D6D8E9',
     fontSize: 15,
   },
   actionBtnRate: {
-    borderWidth: 1,
-    borderColor: '#A0C21F',
+    borderWidth: 0.5,
+    borderRadius: 18,
+    borderColor: darkTheme.colors.accent,
     backgroundColor: 'transparent',
   },
   actionBtnRateText: {
-    color: '#B6D62D',
+    color: darkTheme.colors.accent,
     fontSize: 15,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
@@ -516,8 +575,8 @@ const styles = StyleSheet.create({
     rowGap: 12,
   },
   skeletonCard: {
-    borderRadius: 18,
-    backgroundColor: '#2A2B66',
+    borderRadius: 14,
+    backgroundColor: 'rgba(125,128,173,0.2)',
     padding: 14,
   },
   skeletonLineWide: {

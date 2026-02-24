@@ -23,11 +23,15 @@ import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
 import EditJobScreen from '../screens/carowner/history/EditJobScreen';
 import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
 import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
+import EscrowFundingScreen from '../screens/carowner/wallet/EscrowFundingScreen';
+import PaymentSuccessScreen from '../screens/carowner/wallet/PaymentSuccessScreen';
 import WaitingMechanicScreen from '../screens/carowner/assistance/WaitingMechanicScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
+import SupportChatMockScreen from '../screens/shared/SupportChatMockScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
@@ -67,6 +71,16 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_FUND_WALLET}
         component={CarOwnerFundWalletScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_ESCROW_FUNDING}
+        component={EscrowFundingScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_PAYMENT_SUCCESS}
+        component={PaymentSuccessScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -175,6 +189,8 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT_CHAT_MOCK} component={SupportChatMockScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );

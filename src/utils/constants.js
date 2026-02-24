@@ -18,6 +18,8 @@ export const ROUTES = {
   CAR_OWNER_HISTORY: 'CarOwnerHistory',
   CAR_OWNER_REWARDS: 'CarOwnerRewards',
   CAR_OWNER_FUND_WALLET: 'CarOwnerFundWallet',
+  CAR_OWNER_ESCROW_FUNDING: 'CarOwnerEscrowFunding',
+  CAR_OWNER_PAYMENT_SUCCESS: 'CarOwnerPaymentSuccess',
   CAR_OWNER_VERIFY_TOP_UP: 'CarOwnerVerifyTopUp',
   CAR_OWNER_TRANSACTION_DETAILS: 'CarOwnerTransactionDetails',
   CAR_OWNER_WITHDRAW: 'CarOwnerWithdraw',
@@ -40,6 +42,8 @@ export const ROUTES = {
   CHANGE_PASSWORD: 'ChangePassword',
   PERSONAL_INFO: 'PersonalInfo',
   SUPPORT: 'Support',
+  SUPPORT_CHAT_MOCK: 'SupportChatMock',
+  PRIVACY_POLICY: 'PrivacyPolicy',
 
   MECH_DASHBOARD: 'MechDashboard',
   MECH_DASHBOARD_TABS: 'MechanicDashboardTabs',

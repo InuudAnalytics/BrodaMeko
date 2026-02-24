@@ -1,36 +1,36 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
   Briefcase01Icon,
-  DollarCircleIcon,
+  Cancel01Icon,
   Edit01Icon,
   HelpCircleIcon,
   Notification01Icon,
-  ShieldUserIcon,
   StarIcon,
   User02Icon,
-  Wallet01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '../../../services/jobs.service';
-import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
 
-const MOCK_USER = {
-  fullName: 'Saheed Niyi',
-};
-
 const SETTINGS_ROWS = [
   { key: 'personal', label: 'Personal information', icon: User02Icon },
-  { key: 'service_pricing', label: 'Service price', icon: DollarCircleIcon, mechanicOnly: true },
-  { key: 'change_password', label: 'Change password', icon: ShieldUserIcon },
   { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
   { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
 ];
@@ -51,76 +51,50 @@ const normalizeAvatarUri = (value) => {
 };
 
 const readUser = (user) => {
-  const fullName =
-    user?.full_name ||
-    user?.fullName ||
-    user?.name ||
-    MOCK_USER.fullName;
+  const fullName = user?.full_name || user?.fullName || user?.name || 'User';
   const email = String(user?.email || '').trim();
 
   return {
-    fullName: String(fullName || MOCK_USER.fullName),
+    fullName: String(fullName || 'User'),
     email,
-    avatarUri: normalizeAvatarUri(
-      user?.avatar ||
-      user?.avatar_url ||
-      user?.avatarUrl ||
-      user?.avatarUri ||
-      user?.profile_photo ||
-      user?.profile_photo_url ||
-      user?.profile_picture ||
-      user?.profilePicture ||
-      user?.image ||
-      user?.image_url ||
-      user?.photo_url ||
-      ''
-    ) || null,
+    avatarUri:
+      normalizeAvatarUri(
+        user?.avatar ||
+          user?.avatar_url ||
+          user?.avatarUrl ||
+          user?.avatarUri ||
+          user?.profile_photo ||
+          user?.profile_photo_url ||
+          user?.profile_picture ||
+          user?.profilePicture ||
+          user?.image ||
+          user?.image_url ||
+          user?.photo_url ||
+          ''
+      ) || null,
   };
-};
-
-const formatCurrency = (amount) => {
-  const value = Number(amount || 0);
-  return `₦${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const maskEmail = (value) => {
-  const email = String(value || '').trim();
-  if (!email.includes('@')) {
-    return email;
-  }
-
-  const [localPart, domain] = email.split('@');
-  const compactLocal = String(localPart || '');
-  const first = compactLocal.slice(0, 3);
-  const last = compactLocal.length > 3 ? compactLocal.slice(-2) : '';
-  return `${first}***${last}@${domain}`;
 };
 
 const SettingRow = ({ label, icon, onPress, isLast }) => {
   return (
-    <TouchableOpacity
-      style={[styles.settingRow, isLast && styles.settingRowLast]}
-      activeOpacity={0.85}
-      onPress={onPress}
-    >
+    <TouchableOpacity style={[styles.settingRow, isLast ? styles.settingRowLast : null]} activeOpacity={0.85} onPress={onPress}>
       <View style={styles.settingLeft}>
-        <HugeiconsIcon icon={icon} size={20} color={darkTheme.colors.text} strokeWidth={1.9} />
+        <HugeiconsIcon icon={icon} size={20} color="rgba(255,255,255,0.42)" strokeWidth={1.9} />
         <AppText style={styles.settingLabel}>{label}</AppText>
       </View>
-      <HugeiconsIcon icon={ArrowRight01Icon} size={18} color={darkTheme.colors.muted} strokeWidth={2.1} />
+      <HugeiconsIcon icon={ArrowRight01Icon} size={18} color="rgba(255,255,255,0.42)" strokeWidth={2.1} />
     </TouchableOpacity>
   );
 };
 
 const UserProfileScreen = ({ navigation }) => {
   const { user, role, signOut, isLoading } = useAuth();
-  const [walletBalance, setWalletBalance] = useState(0);
   const [totalJobs, setTotalJobs] = useState(0);
   const [rating, setRating] = useState(0);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showSupportSheet, setShowSupportSheet] = useState(false);
 
   const profile = readUser(user);
-  const settingsRows = SETTINGS_ROWS.filter((row) => !row.mechanicOnly || role === ROLES.MECH);
   const initials = profile.fullName
     .split(/\s+/)
     .filter(Boolean)
@@ -132,23 +106,17 @@ const UserProfileScreen = ({ navigation }) => {
     useCallback(() => {
       let active = true;
 
-      const fetchBalance = async () => {
+      const fetchStats = async () => {
         try {
           const mechanicId = String(user?.id || user?._id || user?.mechanic_id || '').trim();
-          const [walletResponse, jobsResponse, statsResponse] = await Promise.all([
-            getWalletBalance(),
-            role === ROLES.MECH
-              ? getMechanicAssignedJobs({ page: 1, limit: 100 })
-              : getCarOwnerJobs({ page: 1, limit: 100 }),
+          const [jobsResponse, statsResponse] = await Promise.all([
+            role === ROLES.MECH ? getMechanicAssignedJobs({ page: 1, limit: 100 }) : getCarOwnerJobs({ page: 1, limit: 100 }),
             role === ROLES.MECH && mechanicId ? getMechanicJobStats(mechanicId).catch(() => null) : Promise.resolve(null),
           ]);
 
           if (!active) {
             return;
           }
-
-          const walletPayload = walletResponse?.data || walletResponse || {};
-          setWalletBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
 
           const jobsPayload = jobsResponse?.data || jobsResponse || {};
           const statsPayload = statsResponse?.data || statsResponse || {};
@@ -161,32 +129,21 @@ const UserProfileScreen = ({ navigation }) => {
           const rawRating = Number(user?.rating || user?.average_rating || user?.avg_rating || 0);
           setRating(Number.isFinite(rawRating) ? rawRating : 0);
         } catch (error) {
-          // refined error handling can go here
+          // noop
         }
       };
 
-      fetchBalance();
-
+      fetchStats();
       return () => {
         active = false;
       };
     }, [role, user?.average_rating, user?.avg_rating, user?.id, user?._id, user?.mechanic_id, user?.rating])
   );
 
-  const handleViewWallet = () => {
-    if (role === ROLES.MECH) {
-      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'wallet' });
-      return;
-    }
-
-    navigation.navigate(ROUTES.CAR_OWNER_REWARDS);
-  };
-
   const handleSignOut = async () => {
     if (isSigningOut) {
       return;
     }
-
     setIsSigningOut(true);
     try {
       await signOut();
@@ -195,44 +152,47 @@ const UserProfileScreen = ({ navigation }) => {
     }
   };
 
+  const handlePersonalInfo = () => {
+    if (role === ROLES.MECH) {
+      navigation.navigate(ROUTES.MECH_EDIT_PROFILE);
+      return;
+    }
+    navigation.navigate(ROUTES.CAR_OWNER_EDIT_PROFILE);
+  };
+
+  const handleSupportAction = (target) => {
+    setShowSupportSheet(false);
+    if (target === 'support_center') {
+      navigation.navigate(ROUTES.SUPPORT);
+      return;
+    }
+    if (target === 'chat') {
+      navigation.navigate(ROUTES.SUPPORT_CHAT_MOCK);
+      return;
+    }
+    navigation.navigate(ROUTES.PRIVACY_POLICY);
+  };
+
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            activeOpacity={0.8}
-            onPress={() => navigation.goBack()}
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#FFFFFF" strokeWidth={2.2} />
+          <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
           </TouchableOpacity>
           <AppText style={styles.heading}>User profile</AppText>
         </View>
 
         <View style={styles.userBlock}>
           <View style={styles.avatar}>
-            {profile.avatarUri ? (
-              <Image source={{ uri: profile.avatarUri }} style={styles.avatarImage} />
-            ) : (
-              <AppText style={styles.avatarText}>{initials}</AppText>
-            )}
+            {profile.avatarUri ? <Image source={{ uri: profile.avatarUri }} style={styles.avatarImage} /> : <AppText style={styles.avatarText}>{initials}</AppText>}
           </View>
-          <AppText variant="subtitle" style={styles.name}>
-            {profile.fullName}
-          </AppText>
-          {profile.email ? (
-            <View style={styles.emailRow}>
-              <AppText variant="muted" style={styles.email}>
-                {maskEmail(profile.email)}
-              </AppText>
-            </View>
-          ) : null}
+          <AppText style={styles.name}>{profile.fullName}</AppText>
+          {profile.email ? <AppText style={styles.email}>{profile.email}</AppText> : null}
 
           <AppButton
             label="Edit profile"
-            onPress={() =>
-              navigation.navigate(role === ROLES.MECH ? ROUTES.MECH_EDIT_PROFILE : ROUTES.CAR_OWNER_EDIT_PROFILE)
-            }
+            onPress={handlePersonalInfo}
             style={styles.editButton}
             textStyle={styles.editButtonText}
             icon={Edit01Icon}
@@ -241,77 +201,49 @@ const UserProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        <View style={styles.walletCard}>
-          <View style={styles.walletTop}>
-            <View>
-              <AppText variant="muted" style={styles.walletLabel}>
-                Wallet balance
-              </AppText>
-              <AppText style={styles.walletAmount}>{formatCurrency(walletBalance)}</AppText>
+        <View style={styles.statsCard}>
+          <View style={styles.statChip}>
+            <View style={styles.statIconWrap}>
+              <HugeiconsIcon icon={Briefcase01Icon} size={15} color={darkTheme.colors.accent} strokeWidth={2} />
             </View>
-
-            <AppButton
-              label="View wallet"
-              onPress={handleViewWallet}
-              style={styles.walletCta}
-              textStyle={styles.walletCtaText}
-              icon={Wallet01Icon}
-              iconSize={15}
-              iconColor="#1A1A1A"
-            />
+            <View>
+              <AppText style={styles.statValue}>{totalJobs}</AppText>
+              <AppText style={styles.statLabel}>Total jobs</AppText>
+            </View>
           </View>
 
-          <View style={styles.chipsRow}>
-            <View style={styles.chip}>
-              <View style={styles.chipContent}>
-                <View style={styles.chipIconBadge}>
-                  <HugeiconsIcon icon={Briefcase01Icon} size={14} color={darkTheme.colors.accent} strokeWidth={2} />
-                </View>
-                <View style={styles.chipTextColumn}>
-                  <AppText style={styles.chipValue}>{totalJobs}</AppText>
-                  <AppText variant="muted" style={styles.chipLabel}>
-                    Total jobs
-                  </AppText>
-                </View>
-              </View>
+          <View style={styles.statChip}>
+            <View style={styles.statIconWrap}>
+              <HugeiconsIcon icon={StarIcon} size={15} color={darkTheme.colors.accent} strokeWidth={2} />
             </View>
-            <View style={styles.chip}>
-              <View style={styles.chipContent}>
-                <View style={styles.chipIconBadge}>
-                  <HugeiconsIcon icon={StarIcon} size={14} color={darkTheme.colors.accent} strokeWidth={2} />
-                </View>
-                <View style={styles.chipTextColumn}>
-                  <AppText style={styles.chipValue}>{rating ? rating.toFixed(1) : '0.0'}</AppText>
-                  <AppText variant="muted" style={styles.chipLabel}>
-                    Ratings
-                  </AppText>
-                </View>
-              </View>
+            <View>
+              <AppText style={styles.statValue}>{rating ? rating.toFixed(1) : '0.0'}</AppText>
+              <AppText style={styles.statLabel}>Ratings</AppText>
             </View>
           </View>
         </View>
 
         <AppText style={styles.settingsTitle}>Settings</AppText>
         <View style={styles.settingsCard}>
-          {settingsRows.map((row, index) => (
+          {SETTINGS_ROWS.map((row, index) => (
             <SettingRow
               key={row.key}
               label={row.label}
               icon={row.icon}
-              isLast={index === settingsRows.length - 1}
-              onPress={() =>
-                row.key === 'help'
-                  ? navigation.navigate(ROUTES.SUPPORT)
-                  : row.key === 'personal'
-                    ? navigation.navigate(ROUTES.PERSONAL_INFO)
-                  : row.key === 'service_pricing'
-                    ? navigation.navigate(ROUTES.MECH_SERVICE_PRICING)
-                  : row.key === 'change_password'
-                    ? navigation.navigate(ROUTES.CHANGE_PASSWORD)
-                  : row.key === 'notifications'
-                    ? navigation.navigate('Notifications')
-                  : navigation.navigate('Placeholder', { title: row.label })
-              }
+              isLast={index === SETTINGS_ROWS.length - 1}
+              onPress={() => {
+                if (row.key === 'help') {
+                  setShowSupportSheet(true);
+                  return;
+                }
+                if (row.key === 'personal') {
+                  handlePersonalInfo();
+                  return;
+                }
+                if (row.key === 'notifications') {
+                  navigation.navigate('Notifications');
+                }
+              }}
             />
           ))}
         </View>
@@ -320,11 +252,29 @@ const UserProfileScreen = ({ navigation }) => {
           label={isSigningOut ? 'Logging out...' : 'Logout'}
           onPress={handleSignOut}
           disabled={isSigningOut || isLoading}
-          left={isSigningOut ? <ActivityIndicator size="small" color="#FF7B8A" /> : null}
+          left={isSigningOut ? <ActivityIndicator size="small" color="#C73B4A" /> : null}
           style={styles.logoutButton}
           textStyle={styles.logoutText}
         />
       </ScrollView>
+
+      <Modal visible={showSupportSheet} transparent animationType="fade" onRequestClose={() => setShowSupportSheet(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowSupportSheet(false)} />
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <AppText style={styles.sheetTitle}>Help & Support</AppText>
+              <TouchableOpacity style={styles.sheetCloseBtn} activeOpacity={0.85} onPress={() => setShowSupportSheet(false)}>
+                <HugeiconsIcon icon={Cancel01Icon} size={16} color="rgba(255,255,255,0.65)" strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+
+            <SettingRow label="Support center" icon={HelpCircleIcon} onPress={() => handleSupportAction('support_center')} />
+            <SettingRow label="Chat with BrodaMeko" icon={Notification01Icon} onPress={() => handleSupportAction('chat')} />
+            <SettingRow label="Privacy policy" icon={User02Icon} onPress={() => handleSupportAction('privacy')} isLast />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -335,22 +285,22 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   content: {
-    paddingHorizontal: 12,
-    paddingTop: 4,
-    paddingBottom: darkTheme.spacing.xxl,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 28,
   },
   header: {
-    minHeight: 36,
+    minHeight: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
     position: 'relative',
   },
   backButton: {
     position: 'absolute',
     left: 0,
-    height: 32,
-    width: 32,
+    height: 34,
+    width: 34,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -362,15 +312,15 @@ const styles = StyleSheet.create({
   },
   userBlock: {
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
   },
   avatar: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    backgroundColor: '#FF8A42',
-    borderWidth: 1.2,
-    borderColor: '#FF8A42',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#F58C43',
+    borderWidth: 2,
+    borderColor: '#D1A527',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -381,146 +331,100 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   avatarText: {
-    color: '#1A1A1A',
-    fontSize: 22,
+    color: '#111133',
+    fontSize: 24,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   name: {
     color: darkTheme.colors.text,
-    marginTop: 8,
+    marginTop: 10,
     fontSize: 20,
-    lineHeight: 24,
+    lineHeight: 22,
+    // fontFamily: darkTheme.typography.fontFamilies.heading,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     textAlign: 'center',
   },
-  emailRow: {
-    marginTop: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 4,
-  },
   email: {
-    color: darkTheme.colors.muted,
+    marginTop: 3,
+    color: 'rgba(255,255,255,0.54)',
     fontSize: 14,
-    lineHeight: 16,
+    lineHeight: 22,
   },
   editButton: {
-    marginTop: 10,
+    marginTop: 12,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
-    minHeight: 34,
+    borderColor: 'rgba(230,199,20,0.55)',
+    minHeight: 36,
+    borderRadius: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
   },
   editButtonText: {
     color: darkTheme.colors.accent,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  walletCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+  statsCard: {
     borderRadius: 14,
-    backgroundColor: 'rgba(120,122,170,0.38)',
-    paddingHorizontal: 16,
-    paddingTop: 25,
-    marginBottom: 16,
-    gap: 16,
-    height: 195,
+    backgroundColor: 'rgba(60,211,66,0.55)',
+    minHeight: 96,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 20,
+    flexDirection: 'row',
+    columnGap: 12,
   },
-  walletTop: {
+  statChip: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    columnGap: darkTheme.spacing.sm,
-  },
-  walletLabel: {
-    color: darkTheme.colors.muted,
-    fontSize: 14,
-    lineHeight: 16,
-  },
-  walletAmount: {
-    color: darkTheme.colors.text,
-    marginTop: 4,
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  walletCta: {
-    minHeight: 42,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-  },
-  walletCtaText: {
-    color: '#1A1A1A',
-    fontSize: 14,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  chipsRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    columnGap: 10,
-  },
-  chip: {
-    flex: 1,
-    borderWidth: 0,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  chipContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     columnGap: 8,
   },
-  chipIconBadge: {
-    height: 26,
+  statIconWrap: {
     width: 26,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 0,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipTextColumn: {
-    flex: 1,
-  },
-  chipLabel: {
-    color: 'rgba(255,255,255,0.62)',
-    fontSize: darkTheme.typography.fontSizes.xs,
-    lineHeight: 16,
-  },
-  chipValue: {
+  statValue: {
     color: darkTheme.colors.text,
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.semibold,
-    lineHeight: 20,
+  },
+  statLabel: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.68)',
+    fontSize: 12,
+    lineHeight: 18,
   },
   settingsTitle: {
     color: darkTheme.colors.text,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.medium,
     marginBottom: 8,
   },
   settingsCard: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 14,
-    backgroundColor: 'transparent',
+    borderRadius: 12,
+    gap: 8,
     marginBottom: 18,
     overflow: 'hidden',
   },
   settingRow: {
-    minHeight: 52,
-    paddingHorizontal: 14,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.3,
     borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 4,
   },
   settingRowLast: {
     borderBottomWidth: 0,
@@ -528,24 +432,67 @@ const styles = StyleSheet.create({
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: 12,
+    columnGap: 10,
   },
   settingLabel: {
-    color: 'rgba(255,255,255,0.74)',
+    color: 'rgba(255,255,255,0.45)',
     fontSize: 14,
-    lineHeight: 18,
-    fontWeight: darkTheme.typography.fontWeights.regular,
+    lineHeight: 24,
   },
   logoutButton: {
-    minHeight: 42,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,77,109,0.28)',
-    borderWidth: 0,
+    marginTop: 6,
+    width: '90%',
+    alignSelf: 'center',
+    maxWidth: 297,
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: 'rgba(207,61,61,0.32)',
   },
   logoutText: {
-    color: '#FF7B8A',
-    fontSize: 16,
+    color: '#CF3D3DF7',
+    fontSize: 14,
     fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(86, 89, 128, 0.62)',
+  },
+  sheet: {
+    minHeight: '30%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: darkTheme.colors.background,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 16,
+  },
+  sheetHeader: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  sheetTitle: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  sheetCloseBtn: {
+    position: 'absolute',
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

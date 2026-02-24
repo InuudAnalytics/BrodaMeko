@@ -230,7 +230,7 @@ const NotificationsScreen = ({ navigation }) => {
             return (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+                style={[styles.tabBtn, isActive ? styles.tabBtnActive : null]}
                 activeOpacity={0.85}
                 onPress={() => setActiveTab(tab.key)}
               >
@@ -351,29 +351,31 @@ const styles = StyleSheet.create({
   tabsWrap: {
     marginTop: 10,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 8,
+    padding: 5,
+    columnGap: 4,
   },
   tabBtn: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 999,
-    paddingVertical: 8,
+    flex: 1,
+    minHeight: 30,
     paddingHorizontal: 12,
-    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
   },
   tabBtnActive: {
     backgroundColor: darkTheme.colors.accent,
-    borderColor: darkTheme.colors.accent,
   },
   tabText: {
-    color: darkTheme.colors.text,
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
     lineHeight: 16,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   tabTextActive: {
-    color: '#1A1A1A',
+    color: 'rgba(26,26,26,0.92)',
   },
   list: {
     paddingTop: 12,

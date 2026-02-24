@@ -1,203 +1,173 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppText, ScreenContainer } from '../../../components';
+import { useChat } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
-const BackIcon = ({ color }) => {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M15 6L9 12L15 18" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-};
-
-const MOCK_JOB = {
-  issue: 'Engine misfire',
-  vehicle: 'Toyota Camry',
-  mechanic: 'Shittu Hassan',
-  walletBalance: 10000,
-};
-
-const MOCK_BREAKDOWN = {
-  diagnosticFee: 2000,
-  labour: 4560,
-  spareParts: 6200,
-  serviceFee: 1770,
-};
+const BackIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Path d="M15 6L9 12L15 18" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
 
 const formatNaira = (value) => {
   const amount = Number(value || 0);
-  return `₦${amount.toLocaleString()}`;
+  return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+};
+
+const RadioOption = ({ label, active, onPress }) => {
+  return (
+    <TouchableOpacity style={styles.paymentOption} activeOpacity={0.85} onPress={onPress}>
+      <View style={styles.radioOuter}>{active ? <View style={styles.radioInner} /> : null}</View>
+      <AppText style={styles.paymentLabel}>{label}</AppText>
+    </TouchableOpacity>
+  );
 };
 
 const EscrowFundingScreen = ({ navigation, route }) => {
-  const [isPaying, setIsPaying] = useState(false);
+  const { respondQuotation, initiatePaymentForJob, addLocalMessage } = useChat();
   const [paymentMethod, setPaymentMethod] = useState('card');
+  const [paying, setPaying] = useState(false);
 
-  const job = route?.params?.job || MOCK_JOB;
-  const breakdown = route?.params?.breakdown || MOCK_BREAKDOWN;
+  const quotationId = String(route?.params?.quotationId || '').trim();
+  const conversationId = String(route?.params?.conversationId || '').trim();
+  const jobId = String(route?.params?.jobId || '').trim();
 
-  const summary = useMemo(
-    () => ({
-      issue: job?.issue || 'Engine misfire',
-      vehicle: job?.vehicle || 'Toyota Camry',
-      mechanic: job?.mechanic || 'Shittu Hassan',
-    }),
-    [job]
+  const issueSummary = route?.params?.issueSummary || {};
+  const mechanic = route?.params?.mechanic || {};
+  const mechanicName = mechanic?.name || mechanic?.full_name || 'Assigned mechanic';
+  const vehicleLabel = route?.params?.vehicle || issueSummary?.carMake || 'Not specified';
+  const issueLabel = issueSummary?.issueType || issueSummary?.issue || 'Issue not specified';
+
+  const quoteAmount = Number(route?.params?.quoteAmount || 0);
+  const diagnosticFee = Number(route?.params?.diagnosticFee || 0);
+  const sparkPlugs = Number(route?.params?.sparkPlugs || 0);
+  const serviceFee = Math.round(quoteAmount * 0.08);
+  const totalFee = diagnosticFee + quoteAmount + sparkPlugs + serviceFee;
+
+  const summaryRows = useMemo(
+    () => [
+      { label: 'Issue', value: String(issueLabel || '').replace(/_/g, ' ') },
+      { label: 'Vehicle', value: vehicleLabel },
+      { label: 'Mechanic', value: mechanicName },
+    ],
+    [issueLabel, mechanicName, vehicleLabel]
   );
 
-  const fees = useMemo(() => {
-    const diagnosticFee = Number(breakdown?.diagnosticFee || 0);
-    const labour = Number(breakdown?.labour || 0);
-    const spareParts = Number(breakdown?.spareParts || breakdown?.parts || 0);
-    const serviceFee = Number(breakdown?.serviceFee || 0);
-    const totalFee = diagnosticFee + labour + spareParts + serviceFee;
+  const breakdownRows = useMemo(
+    () => [
+      { label: 'Diagnostic fee', value: formatNaira(diagnosticFee) },
+      { label: 'Labour', value: formatNaira(quoteAmount) },
+      { label: 'Spark plugs', value: formatNaira(sparkPlugs) },
+      { label: 'Service fee', value: formatNaira(serviceFee) },
+    ],
+    [diagnosticFee, quoteAmount, serviceFee, sparkPlugs]
+  );
 
-    return {
-      diagnosticFee,
-      labour,
-      spareParts,
-      serviceFee,
-      totalFee,
-    };
-  }, [breakdown]);
-
-  const fundEscrow = async () => {
-    const walletBalance = Number(job?.walletBalance || 0);
-
-    if (walletBalance < fees.totalFee) {
-      navigation.navigate(ROUTES.CAR_OWNER_FUND_WALLET);
+  const handleConfirmAndPay = async () => {
+    if (!quotationId || !conversationId || !jobId) {
+      Alert.alert('Unable to continue', 'Payment context is incomplete.');
       return;
     }
 
-    navigation.navigate('PaymentSuccessScreen', { payeeName: 'Saheed Niyi' });
-  };
-
-  const handleConfirmAndPay = async () => {
-    setIsPaying(true);
-
+    setPaying(true);
     try {
-      await fundEscrow();
+      await respondQuotation(conversationId, {
+        quotation_id: quotationId,
+        action: 'accept',
+      });
+
+      // Backend currently accepts wallet/paystack/cash.
+      // UI has card/transfer; both routes are processed through paystack.
+      await initiatePaymentForJob(jobId, 'paystack');
+
+      addLocalMessage(conversationId, {
+        type: 'system',
+        text: 'Price accepted',
+      });
+
+      navigation.replace(ROUTES.CAR_OWNER_PAYMENT_SUCCESS, {
+        payeeName: mechanicName,
+        nextRoute: ROUTES.CAR_OWNER_DASHBOARD,
+        nextParams: {
+          activeSession: {
+            status: 'active',
+            jobId,
+            mechanicId: route?.params?.mechanicId || '',
+            conversationId,
+            agreedPrice: quoteAmount || null,
+            mechanic,
+            issueSummary,
+          },
+        },
+      });
+    } catch (error) {
+      Alert.alert('Payment failed', error?.message || 'Could not complete payment.');
     } finally {
-      setIsPaying(false);
+      setPaying(false);
     }
   };
 
   return (
-    <ScreenContainer style={styles.screen} edges={['left', 'right', 'bottom']}>
+    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
           <BackIcon color={darkTheme.colors.text} />
         </TouchableOpacity>
-        <AppText variant="subtitle" style={styles.headerTitle}>
-          Payment
-        </AppText>
-        <View style={styles.backButton} />
+        <AppText style={styles.headerTitle}>Payment</AppText>
+        <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.section}>
-        <AppText variant="subtitle" style={styles.sectionTitle}>
-          Job summary
-        </AppText>
-
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Issue
-          </AppText>
-          <AppText style={styles.value}>{summary.issue}</AppText>
-        </View>
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Vehicle
-          </AppText>
-          <AppText style={styles.value}>{summary.vehicle}</AppText>
-        </View>
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Mechanic
-          </AppText>
-          <AppText style={styles.value}>{summary.mechanic}</AppText>
-        </View>
+        <AppText style={styles.sectionTitle}>Job summary</AppText>
+        {summaryRows.map((row) => (
+          <View key={row.label} style={styles.row}>
+            <AppText style={styles.rowLabel}>{row.label}</AppText>
+            <AppText style={styles.rowValue}>{row.value}</AppText>
+          </View>
+        ))}
       </View>
 
       <View style={styles.section}>
-        <AppText variant="subtitle" style={styles.sectionTitle}>
-          Cost breakdown
-        </AppText>
-
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Diagnostic fee
-          </AppText>
-          <AppText style={styles.value}>{formatNaira(fees.diagnosticFee)}</AppText>
-        </View>
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Labour
-          </AppText>
-          <AppText style={styles.value}>{formatNaira(fees.labour)}</AppText>
-        </View>
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Spare parts
-          </AppText>
-          <AppText style={styles.value}>{formatNaira(fees.spareParts)}</AppText>
-        </View>
-        <View style={styles.row}>
-          <AppText variant="muted" style={styles.label}>
-            Service fee
-          </AppText>
-          <AppText style={styles.value}>{formatNaira(fees.serviceFee)}</AppText>
-        </View>
+        <AppText style={styles.sectionTitle}>Cost breakdown</AppText>
+        {breakdownRows.map((row) => (
+          <View key={row.label} style={styles.row}>
+            <AppText style={styles.rowLabel}>{row.label}</AppText>
+            <AppText style={styles.rowValue}>{row.value}</AppText>
+          </View>
+        ))}
         <View style={styles.row}>
           <AppText style={styles.totalLabel}>Total fee</AppText>
-          <AppText style={styles.totalValue}>{formatNaira(fees.totalFee)}</AppText>
+          <AppText style={styles.totalValue}>{formatNaira(totalFee)}</AppText>
         </View>
       </View>
 
       <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.paymentOption}
-          activeOpacity={0.85}
+        <RadioOption
+          label="Pay with your ATM card"
+          active={paymentMethod === 'card'}
           onPress={() => setPaymentMethod('card')}
-        >
-          <View style={styles.radioOuter}>
-            {paymentMethod === 'card' ? <View style={styles.radioInner} /> : null}
-          </View>
-          <AppText style={styles.paymentLabel}>Pay with your ATM card</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.paymentOption}
-          activeOpacity={0.85}
+        />
+        <RadioOption
+          label="Pay with transfer"
+          active={paymentMethod === 'transfer'}
           onPress={() => setPaymentMethod('transfer')}
-        >
-          <View style={styles.radioOuter}>
-            {paymentMethod === 'transfer' ? <View style={styles.radioInner} /> : null}
-          </View>
-          <AppText style={styles.paymentLabel}>Pay with transfer</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.paymentOption}
-          activeOpacity={0.85}
-          onPress={() => setPaymentMethod('cash')}
-        >
-          <View style={styles.radioOuter}>
-            {paymentMethod === 'cash' ? <View style={styles.radioInner} /> : null}
-          </View>
-          <AppText style={styles.paymentLabel}>Pay with cash on arrival</AppText>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.ctaWrap}>
-        <AppButton
-          label={isPaying ? 'Processing...' : 'Confirm and pay'}
-          onPress={handleConfirmAndPay}
-          disabled={isPaying}
-          left={isPaying ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
         />
       </View>
+
+      <View style={styles.spacer} />
+
+      <TouchableOpacity
+        style={[styles.confirmButton, paying ? styles.confirmButtonBusy : null]}
+        activeOpacity={0.88}
+        onPress={handleConfirmAndPay}
+        disabled={paying}
+      >
+        {paying ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
+        <AppText style={styles.confirmButtonText}>{paying ? 'Processing...' : 'Confirm and pay'}</AppText>
+      </TouchableOpacity>
     </ScreenContainer>
   );
 };
@@ -206,87 +176,122 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: darkTheme.colors.background,
-    paddingHorizontal: darkTheme.spacing.lg,
-    paddingTop: darkTheme.spacing.sm,
+    paddingHorizontal: darkTheme.spacing.md,
+    paddingTop: darkTheme.spacing.xs,
+    paddingBottom: darkTheme.spacing.xl,
   },
   header: {
-    flexDirection: 'row',
+    minHeight: 44,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: darkTheme.spacing.xl,
+    position: 'relative',
   },
   backButton: {
-    width: 28,
-    height: 28,
+    position: 'absolute',
+    left: 0,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.lg,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  headerSpacer: {
+    width: 36,
+    height: 36,
   },
   section: {
     marginBottom: darkTheme.spacing.lg,
   },
   sectionTitle: {
     color: darkTheme.colors.text,
+    fontSize: 31,
+    lineHeight: 36,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
     marginBottom: darkTheme.spacing.sm,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: darkTheme.spacing.xs,
+    marginBottom: 10,
   },
-  label: {
-    color: 'rgba(255,255,255,0.58)',
-    fontSize: darkTheme.typography.fontSizes.md,
+  rowLabel: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: darkTheme.typography.fontWeights.regular,
   },
-  value: {
-    color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.md,
-    fontWeight: darkTheme.typography.fontWeights.medium,
+  rowValue: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: darkTheme.typography.fontWeights.regular,
+    textTransform: 'capitalize',
   },
   totalLabel: {
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.md,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: darkTheme.typography.fontWeights.semibold,
-    marginTop: darkTheme.spacing.xs,
   },
   totalValue: {
     color: darkTheme.colors.accent,
-    fontSize: darkTheme.typography.fontSizes.lg,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: darkTheme.typography.fontWeights.semibold,
-    marginTop: darkTheme.spacing.xs,
   },
   paymentOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: darkTheme.spacing.sm,
-    marginBottom: darkTheme.spacing.sm,
+    marginBottom: 12,
   },
   radioOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.6,
-    borderColor: 'rgba(255,255,255,0.55)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 8,
   },
   radioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: darkTheme.colors.accent,
   },
   paymentLabel: {
-    color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.sm,
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 24,
+    lineHeight: 30,
   },
-  ctaWrap: {
-    marginTop: 'auto',
-    marginBottom: darkTheme.spacing.xxl,
+  spacer: {
+    flex: 1,
+  },
+  confirmButton: {
+    minHeight: 56,
+    borderRadius: 14,
+    backgroundColor: darkTheme.colors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 8,
+  },
+  confirmButtonBusy: {
+    opacity: 0.9,
+  },
+  confirmButtonText: {
+    color: darkTheme.colors.background,
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
 });
 

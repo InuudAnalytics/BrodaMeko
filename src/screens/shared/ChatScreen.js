@@ -192,7 +192,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     sendTypingEvent,
     sendQuotation,
     respondQuotation,
-    initiatePaymentForJob,
     wsStatus,
   } = useChat();
 
@@ -205,9 +204,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isSettingPrice, setIsSettingPrice] = useState(false);
   const [showPriceConfirm, setShowPriceConfirm] = useState(false);
-  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
-  const [selectedQuoteMessage, setSelectedQuoteMessage] = useState(null);
-  const [paying, setPaying] = useState(false);
   const typingLastSentAtRef = useRef(0);
 
   const syncReadState = useCallback(async () => {
@@ -350,59 +346,22 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
   };
 
   const handleAcceptPrice = (message) => {
-    setSelectedQuoteMessage(message);
-    setShowPaymentMethodModal(true);
-  };
-
-  const handleConfirmPaymentMethod = async (paymentMethod) => {
-    const message = selectedQuoteMessage;
     const quotationId = String(message?.quotation_id || message?.id || message?._id || '').trim();
-
     if (!quotationId) {
       Alert.alert('Unable to continue', 'Quotation reference is missing.');
       return;
     }
 
-    setPaying(true);
-    try {
-      const quotationResponse = await respondQuotation(conversationId, {
-        quotation_id: quotationId,
-        action: 'accept',
-      });
-
-      if (!quotationResponse) {
-        Alert.alert('Error', 'Could not accept quotation.');
-        return;
-      }
-
-      const jobId = route?.params?.jobId;
-      const paymentResponse = await initiatePaymentForJob(jobId, paymentMethod);
-
-      if (!paymentResponse) {
-        Alert.alert('Error', 'Payment could not be initiated.');
-        return;
-      }
-
-      setShowPaymentMethodModal(false);
-      setSelectedQuoteMessage(null);
-      addLocalMessage(conversationId, {
-        type: 'system',
-        text: 'Price accepted',
-      });
-      navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD, {
-        activeSession: {
-          status: 'active',
-          jobId: route?.params?.jobId,
-          mechanicId: route?.params?.mechanicId,
-          conversationId,
-          agreedPrice: message?.amount || null,
-          mechanic: route?.params?.mechanic,
-          issueSummary: route?.params?.issueSummary,
-        },
-      });
-    } finally {
-      setPaying(false);
-    }
+    navigation.navigate(ROUTES.CAR_OWNER_ESCROW_FUNDING, {
+      quotationId,
+      quoteAmount: Number(message?.amount || 0),
+      conversationId,
+      jobId: route?.params?.jobId,
+      mechanicId: route?.params?.mechanicId,
+      mechanic: route?.params?.mechanic,
+      issueSummary: route?.params?.issueSummary,
+      vehicle: route?.params?.issueSummary?.carMake || route?.params?.job?.car_make || '',
+    });
   };
 
   const handleDeclinePrice = async (message) => {
@@ -580,42 +539,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
         </View>
       </Modal>
 
-      <Modal
-        visible={showPaymentMethodModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPaymentMethodModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <AppText style={styles.modalTitle}>Choose payment method</AppText>
-            <View style={styles.paymentMethodList}>
-              <TouchableOpacity style={styles.paymentMethodBtn} activeOpacity={0.85} onPress={() => handleConfirmPaymentMethod('wallet')} disabled={paying}>
-                <AppText style={styles.paymentMethodText}>Wallet</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.paymentMethodBtn} activeOpacity={0.85} onPress={() => handleConfirmPaymentMethod('paystack')} disabled={paying}>
-                <AppText style={styles.paymentMethodText}>Paystack</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.paymentMethodBtn} activeOpacity={0.85} onPress={() => handleConfirmPaymentMethod('cash')} disabled={paying}>
-                <AppText style={styles.paymentMethodText}>Cash</AppText>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={styles.modalBtnSecondary}
-              activeOpacity={0.85}
-              onPress={() => {
-                if (!paying) {
-                  setShowPaymentMethodModal(false);
-                  setSelectedQuoteMessage(null);
-                }
-              }}
-              disabled={paying}
-            >
-              <AppText style={styles.modalBtnSecondaryText}>{paying ? 'Processing...' : 'Cancel'}</AppText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </ScreenContainer>
   );
 };

@@ -1,8 +1,24 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Camera01Icon } from '@hugeicons/core-free-icons';
+import {
+  ArrowLeft01Icon,
+  Camera01Icon,
+  Cancel01Icon,
+  HelpCircleIcon,
+  Notification01Icon,
+  User02Icon,
+} from '@hugeicons/core-free-icons';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
@@ -40,11 +56,23 @@ const isEmailValid = (value) => {
   return Boolean(email && email.includes('@') && email.includes('.'));
 };
 
+const SupportActionRow = ({ label, icon, onPress, isLast }) => {
+  return (
+    <TouchableOpacity style={[styles.supportRow, isLast ? styles.supportRowLast : null]} activeOpacity={0.85} onPress={onPress}>
+      <View style={styles.supportRowLeft}>
+        <HugeiconsIcon icon={icon} size={18} color="rgba(255,255,255,0.75)" strokeWidth={1.9} />
+        <AppText style={styles.supportRowLabel}>{label}</AppText>
+      </View>
+      <AppText style={styles.supportChevron}>›</AppText>
+    </TouchableOpacity>
+  );
+};
+
 const EditProfileScreen = ({ navigation }) => {
   const { user, updateUserData } = useAuth();
 
-  const profile = useMemo(() => {
-    return {
+  const profile = useMemo(
+    () => ({
       name: user?.full_name || user?.fullName || user?.name || '',
       email: String(user?.email || '').trim(),
       phone: String(user?.phone || user?.phoneNumber || user?.phone_number || '').trim(),
@@ -61,14 +89,18 @@ const EditProfileScreen = ({ navigation }) => {
             user?.photo_url ||
             ''
         ) || null,
-    };
-  }, [user]);
+    }),
+    [user]
+  );
 
   const [avatarUri, setAvatarUri] = useState(profile.avatarUri);
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
   const [phone, setPhone] = useState(profile.phone);
+  const [passwordMask] = useState('••••••••');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showSupportSheet, setShowSupportSheet] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,17 +111,12 @@ const EditProfileScreen = ({ navigation }) => {
     }, [profile.avatarUri, profile.name, profile.email, profile.phone])
   );
 
-  const missingContactType = useMemo(() => {
-    if (!profile.email) {
-      return 'email';
-    }
-
-    if (!profile.phone) {
-      return 'phone';
-    }
-
-    return null;
-  }, [profile.email, profile.phone]);
+  const hasEmail = Boolean(String(profile.email || '').trim());
+  const emailMissing = !hasEmail;
+  const safeOriginalPhone = String(profile.phone || '').trim();
+  const safeCurrentPhone = String(phone || '').trim();
+  const phoneChanged = safeCurrentPhone !== safeOriginalPhone;
+  const emailChangedWhenMissing = emailMissing && String(email || '').trim() && String(email || '').trim() !== String(profile.email || '').trim();
 
   const handlePickAvatar = async () => {
     const { asset, cancelled } = await pickSingleImageFromGallery();
@@ -131,13 +158,11 @@ const EditProfileScreen = ({ navigation }) => {
     if (isSaving) {
       return;
     }
-
     setIsSaving(true);
 
     try {
       let nextAvatar = avatarUri || '';
       const avatarChanged = Boolean(avatarUri) && avatarUri !== profile.avatarUri;
-
       if (avatarChanged) {
         const uploadResponse = await uploadAvatarService({
           uri: avatarUri,
@@ -148,9 +173,6 @@ const EditProfileScreen = ({ navigation }) => {
       }
 
       await updateUserData({
-        full_name: name.trim(),
-        fullName: name.trim(),
-        name: name.trim(),
         avatar: nextAvatar,
         avatar_url: nextAvatar,
         avatarUrl: nextAvatar,
@@ -161,14 +183,8 @@ const EditProfileScreen = ({ navigation }) => {
         photo_url: nextAvatar,
       });
 
-      if (!missingContactType) {
-        navigation.goBack();
-        return;
-      }
-
-      if (missingContactType === 'email') {
+      if (emailChangedWhenMissing) {
         const nextEmail = String(email || '').trim();
-
         if (!isEmailValid(nextEmail)) {
           Alert.alert('Invalid email', 'Enter a valid email address to continue.');
           return;
@@ -179,24 +195,31 @@ const EditProfileScreen = ({ navigation }) => {
           flow: 'add_contact',
           contactType: 'email',
           destination: nextEmail,
+          verifyEndpoint: 'confirm_contact',
           info: 'Enter the OTP sent to your email to complete contact update.',
         });
         return;
       }
 
-      if (!isValidNigerianPhoneDigits(phone)) {
-        Alert.alert('Invalid phone number', 'Phone number must be exactly 10 digits.');
+      if (phoneChanged) {
+        if (!isValidNigerianPhoneDigits(safeCurrentPhone)) {
+          Alert.alert('Invalid phone number', 'Phone number must be exactly 10 digits.');
+          return;
+        }
+
+        const phoneWithCountryCode = withNigerianCountryCode(safeCurrentPhone);
+        await verifyAddContactService({ phoneNumber: phoneWithCountryCode });
+        navigation.navigate(ROUTES.OTP_VERIFICATION, {
+          flow: 'add_contact',
+          contactType: 'phone',
+          destination: phoneWithCountryCode,
+          verifyEndpoint: 'confirm_contact',
+          info: 'Enter the OTP sent to your phone number to complete contact update.',
+        });
         return;
       }
 
-      const phoneWithCountryCode = withNigerianCountryCode(phone);
-      await verifyAddContactService({ phoneNumber: phoneWithCountryCode });
-      navigation.navigate(ROUTES.OTP_VERIFICATION, {
-        flow: 'add_contact',
-        contactType: 'phone',
-        destination: phoneWithCountryCode,
-        info: 'Enter the OTP sent to your phone number to complete contact update.',
-      });
+      navigation.goBack();
     } catch (updateError) {
       Alert.alert('Update failed', updateError?.message || 'Could not update profile.');
     } finally {
@@ -210,19 +233,17 @@ const EditProfileScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
           <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
         </TouchableOpacity>
+        <AppText style={styles.headerTitle}>Personal information</AppText>
+        <View style={styles.backButton} />
       </View>
 
       <View style={styles.content}>
         <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.85} onPress={handlePickAvatar}>
           <View style={styles.avatar}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarFallback} />
-            )}
+            {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} /> : <View style={styles.avatarFallback} />}
           </View>
           <View style={styles.cameraBadge}>
-            <HugeiconsIcon icon={Camera01Icon} size={14} color={darkTheme.colors.accent} strokeWidth={2} />
+            <HugeiconsIcon icon={Camera01Icon} size={15} color={darkTheme.colors.accent} strokeWidth={2} />
           </View>
         </TouchableOpacity>
 
@@ -232,12 +253,18 @@ const EditProfileScreen = ({ navigation }) => {
             <LiftableTextInput
               value={name}
               onChangeText={setName}
-              editable={!isSaving}
+              editable={false}
               placeholder="Enter your name"
               placeholderTextColor={darkTheme.colors.muted}
-              style={styles.input}
+              style={[styles.input, styles.inputDisabled]}
             />
           </View>
+          <AppText style={styles.helperText}>
+            Name cannot be changed for security reasons.{' '}
+            <AppText style={styles.helperLink} onPress={() => setShowSupportSheet(true)}>
+              Contact support
+            </AppText>
+          </AppText>
         </View>
 
         <View style={styles.field}>
@@ -246,14 +273,22 @@ const EditProfileScreen = ({ navigation }) => {
             <LiftableTextInput
               value={email}
               onChangeText={setEmail}
-              editable={!isSaving && (missingContactType === 'email' || !missingContactType)}
+              editable={emailMissing && !isSaving}
               placeholder="Enter your email"
               placeholderTextColor={darkTheme.colors.muted}
-              style={styles.input}
+              style={[styles.input, !emailMissing ? styles.inputDisabled : null]}
               keyboardType="email-address"
               autoCapitalize="none"
             />
           </View>
+          {!emailMissing ? (
+            <AppText style={styles.helperText}>
+              Email cannot be changed for security reasons.{' '}
+              <AppText style={styles.helperLink} onPress={() => setShowSupportSheet(true)}>
+                Contact support
+              </AppText>
+            </AppText>
+          ) : null}
         </View>
 
         <View style={styles.field}>
@@ -262,7 +297,7 @@ const EditProfileScreen = ({ navigation }) => {
             <LiftableTextInput
               value={phone}
               onChangeText={setPhone}
-              editable={!isSaving && (missingContactType === 'phone' || !missingContactType)}
+              editable={!isSaving}
               placeholder="Enter your phone number"
               placeholderTextColor={darkTheme.colors.muted}
               style={styles.input}
@@ -271,11 +306,31 @@ const EditProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {missingContactType ? (
-          <AppText style={styles.helperText}>
-            Add your missing {missingContactType === 'email' ? 'email address' : 'phone number'} and tap Update to receive OTP.
-          </AppText>
-        ) : null}
+        <View style={styles.field}>
+          <AppText style={styles.label}>Password</AppText>
+          <View style={styles.inputWrap}>
+            <LiftableTextInput value={passwordMask} editable={false} style={[styles.input, styles.inputDisabled]} />
+          </View>
+          <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate(ROUTES.CHANGE_PASSWORD)}>
+            <AppText style={styles.helperLinkSolo}>Change password</AppText>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.field}>
+          <AppText style={styles.label}>Add recovery email</AppText>
+          <View style={styles.inputWrap}>
+            <LiftableTextInput
+              value={recoveryEmail}
+              onChangeText={setRecoveryEmail}
+              editable={!isSaving}
+              placeholder=""
+              placeholderTextColor={darkTheme.colors.muted}
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+        </View>
       </View>
 
       <View style={styles.ctaWrap}>
@@ -286,6 +341,46 @@ const EditProfileScreen = ({ navigation }) => {
           left={isSaving ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
         />
       </View>
+
+      <Modal visible={showSupportSheet} transparent animationType="fade" onRequestClose={() => setShowSupportSheet(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowSupportSheet(false)} />
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <AppText style={styles.sheetTitle}>Help & Support</AppText>
+              <TouchableOpacity style={styles.sheetCloseBtn} activeOpacity={0.85} onPress={() => setShowSupportSheet(false)}>
+                <HugeiconsIcon icon={Cancel01Icon} size={16} color="rgba(255,255,255,0.65)" strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+
+            <SupportActionRow
+              label="Support center"
+              icon={HelpCircleIcon}
+              onPress={() => {
+                setShowSupportSheet(false);
+                navigation.navigate(ROUTES.SUPPORT);
+              }}
+            />
+            <SupportActionRow
+              label="Chat with BrodaMeko"
+              icon={Notification01Icon}
+              onPress={() => {
+                setShowSupportSheet(false);
+                navigation.navigate(ROUTES.SUPPORT_CHAT_MOCK);
+              }}
+            />
+            <SupportActionRow
+              label="Privacy policy"
+              icon={User02Icon}
+              isLast
+              onPress={() => {
+                setShowSupportSheet(false);
+                navigation.navigate(ROUTES.PRIVACY_POLICY);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -296,32 +391,41 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   header: {
-    paddingHorizontal: darkTheme.spacing.lg,
-    paddingTop: darkTheme.spacing.sm,
-    minHeight: 40,
+    minHeight: 44,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backButton: {
-    width: 36,
-    height: 36,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
   content: {
     flex: 1,
-    paddingHorizontal: darkTheme.spacing.lg,
-    paddingTop: darkTheme.spacing.md,
+    paddingHorizontal: 12,
+    paddingTop: 8,
   },
   avatarWrap: {
     alignSelf: 'center',
-    marginBottom: darkTheme.spacing.lg,
+    marginBottom: 12,
   },
   avatar: {
     width: 84,
     height: 84,
     borderRadius: 42,
-    borderWidth: 1.4,
-    borderColor: darkTheme.colors.accent,
-    backgroundColor: withAlpha(darkTheme.colors.accent, 0.12),
+    borderWidth: 1.6,
+    borderColor: '#D1A527',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.16),
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -329,56 +433,140 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   avatarFallback: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   },
   cameraBadge: {
     position: 'absolute',
-    right: -4,
-    bottom: -4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#14144A',
+    right: 2,
+    bottom: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
+    borderColor: 'rgba(230,199,20,0.6)',
+    backgroundColor: 'rgba(18,18,62,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   field: {
-    marginBottom: darkTheme.spacing.md,
+    marginBottom: 14,
   },
   label: {
     color: darkTheme.colors.text,
-    fontSize: 14,
-    marginBottom: darkTheme.spacing.xs,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+    marginBottom: 4,
   },
   inputWrap: {
-    minHeight: 50,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: darkTheme.spacing.md,
+    minHeight: 44,
+    borderRadius: 4,
+    backgroundColor: 'rgba(160,161,197,0.21)',
+    paddingHorizontal: 10,
     justifyContent: 'center',
   },
   input: {
     color: darkTheme.colors.text,
     fontSize: 14,
+    lineHeight: 20,
+  },
+  inputDisabled: {
+    opacity: 0.88,
   },
   helperText: {
     marginTop: 4,
-    color: darkTheme.colors.muted,
+    color: 'rgba(255,255,255,0.36)',
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 16,
+  },
+  helperLink: {
+    fontSize: 11,
+    color: darkTheme.colors.accent,
+  },
+  helperLinkSolo: {
+    marginTop: 4,
+    color: darkTheme.colors.accent,
+    fontSize: 12,
+    lineHeight: 18,
   },
   ctaWrap: {
-    paddingHorizontal: darkTheme.spacing.lg,
-    paddingBottom: darkTheme.spacing.xxl,
+    paddingHorizontal: 44,
+    paddingBottom: 30,
+    paddingTop: 6,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(86, 89, 128, 0.62)',
+  },
+  sheet: {
+    minHeight: '30%',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    backgroundColor: darkTheme.colors.background,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 16,
+  },
+  sheetHeader: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  sheetTitle: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  sheetCloseBtn: {
+    position: 'absolute',
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  supportRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 4,
+  },
+  supportRowLast: {
+    borderBottomWidth: 0,
+  },
+  supportRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
+  },
+  supportRowLabel: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 19,
+    lineHeight: 22,
+  },
+  supportChevron: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 24,
+    lineHeight: 26,
   },
 });
 
