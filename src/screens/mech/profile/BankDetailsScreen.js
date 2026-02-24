@@ -210,17 +210,24 @@ const BankDetailsScreen = ({ navigation, route }) => {
     setSavingError('');
 
     try {
-      await addMechanicBank({
+      const response = await addMechanicBank({
         account_name: String(accountName).trim(),
         account_number: cleanAccount,
         bank_code: selectedBankCode,
         bank_name: selectedBankName,
       });
 
+      const payload = response?.data || response || {};
+      const savedBank = payload?.bank || payload?.data?.bank || payload;
+      const savedBankId = String(savedBank?.id || savedBank?._id || '').trim();
+      const savedPrimary = Boolean(savedBank?.is_primary || savedBank?.isPrimary);
+
       setBankDetails({
+        id: savedBankId,
         accountName: String(accountName).trim(),
         accountNumber: cleanAccount,
         bankName: selectedBankName,
+        isPrimary: savedPrimary,
       });
 
       if (isOnboarding) {

@@ -18,7 +18,7 @@ import {
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
-import { getCarOwnerJobs, getMechanicAssignedJobs } from '../../../services/jobs.service';
+import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '../../../services/jobs.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
@@ -134,11 +134,13 @@ const UserProfileScreen = ({ navigation }) => {
 
       const fetchBalance = async () => {
         try {
-          const [walletResponse, jobsResponse] = await Promise.all([
+          const mechanicId = String(user?.id || user?._id || user?.mechanic_id || '').trim();
+          const [walletResponse, jobsResponse, statsResponse] = await Promise.all([
             getWalletBalance(),
             role === ROLES.MECH
               ? getMechanicAssignedJobs({ page: 1, limit: 100 })
               : getCarOwnerJobs({ page: 1, limit: 100 }),
+            role === ROLES.MECH && mechanicId ? getMechanicJobStats(mechanicId).catch(() => null) : Promise.resolve(null),
           ]);
 
           if (!active) {
@@ -149,10 +151,12 @@ const UserProfileScreen = ({ navigation }) => {
           setWalletBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
 
           const jobsPayload = jobsResponse?.data || jobsResponse || {};
+          const statsPayload = statsResponse?.data || statsResponse || {};
           const jobsList = Array.isArray(jobsPayload)
             ? jobsPayload
             : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
-          setTotalJobs(Number(jobsPayload?.total || jobsList.length || 0));
+          const completedFromStats = Number(statsPayload?.total_completed_jobs || statsPayload?.completed_jobs || 0);
+          setTotalJobs(Number(completedFromStats || jobsPayload?.total || jobsList.length || 0));
 
           const rawRating = Number(user?.rating || user?.average_rating || user?.avg_rating || 0);
           setRating(Number.isFinite(rawRating) ? rawRating : 0);
@@ -166,7 +170,7 @@ const UserProfileScreen = ({ navigation }) => {
       return () => {
         active = false;
       };
-    }, [role, user?.average_rating, user?.avg_rating, user?.rating])
+    }, [role, user?.average_rating, user?.avg_rating, user?.id, user?._id, user?.mechanic_id, user?.rating])
   );
 
   const handleViewWallet = () => {
@@ -298,6 +302,8 @@ const UserProfileScreen = ({ navigation }) => {
               onPress={() =>
                 row.key === 'help'
                   ? navigation.navigate(ROUTES.SUPPORT)
+                  : row.key === 'personal'
+                    ? navigation.navigate(ROUTES.PERSONAL_INFO)
                   : row.key === 'service_pricing'
                     ? navigation.navigate(ROUTES.MECH_SERVICE_PRICING)
                   : row.key === 'change_password'

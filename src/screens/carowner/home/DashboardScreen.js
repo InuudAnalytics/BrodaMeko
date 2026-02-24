@@ -1,41 +1,70 @@
-import React, { useCallback, useMemo } from 'react';
-import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  PanResponder,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowRight01Icon, Location06Icon, Notification01Icon } from '@hugeicons/core-free-icons';
+import { ArrowRight01Icon, Location06Icon, Mail01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
-import { AppBottomNav, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
+import { confirmJob, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getWATGreeting, ROUTES } from '../../../utils';
 
-const extractFirstName = (user) => {
-  const rawName =
-    user?.first_name ||
-    user?.firstName ||
-    user?.full_name ||
-    user?.fullName ||
-    user?.name ||
-    '';
-  const fullName = String(rawName).trim();
+const PANEL_MAX_DOWN = 320;
+const TRACKER_STEPS = [
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'en_route', label: 'En Route' },
+  { key: 'arrived', label: 'Arrived' },
+  { key: 'repairing', label: 'Repairing' },
+  { key: 'completed', label: 'Completed' },
+];
 
-  if (!fullName) {
-    return '';
+const normalizeProgressStatus = (value) => {
+  const status = String(value || '').trim().toLowerCase();
+
+  if (!status) {
+    return 'accepted';
   }
 
-  return fullName.split(/\s+/)[0];
+  if (status === 'accepted') {
+    return 'accepted';
+  }
+
+  if (status === 'en_route' || status === 'enroute' || status === 'on_the_way') {
+    return 'en_route';
+  }
+
+  if (status === 'arrived') {
+    return 'arrived';
+  }
+
+  if (status === 'repairing' || status === 'in_progress') {
+    return 'repairing';
+  }
+
+  if (status === 'completed' || status === 'done') {
+    return 'completed';
+  }
+
+  return 'accepted';
 };
 
-const HelpActionRow = ({ label, onPress }) => {
-  return (
-    <TouchableOpacity style={styles.helpRow} activeOpacity={0.9} onPress={onPress}>
-      <AppText style={styles.helpRowText}>{label}</AppText>
-      <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#1A1A1A" strokeWidth={2} />
-    </TouchableOpacity>
-  );
+const extractFirstName = (user) => {
+  const rawName = user?.first_name || user?.firstName || user?.full_name || user?.fullName || user?.name || '';
+  const fullName = String(rawName).trim();
+  return fullName ? fullName.split(/\s+/)[0] : '';
 };
 
 const normalizeAvatarUri = (value) => {
@@ -56,60 +85,89 @@ const normalizeAvatarUri = (value) => {
 const readAvatarUri = (user) =>
   normalizeAvatarUri(
     user?.avatar ||
-    user?.avatar_url ||
-    user?.avatarUrl ||
-    user?.avatarUri ||
-    user?.profile_photo ||
-    user?.profile_photo_url ||
-    user?.profile_picture ||
-    user?.image_url ||
-    user?.photo_url ||
-    ''
+      user?.avatar_url ||
+      user?.avatarUrl ||
+      user?.avatarUri ||
+      user?.profile_photo ||
+      user?.profile_photo_url ||
+      user?.profile_picture ||
+      user?.image_url ||
+      user?.photo_url ||
+      ''
   );
 
-const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loading, locationEnabled }) => {
-  return (
-    <View style={styles.locationFallbackWrap}>
-      <View style={styles.locationFallbackCard}>
-        <View style={styles.locationIconWrap}>
-          <HugeiconsIcon icon={Location06Icon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
-        </View>
-        <AppText style={styles.locationFallbackTitle}>Location is off</AppText>
-        <AppText style={styles.locationFallbackBody}>
-          {locationEnabled
-            ? 'Turn on location to find mechanics near you.'
-            : 'Location is temporarily disabled while map setup is pending.'}
-        </AppText>
+const HelpActionRow = ({ label, onPress }) => (
+  <TouchableOpacity style={styles.helpRow} activeOpacity={0.9} onPress={onPress}>
+    <AppText style={styles.helpRowText}>{label}</AppText>
+    <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#1A1A1A" strokeWidth={2} />
+  </TouchableOpacity>
+);
 
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={[styles.locationActionBtn, loading ? styles.locationActionBtnDisabled : null]}
-          onPress={onEnableLocation}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#1A1A1A" />
-          ) : (
-            <AppText style={styles.locationActionBtnText}>
-              {locationEnabled ? 'Enable location' : 'Location unavailable'}
-            </AppText>
-          )}
-        </TouchableOpacity>
-
-        {isBlocked ? (
-          <TouchableOpacity activeOpacity={0.9} style={styles.settingsBtn} onPress={onOpenSettings}>
-            <AppText style={styles.settingsBtnText}>Open settings</AppText>
-          </TouchableOpacity>
-        ) : null}
+const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loading, locationEnabled }) => (
+  <View style={styles.locationFallbackWrap}>
+    <View style={styles.locationFallbackCard}>
+      <View style={styles.locationIconWrap}>
+        <HugeiconsIcon icon={Location06Icon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
       </View>
-    </View>
-  );
-};
+      <AppText style={styles.locationFallbackTitle}>Location is off</AppText>
+      <AppText style={styles.locationFallbackBody}>
+        {locationEnabled
+          ? 'Turn on location to find mechanics near you.'
+          : 'Location is temporarily disabled while map setup is pending.'}
+      </AppText>
 
-const DashboardScreen = ({ navigation }) => {
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.locationActionBtn, loading ? styles.locationActionBtnDisabled : null]}
+        onPress={onEnableLocation}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color="#1A1A1A" />
+        ) : (
+          <AppText style={styles.locationActionBtnText}>
+            {locationEnabled ? 'Enable location' : 'Location unavailable'}
+          </AppText>
+        )}
+      </TouchableOpacity>
+
+      {isBlocked ? (
+        <TouchableOpacity activeOpacity={0.9} style={styles.settingsBtn} onPress={onOpenSettings}>
+          <AppText style={styles.settingsBtnText}>Open settings</AppText>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  </View>
+);
+
+const DashboardScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { location, permissionStatus, loading, requestPermission, refreshOnce } =
-    useUserLocation();
+  const { location, permissionStatus, loading, requestPermission, refreshOnce } = useUserLocation();
+  const [activeSession, setActiveSession] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const panelY = useRef(new Animated.Value(0)).current;
+  const panelYRef = useRef(0);
+  const dragStartRef = useRef(0);
+
+  useEffect(() => {
+    const id = panelY.addListener(({ value }) => {
+      panelYRef.current = value;
+    });
+    return () => panelY.removeListener(id);
+  }, [panelY]);
+
+  useEffect(() => {
+    const sessionParam = route?.params?.activeSession;
+    if (sessionParam && typeof sessionParam === 'object') {
+      setActiveSession((prev) => ({
+        ...(prev || {}),
+        ...sessionParam,
+        progressStatus: normalizeProgressStatus(sessionParam?.progressStatus),
+      }));
+      navigation.setParams?.({ activeSession: undefined });
+    }
+  }, [navigation, route?.params?.activeSession]);
 
   const firstName = extractFirstName(user);
   const greetingPrefix = getWATGreeting();
@@ -124,11 +182,7 @@ const DashboardScreen = ({ navigation }) => {
       if (!LOCATION_ENABLED || !hasLocationPermission) {
         return undefined;
       }
-
-      // watchPosition is disabled on this build (Play Services version mismatch).
-      // Refresh location with a single reading whenever the screen gains focus.
       refreshOnce();
-
       return undefined;
     }, [hasLocationPermission, refreshOnce])
   );
@@ -137,7 +191,6 @@ const DashboardScreen = ({ navigation }) => {
     if (!location) {
       return 'Detecting location...';
     }
-
     return `Lat ${location.latitude.toFixed(4)} - Lng ${location.longitude.toFixed(4)}`;
   }, [location]);
 
@@ -145,22 +198,211 @@ const DashboardScreen = ({ navigation }) => {
     if (routeName === ROUTES.CAR_OWNER_DASHBOARD) {
       return;
     }
-
     navigation.navigate(routeName);
   };
 
   const handleEnableLocation = useCallback(async () => {
     if (!LOCATION_ENABLED) {
-      // TODO: ADD VALID API KEY AND RE-ENABLE LOCATION FLOW.
       return;
     }
-
     const status = await requestPermission();
-
     if (status === 'granted') {
       await refreshOnce();
     }
   }, [refreshOnce, requestPermission]);
+
+  const animatePanelTo = useCallback(
+    (toValue) => {
+      Animated.spring(panelY, {
+        toValue,
+        useNativeDriver: true,
+        friction: 9,
+        tension: 55,
+      }).start();
+    },
+    [panelY]
+  );
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+        onPanResponderGrant: () => {
+          dragStartRef.current = panelYRef.current;
+        },
+        onPanResponderMove: (_, gesture) => {
+          const next = Math.max(0, Math.min(PANEL_MAX_DOWN, dragStartRef.current + gesture.dy));
+          panelY.setValue(next);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          const next = panelYRef.current + gesture.dy;
+          if (next > PANEL_MAX_DOWN * 0.45) {
+            animatePanelTo(PANEL_MAX_DOWN);
+          } else {
+            animatePanelTo(0);
+          }
+        },
+      }),
+    [animatePanelTo, panelY]
+  );
+
+  const handleOpenChat = () => {
+    const conversationId = String(activeSession?.conversationId || '').trim();
+    const jobId = String(activeSession?.jobId || '').trim();
+    if (!conversationId || !jobId) {
+      return;
+    }
+    navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+      conversationId,
+      jobId,
+      mechanic: activeSession?.mechanic,
+      mechanicId: activeSession?.mechanicId,
+      issueSummary: activeSession?.issueSummary,
+      progressStatus: activeSession?.progressStatus,
+    });
+  };
+
+  const handleCancelJob = async () => {
+    const jobId = String(activeSession?.jobId || '').trim();
+    if (!jobId || cancelling) {
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      await updateJobStatus(jobId, 'cancelled');
+      setActiveSession(null);
+      Alert.alert('Cancelled', 'Job has been cancelled.');
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Could not cancel job.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleConfirmRepairing = async () => {
+    const jobId = String(activeSession?.jobId || '').trim();
+    if (!jobId || syncing) {
+      return;
+    }
+    setSyncing(true);
+    try {
+      await updateJobStatus(jobId, 'repairing');
+      setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'repairing' } : prev));
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Could not update repairing status.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleConfirmCompletion = async () => {
+    const jobId = String(activeSession?.jobId || '').trim();
+    if (!jobId || syncing) {
+      return;
+    }
+    setSyncing(true);
+    try {
+      await confirmJob(jobId);
+      setActiveSession(null);
+      Alert.alert('Success', 'Job completion confirmed.');
+    } catch (error) {
+      Alert.alert('Error', error?.message || 'Could not confirm completion.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const renderDefaultContent = () => (
+    <>
+      <AppText variant="title" style={styles.sheetTitle}>
+        Need help now?
+      </AppText>
+      <AppText variant="muted" style={styles.sheetSubtitle}>
+        Our certified mechanics are nearby
+      </AppText>
+      <HelpActionRow label="I know the issues" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)} />
+      <HelpActionRow label="Diagnose my car" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS)} />
+    </>
+  );
+
+  const renderTrackingContent = () => {
+    const mechanic = activeSession?.mechanic || { name: 'Assigned mechanic', initials: 'M', rating: '4.8' };
+    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+    const currentStepIndex = TRACKER_STEPS.findIndex((item) => item.key === progressStatus);
+    const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
+
+    return (
+      <>
+        <AppText style={styles.trackTitle}>Live tracking</AppText>
+        <AppText variant="muted" style={styles.trackSubtitle}>
+          {`${mechanic.name} is now active on this job.`}
+        </AppText>
+
+        <View style={styles.trackerWrap}>
+          {TRACKER_STEPS.map((step, index) => {
+            const active = index <= currentStepIndex;
+            return (
+              <View key={step.key} style={styles.trackerStep}>
+                <View style={[styles.trackerDot, active ? styles.trackerDotActive : null]} />
+                <AppText style={[styles.trackerText, active ? styles.trackerTextActive : null]}>{step.label}</AppText>
+              </View>
+            );
+          })}
+        </View>
+        <AppText style={styles.trackerHint}>Current progress: {currentLabel}</AppText>
+
+        <View style={styles.trackCard}>
+          <View style={styles.trackRow}>
+            <View style={styles.trackAvatar}>
+              <AppText style={styles.trackAvatarText}>{mechanic.initials || 'M'}</AppText>
+            </View>
+            <View style={styles.trackInfo}>
+              <AppText style={styles.trackName}>{mechanic.name}</AppText>
+              <AppText style={styles.trackMeta}>Rating {mechanic.rating || '4.8'}</AppText>
+            </View>
+          </View>
+
+          <View style={styles.trackActions}>
+            <AppButton label="Message" onPress={handleOpenChat} style={styles.trackBtn} />
+            <TouchableOpacity style={styles.callBtn} activeOpacity={0.88} onPress={handleCancelJob} disabled={cancelling}>
+              <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.accent} strokeWidth={2} />
+              <AppText style={styles.callBtnText}>{cancelling ? 'Cancelling...' : 'Cancel'}</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.trackFooterActions}>
+          {progressStatus === 'arrived' ? (
+            <AppButton
+              label={syncing ? 'Updating...' : 'Confirm mechanic is repairing'}
+              onPress={handleConfirmRepairing}
+              disabled={syncing}
+            />
+          ) : null}
+          <AppButton
+            label={syncing ? 'Confirming...' : 'Confirm completion (after payment)'}
+            onPress={handleConfirmCompletion}
+            disabled={syncing || progressStatus !== 'repairing'}
+          />
+          <TouchableOpacity
+            style={styles.secondaryAction}
+            activeOpacity={0.88}
+            onPress={() =>
+              navigation.navigate(ROUTES.CAR_OWNER_RATE_MECHANIC, {
+                mechanicId: activeSession?.mechanicId || null,
+                mechanicName: mechanic.name,
+                issueName: activeSession?.issueSummary?.issueType || '',
+                jobId: activeSession?.jobId || null,
+              })
+            }
+          >
+            <AppText style={styles.secondaryActionText}>Rate mechanic</AppText>
+          </TouchableOpacity>
+        </View>
+      </>
+    );
+  };
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -168,18 +410,15 @@ const DashboardScreen = ({ navigation }) => {
         {hasLocationPermission ? (
           <>
             <OpenStreetMapView latitude={location?.latitude} longitude={location?.longitude} />
-
             {!location ? (
               <View style={styles.locationLoadingOverlay}>
                 <ActivityIndicator size="small" color={darkTheme.colors.accent} />
                 <AppText style={styles.locationLoadingText}>Getting your location...</AppText>
               </View>
             ) : null}
-
             <View style={styles.locationLiveBadge}>
               <AppText style={styles.locationLiveBadgeText}>{locationBadgeText}</AppText>
             </View>
-
             <View style={styles.osmAttribution}>
               <AppText style={styles.osmAttributionText}>Map data © OpenStreetMap contributors</AppText>
             </View>
@@ -197,11 +436,7 @@ const DashboardScreen = ({ navigation }) => {
         <View style={styles.topBar}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-              ) : (
-                <AppText style={styles.avatarText}>{avatarInitial}</AppText>
-              )}
+              {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} /> : <AppText style={styles.avatarText}>{avatarInitial}</AppText>}
             </View>
             <View>
               <AppText variant="body" style={styles.greeting}>
@@ -213,53 +448,29 @@ const DashboardScreen = ({ navigation }) => {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.bellButton}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Notifications')}
-          >
+          <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
             <HugeiconsIcon icon={Notification01Icon} size={22} color={darkTheme.colors.text} strokeWidth={1.8} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.bottomSheet}>
+      <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]} {...panResponder.panHandlers}>
         <View style={styles.handle} />
+        <View style={styles.contentArea}>{activeSession ? renderTrackingContent() : renderDefaultContent()}</View>
+      </Animated.View>
 
-        <AppText variant="title" style={styles.sheetTitle}>
-          Need help now?
-        </AppText>
+      <TouchableOpacity style={styles.peekHandle} activeOpacity={0.9} onPress={() => animatePanelTo(0)}>
+        <View style={styles.peekPill} />
+      </TouchableOpacity>
 
-        <AppText variant="muted" style={styles.sheetSubtitle}>
-          Our certified mechanics are nearby
-        </AppText>
-
-        <HelpActionRow
-          label="I know the issues"
-          onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)}
-        />
-
-        <HelpActionRow
-          label="Diagnose my car"
-          onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS)}
-        />
-      </View>
-
-      <AppBottomNav activeTab={ROUTES.CAR_OWNER_DASHBOARD} onTabPress={handleTabPress} />
+      <AppBottomNav activeTab={ROUTES.CAR_OWNER_DASHBOARD} onTabPress={handleTabPress} style={styles.stickyFooter} />
     </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: darkTheme.colors.background,
-  },
-  mapBackdrop: {
-    flex: 1,
-    backgroundColor: '#2B2B31',
-    overflow: 'hidden',
-  },
+  screen: { flex: 1, backgroundColor: darkTheme.colors.background },
+  mapBackdrop: { flex: 1, backgroundColor: '#2B2B31', overflow: 'hidden' },
   topBar: {
     marginTop: darkTheme.spacing.xl,
     paddingHorizontal: darkTheme.spacing.lg,
@@ -296,30 +507,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: darkTheme.spacing.sm,
   },
-  locationLiveBadgeText: {
-    color: darkTheme.colors.accent,
-    fontSize: darkTheme.typography.fontSizes.xs,
-  },
-  osmAttribution: {
-    position: 'absolute',
-    left: darkTheme.spacing.sm,
-    right: darkTheme.spacing.sm,
-    bottom: 6,
-    alignItems: 'center',
-  },
-  osmAttributionText: {
-    color: '#AAB0C2',
-    fontSize: 10,
-  },
-  locationLoadingText: {
-    color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.sm,
-  },
-  locationFallbackWrap: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    paddingHorizontal: darkTheme.spacing.lg,
-  },
+  locationLiveBadgeText: { color: darkTheme.colors.accent, fontSize: darkTheme.typography.fontSizes.xs },
+  osmAttribution: { position: 'absolute', left: darkTheme.spacing.sm, right: darkTheme.spacing.sm, bottom: 6, alignItems: 'center' },
+  osmAttributionText: { color: '#AAB0C2', fontSize: 10 },
+  locationLoadingText: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.sm },
+  locationFallbackWrap: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', paddingHorizontal: darkTheme.spacing.lg },
   locationFallbackCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -340,11 +532,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: darkTheme.spacing.sm,
   },
-  locationFallbackTitle: {
-    color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.lg,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
+  locationFallbackTitle: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.lg, fontWeight: darkTheme.typography.fontWeights.semibold },
   locationFallbackBody: {
     marginTop: darkTheme.spacing.xs,
     color: darkTheme.colors.muted,
@@ -362,29 +550,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: darkTheme.spacing.lg,
   },
-  locationActionBtnDisabled: {
-    opacity: 0.85,
-  },
-  locationActionBtnText: {
-    color: '#1A1A1A',
-    fontSize: darkTheme.typography.fontSizes.sm,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  settingsBtn: {
-    marginTop: darkTheme.spacing.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  settingsBtnText: {
-    color: darkTheme.colors.text,
-    textDecorationLine: 'underline',
-    fontSize: darkTheme.typography.fontSizes.sm,
-  },
-  avatarWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: darkTheme.spacing.sm,
-  },
+  locationActionBtnDisabled: { opacity: 0.85 },
+  locationActionBtnText: { color: '#1A1A1A', fontSize: darkTheme.typography.fontSizes.sm, fontWeight: darkTheme.typography.fontWeights.medium },
+  settingsBtn: { marginTop: darkTheme.spacing.sm, paddingVertical: 6, paddingHorizontal: 8 },
+  settingsBtnText: { color: darkTheme.colors.text, textDecorationLine: 'underline', fontSize: darkTheme.typography.fontSizes.sm },
+  avatarWrap: { flexDirection: 'row', alignItems: 'center', gap: darkTheme.spacing.sm },
   avatar: {
     width: 42,
     height: 42,
@@ -394,23 +564,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  avatarText: {
-    color: darkTheme.colors.text,
-    fontWeight: darkTheme.typography.fontWeights.bold,
-  },
-  greeting: {
-    color: darkTheme.colors.text,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  greetingSub: {
-    color: darkTheme.colors.muted,
-    marginTop: darkTheme.spacing.xxs,
-  },
+  avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  avatarText: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.bold },
+  greeting: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.semibold },
+  greetingSub: { color: darkTheme.colors.muted, marginTop: darkTheme.spacing.xxs },
   bellButton: {
     width: 44,
     height: 44,
@@ -422,22 +579,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   bottomSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 56,
     backgroundColor: darkTheme.colors.background,
     borderTopLeftRadius: 52,
     borderTopRightRadius: 52,
-    marginTop: -18,
     paddingTop: darkTheme.spacing.md,
     paddingHorizontal: darkTheme.spacing.xl,
     paddingBottom: darkTheme.spacing.lg,
+    minHeight: 320,
   },
-  handle: {
+  peekHandle: {
+    position: 'absolute',
     alignSelf: 'center',
-    width: 76,
+    bottom: 66,
+    width: 92,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  peekPill: {
+    width: 54,
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    marginBottom: darkTheme.spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.55)',
   },
+  handle: { alignSelf: 'center', width: 76, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.65)', marginBottom: darkTheme.spacing.md },
+  contentArea: { width: '100%' },
   sheetTitle: {
     color: darkTheme.colors.text,
     textAlign: 'center',
@@ -464,11 +634,109 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: darkTheme.spacing.md,
   },
-  helpRowText: {
-    color: '#1A1A1A',
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: darkTheme.typography.fontWeights.regular,
+  helpRowText: { color: '#1A1A1A', fontSize: 14, lineHeight: 20, fontWeight: darkTheme.typography.fontWeights.regular },
+  trackTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 22,
+    lineHeight: 28,
+    textAlign: 'center',
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  trackSubtitle: {
+    marginTop: darkTheme.spacing.xs,
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
+    marginBottom: darkTheme.spacing.md,
+  },
+  trackCard: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: darkTheme.radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: darkTheme.spacing.md,
+  },
+  trackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trackAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FF7B4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: darkTheme.spacing.sm,
+  },
+  trackAvatarText: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  trackInfo: { flex: 1 },
+  trackName: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.semibold },
+  trackMeta: { color: darkTheme.colors.muted, marginTop: 2 },
+  trackerWrap: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: darkTheme.radius.md,
+    paddingVertical: darkTheme.spacing.sm,
+    paddingHorizontal: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  trackerStep: { width: 62, alignItems: 'center' },
+  trackerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    marginBottom: 4,
+  },
+  trackerDotActive: { backgroundColor: darkTheme.colors.accent },
+  trackerText: {
+    color: darkTheme.colors.muted,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    textAlign: 'center',
+  },
+  trackerTextActive: {
+    color: darkTheme.colors.accent,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  trackerHint: {
+    color: darkTheme.colors.muted,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    textAlign: 'center',
+    marginBottom: darkTheme.spacing.sm,
+  },
+  trackActions: { marginTop: darkTheme.spacing.md, rowGap: darkTheme.spacing.sm },
+  trackBtn: { minHeight: 44 },
+  callBtn: {
+    minHeight: 44,
+    borderRadius: darkTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: darkTheme.spacing.xs,
+  },
+  callBtnText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
+  trackFooterActions: { marginTop: darkTheme.spacing.md, rowGap: darkTheme.spacing.sm },
+  secondaryAction: {
+    minHeight: 42,
+    borderRadius: darkTheme.radius.md,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
+  stickyFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
 

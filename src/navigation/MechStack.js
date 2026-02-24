@@ -19,6 +19,7 @@ import {
 import MechanicChatScreen from '../screens/mech/chat/MechanicChatScreen';
 import MechanicJobDetailsScreen from '../screens/mech/jobs/MechanicJobDetailsScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
+import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
 import { useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -100,6 +101,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.USER_PROFILE}
         component={UserProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.PERSONAL_INFO}
+        component={PersonalInfoScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

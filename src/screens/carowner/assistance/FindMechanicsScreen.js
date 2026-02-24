@@ -13,7 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useChat } from '../../../context';
-import { getMechanicsForJob } from '../../../services/jobs.service';
+import { getMechanicsForJob, hireMechanicForJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -64,6 +64,11 @@ const readMechanics = (payload) => {
   return [];
 };
 
+const readIssueType = (payload) => {
+  const root = payload?.data || payload || {};
+  return String(root?.issue_type || '').trim();
+};
+
 const parseMaybeNumber = (value) => {
   const parsed = Number(value);
   if (Number.isFinite(parsed)) {
@@ -74,7 +79,41 @@ const parseMaybeNumber = (value) => {
   return Number.isFinite(fromString) ? fromString : 0;
 };
 
-const normalizeMechanic = (item, index) => {
+const toPriceRange = (services, fallbackIssueType) => {
+  const safeServices = Array.isArray(services) ? services : [];
+  if (!safeServices.length) {
+    return '';
+  }
+
+  const safeIssueType = String(fallbackIssueType || '').trim().toLowerCase();
+  const matchedService = safeIssueType
+    ? safeServices.find((service) => String(service?.issue_type || '').trim().toLowerCase() === safeIssueType)
+    : null;
+  const target = matchedService || safeServices[0] || null;
+
+  if (!target) {
+    return '';
+  }
+
+  const minPrice = Number(target?.min_price || target?.minPrice || 0);
+  const maxPrice = Number(target?.max_price || target?.maxPrice || 0);
+
+  if (minPrice > 0 && maxPrice > 0) {
+    return `₦${minPrice.toLocaleString('en-NG')}-${maxPrice.toLocaleString('en-NG')}`;
+  }
+
+  if (minPrice > 0) {
+    return `₦${minPrice.toLocaleString('en-NG')}`;
+  }
+
+  if (maxPrice > 0) {
+    return `₦${maxPrice.toLocaleString('en-NG')}`;
+  }
+
+  return '';
+};
+
+const normalizeMechanic = (item, index, fallbackIssueType = '') => {
   const user = item?.user || {};
   const fullName =
     item?.name ||
@@ -90,12 +129,26 @@ const normalizeMechanic = (item, index) => {
     .map((part) => part[0].toUpperCase())
     .join('') || 'M';
 
-  const minPrice = Number(item?.min_price || item?.minPrice || item?.min || 0);
-  const maxPrice = Number(item?.max_price || item?.maxPrice || item?.max || 0);
-  const priceRange = minPrice || maxPrice
-    ? `N${minPrice.toLocaleString('en-NG')} - N${maxPrice.toLocaleString('en-NG')}`
-    : 'Price on request';
+  const priceRange =
+    toPriceRange(item?.services, fallbackIssueType) ||
+    toPriceRange(item?.service_estimates, fallbackIssueType) ||
+    (() => {
+      const minPrice = Number(item?.min_price || item?.minPrice || item?.min || 0);
+      const maxPrice = Number(item?.max_price || item?.maxPrice || item?.max || 0);
+      if (minPrice > 0 && maxPrice > 0) {
+        return `₦${minPrice.toLocaleString('en-NG')}-${maxPrice.toLocaleString('en-NG')}`;
+      }
+      if (minPrice > 0) {
+        return `₦${minPrice.toLocaleString('en-NG')}`;
+      }
+      if (maxPrice > 0) {
+        return `₦${maxPrice.toLocaleString('en-NG')}`;
+      }
+      return '';
+    })();
+
   const avatarUri = normalizeAvatarUri(
+    item?.avatar?.url ||
     item?.avatar ||
     item?.avatar_url ||
     item?.avatarUrl ||
@@ -107,6 +160,7 @@ const normalizeMechanic = (item, index) => {
     item?.user?.avatar ||
     item?.user?.avatar_url ||
     item?.user?.profile_photo ||
+    item?.user?.avatar?.url ||
     ''
   );
   const specialty =
@@ -130,7 +184,7 @@ const normalizeMechanic = (item, index) => {
     rating: parseMaybeNumber(item?.rating || item?.average_rating || user?.rating || user?.average_rating || 0),
     distanceKm: parseMaybeNumber(item?.distance_km || item?.distance || 0),
     etaMins: parseMaybeNumber(item?.eta_minutes || item?.eta || 0),
-    priceRange,
+    priceRange: priceRange || 'Price on request',
     available: item?.available !== false,
     raw: item,
   };
@@ -187,7 +241,7 @@ const HireButton = ({ onPress, loading }) => {
 const MechanicCard = ({ item, loading, onHire }) => {
   return (
     <View style={styles.card}>
-      <View style={styles.cardMain}>
+      <View style={styles.cardTopRow}>
         <View style={styles.avatar}>
           {item.avatarUri ? (
             <Image source={{ uri: item.avatarUri }} style={styles.avatarImage} />
@@ -196,50 +250,53 @@ const MechanicCard = ({ item, loading, onHire }) => {
           )}
         </View>
 
-        <View style={styles.cardDetails}>
+        <View style={styles.identityColumn}>
           <AppText style={styles.name}>{item.name}</AppText>
-          {item.details ? <AppText style={styles.detailsText}>{item.details}</AppText> : null}
 
           <View style={styles.metaRow}>
             <View style={styles.ratingRow}>
               <StarIcon color={darkTheme.colors.accent} />
               <AppText style={styles.metaText}>{item.rating ? item.rating.toFixed(1) : 'N/A'}</AppText>
             </View>
-            <AppText style={styles.metaText}>
-              {item.distanceKm ? `${item.distanceKm}km away` : 'Distance unavailable'}
-            </AppText>
-            <AppText style={styles.metaText}>
-              {item.etaMins ? `${item.etaMins} minutes` : 'ETA unavailable'}
-            </AppText>
-          </View>
-
-          <AppText style={styles.priceLabel}>Estimated price</AppText>
-          <View style={styles.priceRow}>
-            <AppText style={styles.priceValue}>{item.priceRange}</AppText>
-
-            {item.available ? (
-              <HireButton onPress={onHire} loading={loading} />
-            ) : (
-              <View style={styles.unavailableWrap}>
-                <AppText style={styles.unavailableText}>Unavailable</AppText>
-              </View>
-            )}
+            <AppText style={styles.metaDot}>•</AppText>
+            <AppText style={styles.metaText}>{item.distanceKm ? `${item.distanceKm}km away` : 'Distance N/A'}</AppText>
+            <AppText style={styles.metaDot}>•</AppText>
+            <AppText style={styles.metaText}>{item.etaMins ? `${item.etaMins} minutes` : 'ETA N/A'}</AppText>
           </View>
         </View>
+      </View>
+
+      <View style={styles.cardBottomRow}>
+        <View style={styles.priceColumn}>
+          <AppText style={styles.priceLabel}>Estimated price</AppText>
+          <AppText style={styles.priceValue}>{item.priceRange}</AppText>
+        </View>
+
+        {item.available ? (
+          <HireButton onPress={onHire} loading={loading} />
+        ) : (
+          <View style={styles.unavailableWrap}>
+            <AppText style={styles.unavailableText}>Unavailable</AppText>
+          </View>
+        )}
       </View>
     </View>
   );
 };
 
 const FindMechanicsScreen = ({ navigation, route }) => {
-  const { startConversation } = useChat();
+  const { clearActiveConversation } = useChat();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadingMechanicId, setLoadingMechanicId] = useState(null);
   const [mechanics, setMechanics] = useState([]);
+  const [matchedIssueType, setMatchedIssueType] = useState('');
 
   const jobId = String(route?.params?.jobId || '').trim();
   const issueSummary = normalizeIssueSummary(route?.params?.job);
+  // TODO(map/location): replace this fallback with the user's live location label.
+  // Mechanics are already filtered by service capability from backend, but this
+  // screen should also filter/sort by proximity to the user's current location.
   const locationText = route?.params?.location || 'Ahmadu Bello way, Kwara state';
 
   const fetchMechanics = useCallback(async () => {
@@ -254,15 +311,20 @@ const FindMechanicsScreen = ({ navigation, route }) => {
 
     try {
       const response = await getMechanicsForJob(jobId);
-      const nextMechanics = readMechanics(response).map(normalizeMechanic);
+      const issueType = readIssueType(response) || issueSummary?.issueType || '';
+      setMatchedIssueType(issueType);
+      const nextMechanics = readMechanics(response).map((item, index) =>
+        normalizeMechanic(item, index, issueType)
+      );
       setMechanics(nextMechanics);
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load mechanics.');
       setMechanics([]);
+      setMatchedIssueType('');
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+  }, [issueSummary?.issueType, jobId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -278,22 +340,21 @@ const FindMechanicsScreen = ({ navigation, route }) => {
     setLoadingMechanicId(mechanic.id);
 
     try {
-      const response = await startConversation({ mechanic_id: mechanic.id, job_id: jobId });
-      const conversation = response?.data?.conversation || response?.data || null;
-      const conversationId = String(
-        conversation?.id || conversation?._id || conversation?.conversation_id || conversation?.conversationId || ''
-      ).trim();
+      const response = await hireMechanicForJob(jobId, mechanic.id);
+      const requestId = String(response?.request_id || response?.data?.request_id || '').trim();
 
-      navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+      clearActiveConversation();
+      navigation.replace(ROUTES.CAR_OWNER_WAITING_MECHANIC, {
         mechanic,
-        jobId,
         mechanicId: mechanic.id,
-        conversationId,
-        conversation,
+        jobId,
         issueSummary,
+        requestId,
+        job: route?.params?.job,
+        location: route?.params?.location,
       });
     } catch (hireError) {
-      setError(hireError?.message || 'Could not start chat with mechanic.');
+      setError(hireError?.message || 'Could not send hire request.');
     } finally {
       setLoadingMechanicId(null);
     }
@@ -323,6 +384,11 @@ const FindMechanicsScreen = ({ navigation, route }) => {
           <AppText variant="muted" style={styles.subtitle}>
             {locationText}
           </AppText>
+          {matchedIssueType ? (
+            <AppText variant="muted" style={styles.issueText}>
+              {matchedIssueType.replace(/_/g, ' ')}
+            </AppText>
+          ) : null}
         </View>
       </View>
 
@@ -397,6 +463,14 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
   },
+  issueText: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+    textTransform: 'capitalize',
+  },
   listContent: {
     paddingHorizontal: darkTheme.spacing.sm,
     paddingTop: darkTheme.spacing.sm,
@@ -411,8 +485,9 @@ const styles = StyleSheet.create({
     padding: darkTheme.spacing.md,
     alignItems: 'stretch',
   },
-  cardMain: {
+  cardTopRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   avatar: {
     width: 46,
@@ -434,7 +509,7 @@ const styles = StyleSheet.create({
     fontWeight: darkTheme.typography.fontWeights.semibold,
     fontSize: darkTheme.typography.fontSizes.sm,
   },
-  cardDetails: {
+  identityColumn: {
     flex: 1,
   },
   name: {
@@ -443,18 +518,12 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.md,
     lineHeight: 22,
   },
-  detailsText: {
-    marginTop: 1,
-    color: darkTheme.colors.muted,
-    fontSize: darkTheme.typography.fontSizes.xs,
-    lineHeight: 16,
-  },
   metaRow: {
     marginTop: 2,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    columnGap: darkTheme.spacing.sm,
+    columnGap: 6,
     rowGap: 2,
   },
   ratingRow: {
@@ -467,6 +536,13 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.xs,
     lineHeight: 16,
   },
+  metaDot: {
+    color: darkTheme.colors.muted,
+    opacity: 0.8,
+    fontSize: 11,
+    lineHeight: 16,
+    paddingHorizontal: 1,
+  },
   priceLabel: {
     marginTop: darkTheme.spacing.xs,
     color: darkTheme.colors.muted,
@@ -475,16 +551,20 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     color: darkTheme.colors.accent,
-    fontSize: darkTheme.typography.fontSizes.sm,
+    fontSize: darkTheme.typography.fontSizes.md,
     lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
-  priceRow: {
-    marginTop: 2,
+  cardBottomRow: {
+    marginTop: darkTheme.spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     columnGap: darkTheme.spacing.sm,
+  },
+  priceColumn: {
+    flex: 1,
+    paddingRight: darkTheme.spacing.sm,
   },
   hireButton: {
     minWidth: 76,

@@ -4,7 +4,11 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { CancelCircleIcon, UserSettings01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../components';
 import { useAuth } from '../../context';
-import { resendOtp as resendOtpService, verifyOtp as verifyOtpService } from '../../services/auth.service';
+import {
+  resendOtp as resendOtpService,
+  verifyConfirmContact as verifyConfirmContactService,
+  verifyOtp as verifyOtpService,
+} from '../../services/auth.service';
 import { darkTheme } from '../../theme';
 import { ROUTES, useKeyboardLift } from '../../utils';
 
@@ -132,7 +136,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
 
     try {
       if (isAddContactFlow) {
-        const response = await verifyOtpService({ otp: otpValue });
+        const response = await verifyConfirmContactService({ otp: otpValue });
         const ok = response?.success !== false;
 
         if (!ok) {
@@ -389,4 +393,3 @@ const styles = StyleSheet.create({
 });
 
 export default OTPVerificationScreen;
-

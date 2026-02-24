@@ -148,6 +148,8 @@ export const ChatProvider = ({ children }) => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [wsStatus, setWsStatus] = useState('idle');
+  const [latestJobRequestUpdate, setLatestJobRequestUpdate] = useState(null);
+  const [latestJobStatusUpdate, setLatestJobStatusUpdate] = useState(null);
   const [error, setError] = useState(null);
   const messagesByConversationIdRef = useRef({});
 
@@ -291,6 +293,31 @@ export const ChatProvider = ({ children }) => {
         try {
           const parsed = JSON.parse(event?.data || '{}');
           const eventType = String(parsed?.type || '').toLowerCase();
+          const payload = parsed?.payload || {};
+
+          if (eventType === 'job_request_updated') {
+            setLatestJobRequestUpdate(payload);
+            return;
+          }
+
+          if (eventType === 'job_status_updated') {
+            setLatestJobStatusUpdate(payload);
+            handleJobStatusChange(payload?.new_status);
+            return;
+          }
+
+          if (eventType === 'quotation_response') {
+            appendMessage(activeConversationIdRef.current || safeConversationId, {
+              id: `quotation-response-${Date.now()}`,
+              conversation_id: activeConversationIdRef.current || safeConversationId,
+              type: 'system',
+              text: `Quotation ${String(payload?.status || payload?.action || 'updated')}.`,
+              created_at: new Date().toISOString(),
+              status: 'sent',
+            });
+            return;
+          }
+
           const normalized = normalizeIncomingMessage(parsed, safeConversationId);
 
           if (!normalized.conversation_id || normalized.conversation_id !== activeConversationIdRef.current) {
@@ -351,8 +378,7 @@ export const ChatProvider = ({ children }) => {
     return true;
     // wsStatus intentionally omitted — read via wsStatusRef.current to avoid
     // stale closure captures and spurious reconnect loops on status transitions.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, token]);
+  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, handleJobStatusChange, token]);
 
   const clearActiveConversation = useCallback(() => {
     disconnectChatSocket();
@@ -799,6 +825,8 @@ export const ChatProvider = ({ children }) => {
       sendingMessage,
       uploadingImages,
       wsStatus,
+      latestJobRequestUpdate,
+      latestJobStatusUpdate,
       error,
       clearError,
       clearActiveConversation,
@@ -831,6 +859,8 @@ export const ChatProvider = ({ children }) => {
       sendingMessage,
       uploadingImages,
       wsStatus,
+      latestJobRequestUpdate,
+      latestJobStatusUpdate,
       error,
       clearError,
       clearActiveConversation,

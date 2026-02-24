@@ -54,6 +54,11 @@ const AppBottomNav = ({ activeTab, onTabPress, style }) => {
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',

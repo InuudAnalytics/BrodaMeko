@@ -28,9 +28,11 @@ const sanitizeProfile = (value) => {
     certificateImages: Array.isArray(next.certificateImages) ? next.certificateImages.filter(Boolean) : [],
     bankDetails: bank
       ? {
+          id: String(bank.id || '').trim(),
           accountName: String(bank.accountName || '').trim(),
           accountNumber: String(bank.accountNumber || '').trim(),
           bankName: String(bank.bankName || '').trim(),
+          isPrimary: Boolean(bank.isPrimary),
         }
       : null,
     skippedSteps: Array.isArray(next.skippedSteps) ? next.skippedSteps.filter(Boolean) : [],
@@ -126,9 +128,11 @@ export const MechanicProfileProvider = ({ children }) => {
   const setBankDetails = useCallback((details) => {
     const normalized = details && typeof details === 'object'
       ? {
+          id: String(details.id || '').trim(),
           accountName: String(details.accountName || '').trim(),
           accountNumber: String(details.accountNumber || '').trim(),
           bankName: String(details.bankName || '').trim(),
+          isPrimary: Boolean(details.isPrimary),
         }
       : null;
 

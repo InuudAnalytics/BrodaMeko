@@ -23,10 +23,12 @@ import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
 import EditJobScreen from '../screens/carowner/history/EditJobScreen';
 import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
 import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
+import WaitingMechanicScreen from '../screens/carowner/assistance/WaitingMechanicScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
+import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -113,6 +115,11 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name={ROUTES.PERSONAL_INFO}
+        component={PersonalInfoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name={ROUTES.CAR_OWNER_EDIT_PROFILE}
         component={CarOwnerEditProfileScreen}
         options={{ headerShown: false }}
@@ -140,6 +147,11 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_MECHANIC_DISCOVERY}
         component={CarOwnerMechanicDiscoveryScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_WAITING_MECHANIC}
+        component={WaitingMechanicScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

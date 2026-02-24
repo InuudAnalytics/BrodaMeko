@@ -191,6 +191,20 @@ export const verifyAddContact = async ({ email, phoneNumber }) => {
   throw lastError || new Error('Could not verify contact.');
 };
 
+export const verifyConfirmContact = async ({ otp }) => {
+  const safeOtp = String(otp || '').trim();
+
+  if (!safeOtp) {
+    const error = new Error('otp is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.post(ENDPOINTS.auth.verifyConfirmContact, { otp: safeOtp });
+  return response.data;
+};
+
 export const googleLogin = async ({ idToken, role }) => {
   const payload = {
     id_token: idToken,
@@ -217,4 +231,5 @@ export default {
   updatePassword,
   uploadAvatar,
   verifyAddContact,
+  verifyConfirmContact,
 };

@@ -8,6 +8,27 @@ import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const STATUS_STEPS = ['Accepted', 'En Route', 'Arrived', 'Repairing', 'Done'];
+const toStatusIndex = (value) => {
+  const status = String(value || '').trim().toLowerCase();
+
+  if (status === 'accepted') {
+    return 0;
+  }
+  if (status === 'en_route' || status === 'enroute' || status === 'on_the_way') {
+    return 1;
+  }
+  if (status === 'arrived') {
+    return 2;
+  }
+  if (status === 'repairing' || status === 'in_progress') {
+    return 3;
+  }
+  if (status === 'completed' || status === 'done') {
+    return 4;
+  }
+
+  return 1;
+};
 
 const StarIcon = ({ color }) => (
   <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -51,6 +72,9 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
     id: customer?.id || route?.params?.carOwnerId || null,
   }), [customer, route?.params?.carOwnerId]);
   const hasSeedMessage = Boolean(route?.params?.issueSummary);
+  // TODO(map/geofence): when mechanic reaches the owner's exact location, this
+  // status should be moved to `arrived` automatically from live GPS distance.
+  const statusIndex = toStatusIndex(route?.params?.trackingStatus || route?.params?.progressStatus);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -69,7 +93,7 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
           You are on your way to {recipient.name}
         </AppText>
 
-        <StatusStepper currentIndex={1} />
+        <StatusStepper currentIndex={statusIndex} />
 
         <View style={styles.card}>
           <View style={styles.row}>

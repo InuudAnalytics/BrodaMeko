@@ -122,6 +122,9 @@ const SkeletonRow = () => {
 };
 
 const SharedConversationsScreen = ({ onConversationPress, emptyStateMessage, renderBottomNav }) => {
+    // Discontinued by product direction:
+    // a generic conversations list exposing multiple chats shifts the app toward
+    // a messaging product, instead of the focused service-rendering workflow.
     const { conversations, loadingConversations, error, fetchConversations, openConversation } = useChat();
 
     useEffect(() => {

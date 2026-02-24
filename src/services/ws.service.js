@@ -1,7 +1,7 @@
 import { CHAT_WS_URL } from '../config/endpoints';
 
-let socketRef = null;
-let socketUrlRef = '';
+const socketsByScope = new Map();
+const DEFAULT_SCOPE = 'default';
 
 const buildUrl = (token) => {
   const safeToken = String(token || '').trim();
@@ -13,30 +13,45 @@ const buildUrl = (token) => {
   return `${CHAT_WS_URL}${separator}token=${encodeURIComponent(safeToken)}`;
 };
 
-export const connect = (token, onMessage, onOpen, onClose, onError) => {
+const getSocketRecord = (scope) => {
+  const safeScope = String(scope || DEFAULT_SCOPE).trim() || DEFAULT_SCOPE;
+  return socketsByScope.get(safeScope) || null;
+};
+
+const setSocketRecord = (scope, record) => {
+  const safeScope = String(scope || DEFAULT_SCOPE).trim() || DEFAULT_SCOPE;
+  if (!record) {
+    socketsByScope.delete(safeScope);
+    return;
+  }
+  socketsByScope.set(safeScope, record);
+};
+
+export const connectScoped = (scope, token, onMessage, onOpen, onClose, onError) => {
   const safeToken = String(token || '').trim();
   const url = buildUrl(safeToken);
+  const existingRecord = getSocketRecord(scope);
+  const existingSocket = existingRecord?.socket || null;
 
   if (
-    socketRef &&
-    socketUrlRef === url &&
-    (socketRef.readyState === WebSocket.OPEN || socketRef.readyState === WebSocket.CONNECTING)
+    existingSocket &&
+    existingRecord?.url === url &&
+    (existingSocket.readyState === WebSocket.OPEN || existingSocket.readyState === WebSocket.CONNECTING)
   ) {
-    return socketRef;
+    return existingSocket;
   }
 
-  if (socketRef) {
+  if (existingSocket) {
     try {
-      socketRef.onopen = null;
-      socketRef.onmessage = null;
-      socketRef.onclose = null;
-      socketRef.onerror = null;
-      socketRef.close();
+      existingSocket.onopen = null;
+      existingSocket.onmessage = null;
+      existingSocket.onclose = null;
+      existingSocket.onerror = null;
+      existingSocket.close();
     } catch (error) {
       // no-op
     }
-    socketRef = null;
-    socketUrlRef = '';
+    setSocketRecord(scope, null);
   }
 
   const socket = new WebSocket(url, [], {
@@ -45,8 +60,7 @@ export const connect = (token, onMessage, onOpen, onClose, onError) => {
     },
   });
 
-  socketRef = socket;
-  socketUrlRef = url;
+  setSocketRecord(scope, { socket, url });
 
   socket.onopen = (event) => {
     if (typeof onOpen === 'function') {
@@ -75,33 +89,45 @@ export const connect = (token, onMessage, onOpen, onClose, onError) => {
   return socket;
 };
 
-export const send = (payload) => {
-  if (!socketRef || socketRef.readyState !== WebSocket.OPEN) {
+export const connect = (token, onMessage, onOpen, onClose, onError) =>
+  connectScoped(DEFAULT_SCOPE, token, onMessage, onOpen, onClose, onError);
+
+export const sendScoped = (scope, payload) => {
+  const record = getSocketRecord(scope);
+  const socket = record?.socket || null;
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
     return false;
   }
 
-  socketRef.send(JSON.stringify(payload));
+  socket.send(JSON.stringify(payload));
   return true;
 };
 
-export const close = () => {
-  if (!socketRef) {
+export const send = (payload) => sendScoped(DEFAULT_SCOPE, payload);
+
+export const closeScoped = (scope) => {
+  const record = getSocketRecord(scope);
+  const socket = record?.socket || null;
+
+  if (!socket) {
     return;
   }
 
   try {
-    socketRef.onopen = null;
-    socketRef.onmessage = null;
-    socketRef.onclose = null;
-    socketRef.onerror = null;
-    socketRef.close();
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onclose = null;
+    socket.onerror = null;
+    socket.close();
   } catch (error) {
     // no-op
   } finally {
-    socketRef = null;
-    socketUrlRef = '';
+    setSocketRecord(scope, null);
   }
 };
+
+export const close = () => closeScoped(DEFAULT_SCOPE);
 
 // Backward-compatible aliases
 export const connectChatWebSocket = ({ token, onMessage, onOpen, onClose, onError } = {}) =>
@@ -113,8 +139,11 @@ export const closeChatWebSocket = () => close();
 
 export default {
   connect,
+  connectScoped,
   send,
+  sendScoped,
   close,
+  closeScoped,
   connectChatWebSocket,
   sendMessage,
   closeChatWebSocket,

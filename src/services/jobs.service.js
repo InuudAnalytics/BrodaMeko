@@ -265,6 +265,62 @@ export const getMechanicsForJob = async (jobId) => {
   return response.data;
 };
 
+export const hireMechanicForJob = async (jobId, mechanicId) => {
+  const safeJobId = assertJobId(jobId);
+  const safeMechanicId = String(mechanicId || '').trim();
+
+  if (!safeMechanicId) {
+    buildServiceError('mechanic_id is required.');
+  }
+
+  const response = await api.post(ENDPOINTS.jobs.hire(safeJobId), {
+    mechanic_id: safeMechanicId,
+  });
+  return response.data;
+};
+
+export const respondToJobRequest = async (jobId, action) => {
+  const safeJobId = assertJobId(jobId);
+  const safeAction = String(action || '').trim().toLowerCase();
+
+  if (safeAction !== 'accept' && safeAction !== 'decline') {
+    buildServiceError('action must be accept or decline.');
+  }
+
+  const response = await api.post(ENDPOINTS.jobs.requestRespond(safeJobId), {
+    action: safeAction,
+  });
+  return response.data;
+};
+
+export const getJobRequestStatus = async (jobId) => {
+  const safeJobId = assertJobId(jobId);
+  const response = await api.get(ENDPOINTS.jobs.requestStatus(safeJobId));
+  return response.data;
+};
+
+export const getMechanicPendingJobRequests = async () => {
+  const response = await api.get(ENDPOINTS.mechanic.jobRequests);
+  return response.data;
+};
+
+export const getConversationByJobId = async (jobId) => {
+  const safeJobId = assertJobId(jobId);
+  const response = await api.get(ENDPOINTS.jobs.getConversation(safeJobId));
+  return response.data;
+};
+
+export const getMechanicJobStats = async (mechanicId) => {
+  const safeMechanicId = String(mechanicId || '').trim();
+
+  if (!safeMechanicId) {
+    buildServiceError('mechanicId is required.');
+  }
+
+  const response = await api.get(ENDPOINTS.jobs.mechanicStats(safeMechanicId));
+  return response.data;
+};
+
 export const getSingleJob = getCarOwnerJob;
 export const updateJob = updateCarOwnerJob;
 export const getAvailableJobs = getMechanicAssignedJobs;
@@ -284,4 +340,10 @@ export default {
   updateJobStatus,
   confirmJob,
   getMechanicsForJob,
+  hireMechanicForJob,
+  respondToJobRequest,
+  getJobRequestStatus,
+  getMechanicPendingJobRequests,
+  getConversationByJobId,
+  getMechanicJobStats,
 };

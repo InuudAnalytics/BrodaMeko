@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
+import { leaveMechanicReview } from '../../../services/mechanic-reviews.service';
 import { darkTheme } from '../../../theme';
 
 const TAGS = ['Arrived on time', 'Professional', 'Friendly', 'Resolved issue quickly'];
@@ -27,6 +28,7 @@ const RateMechanicScreen = ({ navigation, route }) => {
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const mechanicName =
     route?.params?.mechanic?.name ||
@@ -40,6 +42,13 @@ const RateMechanicScreen = ({ navigation, route }) => {
     route?.params?.job?.issue_name ||
     'Flat tire replacement';
   const displayId = route?.params?.displayId || makeBmId();
+  const mechanicId = String(
+    route?.params?.mechanicId ||
+    route?.params?.mechanic_id ||
+    route?.params?.mechanic?.id ||
+    route?.params?.mechanic?.mechanic_id ||
+    ''
+  ).trim();
 
   const profileLines = useMemo(
     () => [
@@ -62,13 +71,30 @@ const RateMechanicScreen = ({ navigation, route }) => {
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((value) => value !== tag) : [...prev, tag]));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!rating) {
       Alert.alert('Select rating', 'Please choose a star rating before submitting.');
       return;
     }
 
-    Alert.alert('Rating submitted', 'Thanks for your feedback.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    if (!mechanicId) {
+      Alert.alert('Missing mechanic', 'Could not identify mechanic for this review.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const commentText = [feedback.trim(), ...selectedTags].filter(Boolean).join(' | ');
+      await leaveMechanicReview(mechanicId, {
+        rating,
+        comment: commentText || 'No additional comment.',
+      });
+      Alert.alert('Rating submitted', 'Thanks for your feedback.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    } catch (submitError) {
+      Alert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -136,7 +162,7 @@ const RateMechanicScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.ctaWrap}>
-          <AppButton label="Submit" onPress={handleSubmit} />
+          <AppButton label={submitting ? 'Submitting...' : 'Submit'} onPress={handleSubmit} disabled={submitting} />
         </View>
       </View>
     </ScreenContainer>

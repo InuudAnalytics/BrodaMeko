@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   AppState,
   Alert,
   Animated,
@@ -14,12 +13,12 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { BubbleChatIcon, PlusSignIcon, SentIcon } from '@hugeicons/core-free-icons';
+import { BubbleChatIcon, SentIcon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../components';
 import { useChat } from '../../context/ChatContext';
 import { darkTheme } from '../../theme';
-import { pickSingleImageFromGallery, ROLES, ROUTES, useKeyboardLift } from '../../utils';
+import { ROLES, ROUTES, useKeyboardLift } from '../../utils';
 
 const hexToRgba = (hex, alpha) => {
   const cleaned = String(hex || '').replace('#', '').trim();
@@ -194,8 +193,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     sendQuotation,
     respondQuotation,
     initiatePaymentForJob,
-    uploadImages,
-    uploadingImages,
     wsStatus,
   } = useChat();
 
@@ -352,30 +349,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     setIsSettingPrice(false);
   };
 
-  const handleAttach = async () => {
-    if (!hasRealConversation) {
-      Alert.alert('Unavailable', 'Open a real conversation before uploading images.');
-      return;
-    }
-
-    try {
-      const { asset, cancelled, error } = await pickSingleImageFromGallery();
-      if (cancelled) {
-        return;
-      }
-      if (error) {
-        Alert.alert('Upload failed', error);
-        return;
-      }
-      if (asset?.uri) {
-        await uploadImages(conversationId, [asset]);
-        setHasInteracted(true);
-      }
-    } catch {
-      Alert.alert('Upload failed', 'Could not attach image. Please try again.');
-    }
-  };
-
   const handleAcceptPrice = (message) => {
     setSelectedQuoteMessage(message);
     setShowPaymentMethodModal(true);
@@ -416,13 +389,16 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
         type: 'system',
         text: 'Price accepted',
       });
-      navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
-        jobId: route?.params?.jobId,
-        mechanicId: route?.params?.mechanicId,
-        conversationId,
-        agreedPrice: message?.amount || null,
-        mechanic: route?.params?.mechanic,
-        issueSummary: route?.params?.issueSummary,
+      navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD, {
+        activeSession: {
+          status: 'active',
+          jobId: route?.params?.jobId,
+          mechanicId: route?.params?.mechanicId,
+          conversationId,
+          agreedPrice: message?.amount || null,
+          mechanic: route?.params?.mechanic,
+          issueSummary: route?.params?.issueSummary,
+        },
       });
     } finally {
       setPaying(false);
@@ -549,14 +525,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
         ) : null}
 
         <View style={styles.composerWrap}>
-          <Pressable style={styles.attachButton} onPress={handleAttach}>
-            {uploadingImages ? (
-              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
-            ) : (
-              <HugeiconsIcon icon={PlusSignIcon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
-            )}
-          </Pressable>
-
           <TextInput
             value={inputValue}
             onChangeText={(value) => {
@@ -775,16 +743,7 @@ const styles = StyleSheet.create({
     paddingBottom: darkTheme.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: darkTheme.spacing.xs,
-  },
-  attachButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
+    columnGap: darkTheme.spacing.sm,
   },
   input: {
     flex: 1,

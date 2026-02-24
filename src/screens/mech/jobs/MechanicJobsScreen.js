@@ -1,94 +1,89 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Clock01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
-import { getMechanicAssignedJobs } from '../../../services/jobs.service';
+import {
+  getMechanicAssignedJobs,
+  getMechanicPendingJobRequests,
+  respondToJobRequest,
+} from '../../../services/jobs.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const TABS = [
-  { key: 'ongoing', label: 'Ongoing' },
+  { key: 'available', label: 'Available jobs' },
+  { key: 'active', label: 'Active' },
   { key: 'completed', label: 'Completed' },
 ];
 
-const readJobs = (payload) => {
-  const root = payload?.data || payload || {};
+const COMPLETED_STATUSES = new Set(['completed', 'done']);
 
-  if (Array.isArray(root)) {
-    return root;
-  }
-
-  if (Array.isArray(root.jobs)) {
-    return root.jobs;
-  }
-
-  if (Array.isArray(root.items)) {
-    return root.items;
-  }
-
-  if (Array.isArray(root.results)) {
-    return root.results;
-  }
-
-  return [];
-};
-
-const initialsFromName = (name) => {
-  return String(name || 'M')
+const initialsFromName = (name) =>
+  String(name || 'M')
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join('');
-};
 
-const normalizeJob = (item, index) => ({
-  id: String(item?.id || item?._id || item?.job_id || `job-${index}`),
-  raw: item,
-  name: item?.car_owner?.name || item?.user?.name || item?.owner?.name || 'Customer',
-  issue: item?.issue_type || item?.title || item?.description || 'Car issue',
-  vehicle: item?.car_make || item?.vehicle || '',
-  distanceKm: Number(item?.distance_km || item?.distance || 0),
-  etaMins: Number(item?.eta_minutes || item?.eta || 0),
-  urgent: String(item?.priority || '').toLowerCase() === 'urgent',
-  status: String(item?.status || '').toLowerCase(),
-});
-
-const COMPLETED_STATUSES = new Set(['completed', 'done']);
-
-const filterJobsForTab = (jobs, tabKey) => {
-  if (tabKey === 'completed') {
-    return jobs.filter((job) => COMPLETED_STATUSES.has(job.status));
+const readList = (response) => {
+  const payload = response?.data || response || {};
+  if (Array.isArray(payload)) {
+    return payload;
   }
-
-  if (tabKey === 'ongoing') {
-    return jobs.filter((job) => !COMPLETED_STATUSES.has(job.status));
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
   }
-
+  if (Array.isArray(payload?.jobs)) {
+    return payload.jobs;
+  }
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+  if (Array.isArray(payload?.results)) {
+    return payload.results;
+  }
   return [];
 };
 
-const JobCard = ({ item, tab, onViewDetails }) => {
-  const isOngoing = tab === 'ongoing';
-  const isCompleted = tab === 'completed';
+const normalizePendingRequest = (item, index) => ({
+  id: String(item?.id || `pending-${index}`),
+  jobId: String(item?.job_id || item?.jobId || ''),
+  ownerName: String(item?.owner_name || item?.car_owner?.name || 'Car owner'),
+  issue: String(item?.issue_type || item?.title || 'Car issue'),
+  carMake: String(item?.car_make || ''),
+  avatarUri: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
+  urgent: String(item?.priority || '').toLowerCase() === 'urgent',
+  status: String(item?.status || 'pending').toLowerCase(),
+});
 
+const normalizeAssignedJob = (item, index) => ({
+  id: String(item?.id || item?._id || item?.job_id || `job-${index}`),
+  ownerName: String(item?.car_owner?.name || item?.owner?.name || item?.user?.name || 'Customer'),
+  issue: String(item?.issue_type || item?.title || 'Car issue'),
+  carMake: String(item?.car_make || ''),
+  status: String(item?.status || '').toLowerCase(),
+});
+
+const RequestCard = ({ item, busyAction, onAccept, onDecline }) => {
+  const initials = initialsFromName(item.ownerName);
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => onViewDetails(item)}>
-      <View style={styles.topRow}>
-        <View style={styles.leftBlock}>
-          <View style={styles.avatar}>
-            <AppText style={styles.avatarText}>{initialsFromName(item.name)}</AppText>
-          </View>
-          <View style={styles.info}>
-            <AppText style={styles.name}>{item.name}</AppText>
-            <AppText style={styles.issue}>
-              {item.issue}{item.vehicle ? ` - ${item.vehicle}` : ''}
-            </AppText>
-          </View>
+    <View style={styles.card}>
+      <View style={styles.cardTop}>
+        <View style={styles.avatar}>
+          {item.avatarUri ? (
+            <Image source={{ uri: item.avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <AppText style={styles.avatarText}>{initials}</AppText>
+          )}
         </View>
-
+        <View style={styles.info}>
+          <AppText style={styles.name}>{item.ownerName}</AppText>
+          <AppText style={styles.issue}>
+            {item.issue}
+            {item.carMake ? ` - ${item.carMake}` : ''}
+          </AppText>
+        </View>
         {item.urgent ? (
           <View style={styles.urgentBadge}>
             <AppText style={styles.urgentText}>Urgent</AppText>
@@ -96,66 +91,75 @@ const JobCard = ({ item, tab, onViewDetails }) => {
         ) : null}
       </View>
 
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-          <AppText style={styles.metaText}>
-            {item.distanceKm ? `${item.distanceKm}km away` : 'Distance unavailable'}
-          </AppText>
-        </View>
-        <View style={styles.metaItem}>
-          <HugeiconsIcon icon={Clock01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-          <AppText style={styles.metaText}>
-            {item.etaMins ? `${item.etaMins} minutes` : 'ETA unavailable'}
-          </AppText>
-        </View>
-      </View>
-
-      {isOngoing ? (
+      <View style={styles.actions}>
         <AppButton
-          label="View details"
-          onPress={() => onViewDetails(item)}
-          style={styles.ctaBtn}
-          textStyle={styles.ctaBtnText}
+          label={busyAction === 'accept' ? 'Accepting...' : 'Accept job'}
+          onPress={() => onAccept(item)}
+          disabled={Boolean(busyAction)}
+          style={styles.acceptBtn}
         />
-      ) : null}
-
-      {isCompleted ? (
-        <View style={styles.completedChip}>
-          <AppText style={styles.completedChipText}>Completed</AppText>
-        </View>
-      ) : null}
-    </TouchableOpacity>
+        <AppButton
+          label={busyAction === 'decline' ? 'Declining...' : 'Decline'}
+          onPress={() => onDecline(item)}
+          disabled={Boolean(busyAction)}
+          style={styles.declineBtn}
+          textStyle={styles.declineBtnText}
+        />
+      </View>
+    </View>
   );
 };
 
-const MechanicJobsScreen = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('ongoing');
+const AssignedCard = ({ item, onOpen }) => (
+  <TouchableOpacity activeOpacity={0.9} style={styles.card} onPress={() => onOpen(item)}>
+    <View style={styles.cardTop}>
+      <View style={styles.avatar}>
+        <AppText style={styles.avatarText}>{initialsFromName(item.ownerName)}</AppText>
+      </View>
+      <View style={styles.info}>
+        <AppText style={styles.name}>{item.ownerName}</AppText>
+        <AppText style={styles.issue}>
+          {item.issue}
+          {item.carMake ? ` - ${item.carMake}` : ''}
+        </AppText>
+      </View>
+    </View>
+    <AppButton label="View details" onPress={() => onOpen(item)} style={styles.acceptBtn} />
+  </TouchableOpacity>
+);
+
+const MechanicJobsScreen = ({ navigation, route }) => {
+  const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [jobsByTab, setJobsByTab] = useState({
-    ongoing: [],
-    completed: [],
-  });
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [activeJobs, setActiveJobs] = useState([]);
+  const [completedJobs, setCompletedJobs] = useState([]);
+  const [busyRequestId, setBusyRequestId] = useState('');
+  const [busyAction, setBusyAction] = useState('');
 
-  const fetchTabJobs = useCallback(async () => {
+  const requestedJobId = String(route?.params?.requestJobId || '').trim();
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const response = await getMechanicAssignedJobs({ page: 1, limit: 50 });
-      const normalized = readJobs(response).map(normalizeJob);
+      const [pendingRes, assignedRes] = await Promise.all([
+        getMechanicPendingJobRequests(),
+        getMechanicAssignedJobs({ page: 1, limit: 100 }),
+      ]);
 
-      setJobsByTab({
-        ongoing: filterJobsForTab(normalized, 'ongoing'),
-        completed: filterJobsForTab(normalized, 'completed'),
-      });
+      const pending = readList(pendingRes).map(normalizePendingRequest);
+      const assigned = readList(assignedRes).map(normalizeAssignedJob);
+      setPendingRequests(pending);
+      setActiveJobs(assigned.filter((item) => !COMPLETED_STATUSES.has(item.status)));
+      setCompletedJobs(assigned.filter((item) => COMPLETED_STATUSES.has(item.status)));
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load jobs.');
-      setJobsByTab({
-        ongoing: [],
-        completed: [],
-      });
+      setPendingRequests([]);
+      setActiveJobs([]);
+      setCompletedJobs([]);
     } finally {
       setLoading(false);
     }
@@ -163,15 +167,55 @@ const MechanicJobsScreen = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchTabJobs();
-    }, [fetchTabJobs])
+      fetchData();
+      if (requestedJobId) {
+        setActiveTab('available');
+      }
+    }, [fetchData, requestedJobId])
   );
 
-  const currentList = useMemo(() => jobsByTab[activeTab] || [], [activeTab, jobsByTab]);
+  const handleRespond = async (item, action) => {
+    const safeJobId = String(item?.jobId || '').trim();
+    if (!safeJobId || busyRequestId) {
+      return;
+    }
 
-  const handleViewDetails = (job) => {
-    navigation.navigate(ROUTES.MECH_JOB_DETAILS, { jobId: job.id });
+    setBusyRequestId(item.id);
+    setBusyAction(action);
+    try {
+      const response = await respondToJobRequest(safeJobId, action);
+      if (action === 'accept') {
+        const payload = response?.data || response || {};
+        const conversationId = String(payload?.conversation_id || '').trim();
+        navigation.navigate(ROUTES.MECH_CHAT, {
+          conversationId,
+          jobId: safeJobId,
+          tab: 'jobs',
+        });
+      } else {
+        await fetchData();
+      }
+    } catch (respondError) {
+      setError(respondError?.message || `Could not ${action} request.`);
+    } finally {
+      setBusyRequestId('');
+      setBusyAction('');
+    }
   };
+
+  const handleOpenJob = (item) => {
+    navigation.navigate(ROUTES.MECH_JOB_DETAILS, { jobId: item.id });
+  };
+
+  const currentItems = useMemo(() => {
+    if (activeTab === 'available') {
+      return pendingRequests;
+    }
+    if (activeTab === 'active') {
+      return activeJobs;
+    }
+    return completedJobs;
+  }, [activeJobs, activeTab, completedJobs, pendingRequests]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -192,6 +236,8 @@ const MechanicJobsScreen = ({ navigation }) => {
           })}
         </View>
 
+        <AppText style={styles.heading}>Nearby requests</AppText>
+
         {loading ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="small" color={darkTheme.colors.accent} />
@@ -201,7 +247,7 @@ const MechanicJobsScreen = ({ navigation }) => {
         {!loading && error ? (
           <View style={styles.centerState}>
             <AppText style={styles.errorText}>{error}</AppText>
-            <TouchableOpacity activeOpacity={0.85} onPress={fetchTabJobs}>
+            <TouchableOpacity activeOpacity={0.85} onPress={fetchData}>
               <AppText style={styles.retryText}>Retry</AppText>
             </TouchableOpacity>
           </View>
@@ -209,16 +255,21 @@ const MechanicJobsScreen = ({ navigation }) => {
 
         {!loading && !error ? (
           <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-            {currentList.map((item) => (
-              <JobCard
-                key={`${activeTab}-${item.id}`}
-                item={item}
-                tab={activeTab}
-                onViewDetails={handleViewDetails}
-              />
-            ))}
+            {activeTab === 'available'
+              ? currentItems.map((item) => (
+                  <RequestCard
+                    key={item.id}
+                    item={item}
+                    busyAction={busyRequestId === item.id ? busyAction : ''}
+                    onAccept={(target) => handleRespond(target, 'accept')}
+                    onDecline={(target) => handleRespond(target, 'decline')}
+                  />
+                ))
+              : currentItems.map((item) => (
+                  <AssignedCard key={item.id} item={item} onOpen={handleOpenJob} />
+                ))}
 
-            {!currentList.length ? (
+            {!currentItems.length ? (
               <View style={styles.centerState}>
                 <AppText style={styles.emptyText}>No jobs in this tab right now.</AppText>
               </View>
@@ -237,152 +288,130 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingTop: 14,
   },
   tabWrap: {
     flexDirection: 'row',
-    columnGap: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245,245,245,0.16)',
+    padding: 6,
   },
   tabBtn: {
     flex: 1,
-    minHeight: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
+    minHeight: 36,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    paddingHorizontal: 8,
   },
   tabBtnActive: {
     backgroundColor: darkTheme.colors.accent,
-    borderColor: darkTheme.colors.accent,
   },
   tabText: {
-    color: darkTheme.colors.text,
+    color: 'rgba(245,245,245,0.72)',
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-    textAlign: 'center',
   },
   tabTextActive: {
-    color: '#1A1A1A',
+    color: '#2A2A2A',
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  heading: {
+    marginTop: 14,
+    color: '#F5F5F5',
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
   listContent: {
-    paddingTop: 12,
-    paddingBottom: 28,
-    rowGap: 10,
+    paddingTop: 10,
+    paddingBottom: 24,
+    rowGap: 12,
   },
   card: {
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: withAlpha(darkTheme.colors.accent, 0.65),
+    borderRadius: 16,
     padding: 12,
+    backgroundColor: 'rgba(0,0,51,0.6)',
   },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    columnGap: 8,
-  },
-  leftBlock: {
+  cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     columnGap: 10,
   },
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: withAlpha(darkTheme.colors.accent, 0.2),
-    borderWidth: 1,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.42),
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarText: {
-    color: darkTheme.colors.accent,
-    fontSize: 12,
+    color: '#F5F5F5',
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   info: {
     flex: 1,
   },
   name: {
-    color: darkTheme.colors.text,
-    fontSize: 15,
-    lineHeight: 20,
+    color: '#F5F5F5',
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   issue: {
     marginTop: 2,
-    color: darkTheme.colors.muted,
-    fontSize: 12,
+    color: 'rgba(245,245,245,0.62)',
+    fontSize: 13,
     lineHeight: 16,
   },
   urgentBadge: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
-    backgroundColor: withAlpha(darkTheme.colors.accent, 0.14),
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  urgentText: {
-    color: darkTheme.colors.accent,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  metaRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 12,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 4,
-  },
-  metaText: {
-    color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  ctaBtn: {
-    marginTop: 10,
-    minHeight: 42,
-    borderRadius: 10,
-  },
-  ctaBtnText: {
-    color: '#1A1A1A',
-    fontSize: 14,
-  },
-  completedChip: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 999,
+    backgroundColor: 'rgba(157,36,74,0.8)',
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  completedChipText: {
-    color: darkTheme.colors.text,
-    fontSize: 11,
-    lineHeight: 14,
+  urgentText: {
+    color: '#F7D1E0',
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  actions: {
+    marginTop: 14,
+    rowGap: 8,
+  },
+  acceptBtn: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: darkTheme.colors.accent,
+  },
+  declineBtn: {
+    minHeight: 40,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+  },
+  declineBtnText: {
+    color: '#F5F5F5',
+    fontSize: 13,
   },
   centerState: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
+    paddingVertical: 24,
     rowGap: 8,
+  },
+  emptyText: {
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
   },
   errorText: {
     color: '#FF7F7F',
@@ -390,10 +419,6 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: darkTheme.colors.accent,
-  },
-  emptyText: {
-    color: darkTheme.colors.muted,
-    textAlign: 'center',
   },
 });
 

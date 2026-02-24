@@ -4,7 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../../components';
-import { getCarOwnerJob } from '../../../services/jobs.service';
+import { getCarOwnerJob, getMechanicJobStats } from '../../../services/jobs.service';
+import { getMechanicReviews } from '../../../services/mechanic-reviews.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -59,6 +60,24 @@ const toAvatar = (job, fallbackFromRoute) => {
     FALLBACK_AVATAR;
   return String(avatar || '').trim() || FALLBACK_AVATAR;
 };
+
+const toMechanicId = (job, route) =>
+  String(
+    route?.params?.mechanicId ||
+    route?.params?.mechanic_id ||
+    route?.params?.mechanic?.id ||
+    route?.params?.mechanic?.mechanic_id ||
+    job?.mechanic?.id ||
+    job?.mechanic?._id ||
+    job?.mechanic?.mechanic_id ||
+    job?.provider?.id ||
+    job?.provider?._id ||
+    job?.provider?.mechanic_id ||
+    job?.assigned_mechanic?.id ||
+    job?.assigned_mechanic?._id ||
+    job?.assigned_mechanic?.mechanic_id ||
+    ''
+  ).trim();
 
 const toReviews = (job) => {
   const items =
@@ -120,6 +139,8 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
   const jobId = String(route?.params?.jobId || '').trim();
   const preview = route?.params?.preview || {};
   const [job, setJob] = useState(null);
+  const [reviewsPayload, setReviewsPayload] = useState([]);
+  const [statsPayload, setStatsPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -135,14 +156,35 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
 
     try {
       const response = await getCarOwnerJob(jobId);
-      setJob(readPayload(response));
+      const parsedJob = readPayload(response);
+      setJob(parsedJob);
+
+      const mechanicId = toMechanicId(parsedJob, route);
+      if (mechanicId) {
+        const [reviewsResponse, statsResponse] = await Promise.all([
+          getMechanicReviews(mechanicId).catch(() => null),
+          getMechanicJobStats(mechanicId).catch(() => null),
+        ]);
+
+        const reviewsRoot = reviewsResponse?.data || reviewsResponse || {};
+        const nextReviews = Array.isArray(reviewsRoot)
+          ? reviewsRoot
+          : (Array.isArray(reviewsRoot?.reviews) ? reviewsRoot.reviews : (Array.isArray(reviewsRoot?.data) ? reviewsRoot.data : []));
+        setReviewsPayload(nextReviews);
+        setStatsPayload(statsResponse?.data || statsResponse || null);
+      } else {
+        setReviewsPayload([]);
+        setStatsPayload(null);
+      }
     } catch (requestError) {
       setError(requestError?.message || 'Could not load mechanic details.');
       setJob(null);
+      setReviewsPayload([]);
+      setStatsPayload(null);
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+  }, [jobId, route]);
 
   useFocusEffect(
     useCallback(() => {
@@ -151,7 +193,7 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
   );
 
   const viewModel = useMemo(() => {
-    const reviews = toReviews(job);
+    const reviews = reviewsPayload.length ? reviewsPayload : toReviews(job);
     const firstReview = reviews[0] || {};
 
     const name = toName(job, preview?.mechanicName);
@@ -164,7 +206,9 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
       FALLBACK_RATING
     );
     const totalJobs = toNumber(
-      job?.mechanic?.total_jobs ||
+      statsPayload?.total_completed_jobs ||
+        statsPayload?.completed_jobs ||
+        job?.mechanic?.total_jobs ||
         job?.provider?.total_jobs ||
         job?.mechanic?.jobs_count ||
         job?.provider?.jobs_count,
@@ -194,7 +238,7 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
           FALLBACK_REVIEW.text,
       },
     };
-  }, [job, preview]);
+  }, [job, preview, reviewsPayload, statsPayload]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -234,6 +278,7 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
                 onPress={() =>
                   navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_REVIEWS, {
                     jobId,
+                    mechanicId: toMechanicId(job, route),
                     preview: {
                       mechanicName: viewModel.name,
                       avatarUrl: viewModel.avatar,

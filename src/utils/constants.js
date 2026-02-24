@@ -30,6 +30,7 @@ export const ROUTES = {
   CAR_OWNER_REQUEST_DIAGNOSTICS: 'CarOwnerRequestDiagnostics',
   CAR_OWNER_DIAGNOSTIC_EXPERTS: 'CarOwnerDiagnosticExperts',
   CAR_OWNER_MECHANIC_DISCOVERY: 'CarOwnerMechanicDiscovery',
+  CAR_OWNER_WAITING_MECHANIC: 'CarOwnerWaitingMechanic',
   CAR_OWNER_LIVE_TRACKING: 'CarOwnerLiveTracking',
   CAR_OWNER_RATE_MECHANIC: 'CarOwnerRateMechanic',
   CAR_OWNER_MECHANIC_DETAILS: 'CarOwnerMechanicDetails',
@@ -37,6 +38,7 @@ export const ROUTES = {
   CAR_OWNER_JOB_DETAILS: 'CarOwnerJobDetails',
   CAR_OWNER_EDIT_JOB: 'CarOwnerEditJob',
   CHANGE_PASSWORD: 'ChangePassword',
+  PERSONAL_INFO: 'PersonalInfo',
   SUPPORT: 'Support',
 
   MECH_DASHBOARD: 'MechDashboard',

@@ -14,6 +14,7 @@ export const ENDPOINTS = {
     updatePassword: '/api/v1/auth/update-password',
     uploadAvatar: '/api/v1/auth/upload-avatar',
     verifyAddContact: '/api/v1/auth/verify/add-contact',
+    verifyConfirmContact: '/api/v1/auth/verify/confirm-contact',
     devices: {
       register: '/api/v1/auth/devices/register',
     },
@@ -47,6 +48,21 @@ export const ENDPOINTS = {
     updateStatus: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/status`,
     confirm: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/confirm`,
     mechanicsForJob: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/mechanics/for-job`,
+    hire: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/hire`,
+    requestRespond: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/request/respond`,
+    requestStatus: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/request/status`,
+    getConversation: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/get/conversation`,
+    mechanicStats: (mechanicId) => `/api/v1/jobs/mechanics/${encodeURIComponent(String(mechanicId || ''))}/stats`,
+  },
+  mechanic: {
+    jobRequests: '/api/v1/jobs/mechanic/job-requests',
+  },
+  notifications: {
+    all: '/api/v1/notifications/all',
+    markRead: (notificationId) =>
+      `/api/v1/notifications/${encodeURIComponent(String(notificationId || ''))}/read`,
+    markAllRead: '/api/v1/notifications/read-all',
+    delete: (notificationId) => `/api/v1/notifications/${encodeURIComponent(String(notificationId || ''))}`,
   },
   wallet: {
     balance: '/api/v1/wallet/balance',
@@ -68,9 +84,29 @@ export const ENDPOINTS = {
     respondToQuotation: (conversationId) =>
       `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/quotation/respond`,
   },
+  mechanicReviews: {
+    leave: (mechanicId) =>
+      `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/review`,
+    list: (mechanicId) =>
+      `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/review`,
+  },
   transactions: {
     list: '/api/v1/transactions/list',
     details: (reference) => `/api/v1/transactions/${encodeURIComponent(String(reference || ''))}`,
+  },
+  admin: {
+    auth: {
+      login: '/api/v1/admin/auth/login',
+      logout: '/api/v1/admin/auth/logout',
+      me: '/api/v1/admin/auth/me',
+      updatePassword: '/api/v1/admin/auth/password',
+    },
+    dashboard: '/api/v1/admin/dashboard',
+    auditLogs: '/api/v1/admin/audit-logs',
+    settings: '/api/v1/admin/settings',
+    updateSetting: (settingKey) =>
+      `/api/v1/admin/settings/${encodeURIComponent(String(settingKey || ''))}`,
+    jobs: '/api/v1/admin/jobs',
   },
   ws: {
     chat: CHAT_WS_URL,
