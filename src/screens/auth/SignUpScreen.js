@@ -15,7 +15,13 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { CancelCircleIcon, CheckmarkCircle02Icon, ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
+import {
+  AppleIcon,
+  CancelCircleIcon,
+  CheckmarkCircle02Icon,
+  ViewIcon,
+  ViewOffIcon,
+} from '@hugeicons/core-free-icons';
 import {
   AppButton,
   AppInput,
@@ -45,7 +51,7 @@ const NEUTRAL_COLOR = 'rgba(255,255,255,0.45)';
 const METHODS = { PHONE: 'phone', EMAIL: 'email' };
 const TERMS_SHEET_HEIGHT_RATIO = 0.7;
 
-const maskEmail = (value) => {
+const maskEmail = value => {
   const email = String(value || '').trim();
   const [name, domain] = email.split('@');
   if (!name || !domain) return email;
@@ -55,9 +61,18 @@ const maskEmail = (value) => {
 
 const SignUpScreen = ({ navigation, route }) => {
   const roleParam = route?.params?.role;
-  const { selectedRole: persistedSelectedRole, signUp, signInWithGoogle: signUpWithGoogle, isLoading, error, clearError } = useAuth();
+  const {
+    selectedRole: persistedSelectedRole,
+    signUp,
+    signInWithGoogle: signUpWithGoogle,
+    isLoading,
+    error,
+    clearError,
+  } = useAuth();
   const selectedRole = roleParam || persistedSelectedRole || ROLES.CAR_OWNER;
-  const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
+  const { targetRef, animatedStyle } = useKeyboardLift({
+    extraOffset: darkTheme.spacing.sm,
+  });
   const { height: screenHeight } = useWindowDimensions();
 
   const [method, setMethod] = useState(METHODS.PHONE);
@@ -70,17 +85,26 @@ const SignUpScreen = ({ navigation, route }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [localError, setLocalError] = useState('');
   const [isTermsVisible, setIsTermsVisible] = useState(false);
-  const termsTranslateY = useState(new Animated.Value(screenHeight * TERMS_SHEET_HEIGHT_RATIO))[0];
+  const termsTranslateY = useState(
+    new Animated.Value(screenHeight * TERMS_SHEET_HEIGHT_RATIO),
+  )[0];
 
   const destinationPreview = useMemo(() => {
-    return method === METHODS.PHONE ? maskNigerianPhone(phone) : maskEmail(email);
+    return method === METHODS.PHONE
+      ? maskNigerianPhone(phone)
+      : maskEmail(email);
   }, [method, phone, email]);
 
-  const passwordChecks = useMemo(() => validatePasswordRules(password), [password]);
-  const isPasswordValid = passwordChecks.minLength && passwordChecks.hasNumberOrSpecialCharacter;
+  const passwordChecks = useMemo(
+    () => validatePasswordRules(password),
+    [password],
+  );
+  const isPasswordValid =
+    passwordChecks.minLength && passwordChecks.hasNumberOrSpecialCharacter;
   const mergedError = localError || error;
 
-  const getRuleState = (isMet) => (isMet ? 'success' : mergedError ? 'error' : 'neutral');
+  const getRuleState = isMet =>
+    isMet ? 'success' : mergedError ? 'error' : 'neutral';
 
   const resetError = () => {
     if (localError) setLocalError('');
@@ -112,17 +136,23 @@ const SignUpScreen = ({ navigation, route }) => {
   };
 
   const handleSignUp = async () => {
-    if (!fullName.trim() || !password.trim() || !confirmPassword.trim()) return setLocalError('Please fill in all required fields.');
-    if (method === METHODS.PHONE && !isValidNigerianPhoneDigits(phone)) return setLocalError('Phone number must be exactly 10 digits.');
-    if (method === METHODS.EMAIL && !email.trim()) return setLocalError('Email address is required.');
-    if (!isPasswordValid) return setLocalError('Password does not meet all requirements.');
-    if (password !== confirmPassword) return setLocalError('Passwords do not match.');
+    if (!fullName.trim() || !password.trim() || !confirmPassword.trim())
+      return setLocalError('Please fill in all required fields.');
+    if (method === METHODS.PHONE && !isValidNigerianPhoneDigits(phone))
+      return setLocalError('Phone number must be exactly 10 digits.');
+    if (method === METHODS.EMAIL && !email.trim())
+      return setLocalError('Email address is required.');
+    if (!isPasswordValid)
+      return setLocalError('Password does not meet all requirements.');
+    if (password !== confirmPassword)
+      return setLocalError('Passwords do not match.');
 
     setLocalError('');
     const result = await signUp({
       fullName: fullName.trim(),
       email: method === METHODS.EMAIL ? email.trim() : '',
-      phoneNumber: method === METHODS.PHONE ? withNigerianCountryCode(phone) : '',
+      phoneNumber:
+        method === METHODS.PHONE ? withNigerianCountryCode(phone) : '',
       password,
       role: selectedRole,
     });
@@ -131,8 +161,8 @@ const SignUpScreen = ({ navigation, route }) => {
       typeof result === 'object' && result !== null
         ? result.status
         : result
-          ? 'success'
-          : 'error';
+        ? 'success'
+        : 'error';
 
     if (status === 'success' || status === 'uncertain') {
       if (status === 'uncertain' && error) {
@@ -154,12 +184,34 @@ const SignUpScreen = ({ navigation, route }) => {
     const state = getRuleState(isMet);
     const isSuccess = state === 'success';
     const isError = state === 'error';
-    const iconColor = isSuccess ? SUCCESS_COLOR : isError ? ERROR_COLOR : NEUTRAL_COLOR;
+    const iconColor = isSuccess
+      ? SUCCESS_COLOR
+      : isError
+      ? ERROR_COLOR
+      : NEUTRAL_COLOR;
 
     return (
       <View style={styles.ruleRow} key={label}>
-        <HugeiconsIcon icon={isSuccess ? CheckmarkCircle02Icon : isError ? CancelCircleIcon : CheckmarkCircle02Icon} size={18} color={iconColor} strokeWidth={1.9} />
-        <AppText variant="muted" style={[styles.ruleText, isSuccess ? styles.ruleTextSuccess : null, isError ? styles.ruleTextError : null]}>
+        <HugeiconsIcon
+          icon={
+            isSuccess
+              ? CheckmarkCircle02Icon
+              : isError
+              ? CancelCircleIcon
+              : CheckmarkCircle02Icon
+          }
+          size={18}
+          color={iconColor}
+          strokeWidth={1.9}
+        />
+        <AppText
+          variant="muted"
+          style={[
+            styles.ruleText,
+            isSuccess ? styles.ruleTextSuccess : null,
+            isError ? styles.ruleTextError : null,
+          ]}
+        >
           {label}
         </AppText>
       </View>
@@ -167,26 +219,50 @@ const SignUpScreen = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} keyboardAware={false}>
-      <KeyboardAvoidingView style={styles.keyboardContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <ScreenContainer
+      padded={false}
+      edges={['top', 'left', 'right', 'bottom']}
+      keyboardAware={false}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
             <Animated.View ref={targetRef} style={animatedStyle}>
               <View style={styles.logoWrap}>
                 <LogoLockup style={styles.logoScale} markSize={44} stacked />
               </View>
 
-              <AppText variant="title" style={styles.heading}>SIGN UP</AppText>
-              <AppText variant="muted" style={styles.subtitle}>Are you ready for the road?</AppText>
+              <AppText variant="title" style={styles.heading}>
+                SIGN UP
+              </AppText>
+              <AppText variant="muted" style={styles.subtitle}>
+                Are you ready for the road?
+              </AppText>
 
               <View style={styles.form}>
-                <AuthMethodToggle initialValue={METHODS.PHONE} onChange={(value) => { setMethod(value); resetError(); }} />
+                <AuthMethodToggle
+                  initialValue={METHODS.PHONE}
+                  onChange={value => {
+                    setMethod(value);
+                    resetError();
+                  }}
+                />
 
                 <AppInput
                   label="Full name"
                   placeholder="Toluwalase Daniel"
                   value={fullName}
-                  onChangeText={(text) => { setFullName(text); resetError(); }}
+                  onChangeText={text => {
+                    setFullName(text);
+                    resetError();
+                  }}
                   autoCapitalize="words"
                 />
 
@@ -195,7 +271,10 @@ const SignUpScreen = ({ navigation, route }) => {
                     label="Email Address"
                     placeholder="you@email.com"
                     value={email}
-                    onChangeText={(text) => { setEmail(text); resetError(); }}
+                    onChangeText={text => {
+                      setEmail(text);
+                      resetError();
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
@@ -203,7 +282,10 @@ const SignUpScreen = ({ navigation, route }) => {
                   <NigerianPhoneInput
                     label="Phone number"
                     value={phone}
-                    onChangeText={(text) => { setPhone(text); resetError(); }}
+                    onChangeText={text => {
+                      setPhone(text);
+                      resetError();
+                    }}
                   />
                 )}
 
@@ -211,11 +293,16 @@ const SignUpScreen = ({ navigation, route }) => {
                   label="Password"
                   placeholder="Enter password"
                   value={password}
-                  onChangeText={(text) => { setPassword(text); resetError(); }}
+                  onChangeText={text => {
+                    setPassword(text);
+                    resetError();
+                  }}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   right={
-                    <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(prev => !prev)}
+                    >
                       <HugeiconsIcon
                         icon={showPassword ? ViewOffIcon : ViewIcon}
                         size={20}
@@ -227,19 +314,30 @@ const SignUpScreen = ({ navigation, route }) => {
                 />
 
                 <View style={styles.rulesWrap}>
-                  {renderRule('At least 8 characters', passwordChecks.minLength)}
-                  {renderRule('Contains a number or special character', passwordChecks.hasNumberOrSpecialCharacter)}
+                  {renderRule(
+                    'At least 8 characters',
+                    passwordChecks.minLength,
+                  )}
+                  {renderRule(
+                    'Contains a number or special character',
+                    passwordChecks.hasNumberOrSpecialCharacter,
+                  )}
                 </View>
 
                 <AppInput
                   label="Confirm password"
                   placeholder="Confirm password"
                   value={confirmPassword}
-                  onChangeText={(text) => { setConfirmPassword(text); resetError(); }}
+                  onChangeText={text => {
+                    setConfirmPassword(text);
+                    resetError();
+                  }}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                   right={
-                    <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
+                    <TouchableOpacity
+                      onPress={() => setShowConfirmPassword(prev => !prev)}
+                    >
                       <HugeiconsIcon
                         icon={showConfirmPassword ? ViewOffIcon : ViewIcon}
                         size={20}
@@ -250,14 +348,23 @@ const SignUpScreen = ({ navigation, route }) => {
                   }
                 />
 
-                {mergedError ? <AppText style={styles.errorText}>{mergedError}</AppText> : null}
+                {mergedError ? (
+                  <AppText style={styles.errorText}>{mergedError}</AppText>
+                ) : null}
 
                 <View style={styles.primaryCta}>
                   <AppButton
                     label={isLoading ? 'Signing Up...' : 'Sign Up'}
                     onPress={handleSignUp}
                     disabled={isLoading}
-                    left={isLoading ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
+                    left={
+                      isLoading ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={darkTheme.colors.background}
+                        />
+                      ) : null
+                    }
                   />
                 </View>
 
@@ -271,10 +378,20 @@ const SignUpScreen = ({ navigation, route }) => {
                   activeOpacity={0.85}
                   disabled={isLoading}
                   onPress={() => {}}
-                  style={[styles.appleButton, isLoading ? styles.appleButtonDisabled : null]}
+                  style={[
+                    styles.appleButton,
+                    isLoading ? styles.appleButtonDisabled : null,
+                  ]}
                 >
-                  <AppText style={styles.appleIcon}></AppText>
-                  <AppText style={styles.appleLabel}>Sign up with Apple</AppText>
+                  <HugeiconsIcon
+                    icon={AppleIcon}
+                    size={18}
+                    color={darkTheme.colors.text}
+                    strokeWidth={1.9}
+                  />
+                  <AppText style={styles.appleLabel}>
+                    Sign up with Apple
+                  </AppText>
                 </TouchableOpacity>
 
                 <View style={styles.termsRow}>
@@ -288,8 +405,12 @@ const SignUpScreen = ({ navigation, route }) => {
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Have an account? </AppText>
-                  <TouchableOpacity onPress={() => navigation.navigate(ROUTES.LOGIN)}>
-                    <AppText variant="muted" color={darkTheme.colors.accent}>Sign In</AppText>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate(ROUTES.LOGIN)}
+                  >
+                    <AppText variant="muted" color={darkTheme.colors.accent}>
+                      Sign In
+                    </AppText>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -298,7 +419,12 @@ const SignUpScreen = ({ navigation, route }) => {
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      <Modal visible={isTermsVisible} transparent animationType="none" onRequestClose={closeTermsSheet}>
+      <Modal
+        visible={isTermsVisible}
+        transparent
+        animationType="none"
+        onRequestClose={closeTermsSheet}
+      >
         <Pressable style={styles.termsBackdrop} onPress={closeTermsSheet}>
           <Pressable onPress={() => {}} style={styles.termsSheetWrap}>
             <Animated.View
@@ -312,12 +438,17 @@ const SignUpScreen = ({ navigation, route }) => {
             >
               <View style={styles.termsHeader}>
                 <View />
-                <TouchableOpacity onPress={closeTermsSheet} hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}>
+                <TouchableOpacity
+                  onPress={closeTermsSheet}
+                  hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
+                >
                   <AppText style={styles.closeText}>x</AppText>
                 </TouchableOpacity>
               </View>
               <View style={styles.termsBody}>
-                <AppText style={styles.termsComingSoon}>Terms and condition coming soon</AppText>
+                <AppText style={styles.termsComingSoon}>
+                  Terms and condition coming soon
+                </AppText>
               </View>
             </Animated.View>
           </Pressable>
@@ -329,18 +460,41 @@ const SignUpScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   keyboardContainer: { flex: 1 },
-  scrollContent: { paddingHorizontal: darkTheme.spacing.xl, paddingBottom: darkTheme.spacing.xxl },
-  logoWrap: { alignItems: 'center', marginTop: darkTheme.spacing.md, marginBottom: darkTheme.spacing.xl },
+  scrollContent: {
+    paddingHorizontal: darkTheme.spacing.xl,
+    paddingBottom: darkTheme.spacing.xxl,
+  },
+  logoWrap: {
+    alignItems: 'center',
+    marginTop: darkTheme.spacing.md,
+    marginBottom: darkTheme.spacing.xl,
+  },
   logoScale: { transform: [{ scale: 1.4 }] },
   heading: { color: darkTheme.colors.text, marginBottom: darkTheme.spacing.xs },
-  subtitle: { color: darkTheme.colors.muted, marginBottom: darkTheme.spacing.xl },
-  form: { marginTop: darkTheme.spacing.xs },
-  rulesWrap: { marginTop: -darkTheme.spacing.xs, marginBottom: darkTheme.spacing.md, rowGap: darkTheme.spacing.xs },
-  ruleRow: { flexDirection: 'row', alignItems: 'center', columnGap: darkTheme.spacing.xs },
+  subtitle: {
+    color: darkTheme.colors.muted,
+    marginBottom: darkTheme.spacing.xl,
+  },
+  rulesWrap: {
+    marginTop: -darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.md,
+    rowGap: darkTheme.spacing.xs,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: darkTheme.spacing.xs,
+  },
   ruleText: { fontSize: darkTheme.typography.fontSizes.sm },
   ruleTextSuccess: { color: SUCCESS_COLOR },
   ruleTextError: { color: ERROR_COLOR },
-  errorText: { color: ERROR_COLOR, fontSize: darkTheme.typography.fontSizes.xs, lineHeight: 16, marginTop: darkTheme.spacing.xs, marginBottom: darkTheme.spacing.sm },
+  errorText: {
+    color: ERROR_COLOR,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    lineHeight: 16,
+    marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
+  },
   primaryCta: { marginTop: darkTheme.spacing.md },
   appleButton: {
     minHeight: 52,
@@ -357,11 +511,6 @@ const styles = StyleSheet.create({
   appleButtonDisabled: {
     opacity: 0.45,
   },
-  appleIcon: {
-    color: darkTheme.colors.text,
-    fontSize: 16,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
   appleLabel: {
     color: darkTheme.colors.text,
     fontSize: darkTheme.typography.fontSizes.md,
@@ -377,7 +526,12 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
     textDecorationLine: 'none',
   },
-  footer: { marginTop: darkTheme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  footer: {
+    marginTop: darkTheme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   termsBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

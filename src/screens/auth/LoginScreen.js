@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
+import { AppleIcon, ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
 import {
   AppButton,
   AppInput,
@@ -33,6 +33,7 @@ const ROLE_LABELS = {
   [ROLES.CAR_OWNER]: 'Car Owner',
   [ROLES.MECH]: 'Mechanic',
   [ROLES.ADMIN]: 'Admin',
+  [ROLES.SPARE_PARTS_SELLER]: 'Spare parts seller',
 };
 
 const LoginScreen = ({ navigation, route }) => {
@@ -215,7 +216,7 @@ const LoginScreen = ({ navigation, route }) => {
                   onPress={() => {}}
                   style={[styles.appleButton, isLoading ? styles.appleButtonDisabled : null]}
                 >
-                  <AppText style={styles.appleIcon}></AppText>
+                  <HugeiconsIcon icon={AppleIcon} size={18} color={darkTheme.colors.text} strokeWidth={1.9} />
                   <AppText style={styles.appleLabel}>Sign in with Apple</AppText>
                 </TouchableOpacity>
 
@@ -275,11 +276,6 @@ const styles = StyleSheet.create({
   },
   appleButtonDisabled: {
     opacity: 0.45,
-  },
-  appleIcon: {
-    color: darkTheme.colors.text,
-    fontSize: 16,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   appleLabel: {
     color: darkTheme.colors.text,
