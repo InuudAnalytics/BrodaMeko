@@ -328,7 +328,6 @@ const styles = StyleSheet.create({
     borderRadius: 146.5,
     backgroundColor: withAlpha(darkTheme.colors.accent, 0.28),
     borderWidth: 1,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.38),
     position: 'absolute',
   },
   middleCircle: {
@@ -337,7 +336,6 @@ const styles = StyleSheet.create({
     borderRadius: 120,
     backgroundColor: withAlpha(darkTheme.colors.accent, 0.44),
     borderWidth: 1,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.56),
     position: 'absolute',
   },
   innerCircle: {
@@ -346,7 +344,6 @@ const styles = StyleSheet.create({
     borderRadius: 98.5,
     backgroundColor: withAlpha(darkTheme.colors.accent, 0.62),
     borderWidth: 1,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.72),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 22,
