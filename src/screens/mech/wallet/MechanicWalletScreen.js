@@ -868,8 +868,8 @@ const styles = StyleSheet.create({
   },
   filterTitle: {
     color: darkTheme.colors.text,
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 20,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   clearFilterButton: {
@@ -881,17 +881,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   clearFilterButtonText: {
-    color: '#707070',
-    fontSize: 16,
-    lineHeight: 20,
+    color: 'rgba(26,26,26,0.65)',
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   filterSectionLabel: {
     marginTop: 20,
     marginBottom: 10,
     color: darkTheme.colors.text,
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   filterTypeWrap: {
@@ -912,9 +912,9 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.accent,
   },
   filterChipText: {
-    color: '#7B7B7B',
-    fontSize: 16,
-    lineHeight: 20,
+    color: 'rgba(26,26,26,0.65)',
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   filterChipTextActive: {
@@ -941,9 +941,9 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.accent,
   },
   dateDropdownText: {
-    color: '#8D8D8D',
-    fontSize: 16,
-    lineHeight: 20,
+    color: 'rgba(26,26,26,0.65)',
+    fontSize: 14,
+    lineHeight: 21,
   },
   dateDropdownTextSelected: {
     color: darkTheme.colors.background,
@@ -969,11 +969,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   applyFiltersButtonDisabled: {
-    backgroundColor: '#C8C8C8',
+    backgroundColor: '#d9d9d9',
   },
   applyFiltersButtonText: {
     color: darkTheme.colors.background,
-    fontSize: 18,
+    fontSize: 14,
     lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
