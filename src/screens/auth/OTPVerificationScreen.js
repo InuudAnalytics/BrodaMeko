@@ -69,9 +69,11 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   }, []);
 
   const fillFromIndex = (rawText, startIndex) => {
-    const digits = String(rawText || '').replace(/\D/g, '');
+    const chars = String(rawText || '')
+      .replace(/[^a-z0-9]/gi, '')
+      .toUpperCase();
 
-    if (!digits) {
+    if (!chars) {
       const nextOtp = [...otp];
       nextOtp[startIndex] = '';
       setOtp(nextOtp);
@@ -81,8 +83,8 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     const nextOtp = [...otp];
     let cursor = startIndex;
 
-    for (let i = 0; i < digits.length && cursor < OTP_LENGTH; i += 1) {
-      nextOtp[cursor] = digits[i];
+    for (let i = 0; i < chars.length && cursor < OTP_LENGTH; i += 1) {
+      nextOtp[cursor] = chars[i];
       cursor += 1;
     }
 
@@ -127,7 +129,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     }
 
     if (otpValue.length !== OTP_LENGTH || otp.some((digit) => !digit)) {
-      setLocalError('Please enter the 6-digit verification code.');
+      setLocalError('Please enter the 6-character verification code.');
       return;
     }
 
@@ -267,9 +269,11 @@ const OTPVerificationScreen = ({ route, navigation }) => {
               value={digit}
               onChangeText={(text) => setDigit(text, index)}
               onKeyPress={(event) => handleKeyPress(event, index)}
-              keyboardType="number-pad"
+              keyboardType="default"
               textContentType="oneTimeCode"
               autoComplete="sms-otp"
+              autoCapitalize="characters"
+              autoCorrect={false}
               editable={!isLockedOut}
               style={styles.otpInput}
               selectionColor={darkTheme.colors.accent}
