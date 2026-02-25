@@ -38,7 +38,7 @@ const SLIDES = [
 const ROLE_ACTIONS = [
   { key: 'car-owner', label: 'Get started as car owner', role: ROLES.CAR_OWNER, variant: 'carOwner' },
   { key: 'mechanic', label: 'Get started as mechanic', role: ROLES.MECH, variant: 'mechanic' },
-  { key: 'spare-parts', label: 'Get started as spare part seller', role: ROLES.CAR_OWNER, variant: 'spareParts' },
+  { key: 'spare-parts', label: 'Get started as spare part seller', role: ROLES.SPARE_PARTS_SELLER, variant: 'spareParts' },
 ];
 
 const BadgeImage = ({ source, clipId }) => {

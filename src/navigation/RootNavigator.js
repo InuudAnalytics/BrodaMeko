@@ -8,6 +8,7 @@ import AdminStack from './AdminStack';
 import AuthStack from './AuthStack';
 import CarOwnerStack from './CarOwnerStack';
 import MechStack from './MechStack';
+import SparePartsStack from './SparePartsStack';
 
 const navTheme = {
   ...NavigationDarkTheme,
@@ -49,6 +50,10 @@ const RootNavigator = () => {
 
     if (role === ROLES.ADMIN) {
       return <AdminStack />;
+    }
+
+    if (role === ROLES.SPARE_PARTS_SELLER) {
+      return <SparePartsStack />;
     }
 
     // Strict mode: never fall back to another role stack.

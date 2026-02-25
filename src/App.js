@@ -5,6 +5,8 @@ import {
   JobsProvider,
   MechanicProfileProvider,
   MechanicServicesProvider,
+  SellerStoreProvider,
+  SparePartsProfileProvider,
   ThemeProvider,
 } from './context';
 import { RootNavigator } from './navigation';
@@ -17,10 +19,14 @@ export default function App() {
         <ChatProvider>
           <JobsProvider>
             <MechanicProfileProvider>
-              <MechanicServicesProvider>
-                <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
-                <RootNavigator />
-              </MechanicServicesProvider>
+              <SparePartsProfileProvider>
+                <SellerStoreProvider>
+                  <MechanicServicesProvider>
+                    <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
+                    <RootNavigator />
+                  </MechanicServicesProvider>
+                </SellerStoreProvider>
+              </SparePartsProfileProvider>
             </MechanicProfileProvider>
           </JobsProvider>
         </ChatProvider>

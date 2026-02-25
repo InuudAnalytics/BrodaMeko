@@ -65,6 +65,16 @@ const normalizeRole = (value) => {
     return ROLES.CAR_OWNER;
   }
 
+  if (
+    role === 'spare_parts_seller' ||
+    role === 'spareparts_seller' ||
+    role === 'spare_parts' ||
+    role === 'spareparts' ||
+    role === 'parts_seller'
+  ) {
+    return ROLES.SPARE_PARTS_SELLER;
+  }
+
   return null;
 };
 

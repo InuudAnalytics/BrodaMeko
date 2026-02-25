@@ -91,6 +91,7 @@ const RoleSelectionScreen = ({ navigation, route }) => {
       >
         <AppButton label="Get started as user" onPress={() => handleSelectRole(ROLES.CAR_OWNER)} style={styles.cta} />
         <AppButton label="Get started as mechanic" onPress={() => handleSelectRole(ROLES.MECH)} />
+        <AppButton label="Get started as spare part seller" onPress={() => handleSelectRole(ROLES.SPARE_PARTS_SELLER)} />
       </Animated.View>
     </ScreenContainer>
   );

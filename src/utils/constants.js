@@ -2,6 +2,7 @@ export const ROLES = {
   CAR_OWNER: 'CAR_OWNER',
   MECH: 'MECH',
   ADMIN: 'ADMIN',
+  SPARE_PARTS_SELLER: 'SPARE_PARTS_SELLER',
 };
 
 export const ROUTES = {
@@ -59,4 +60,16 @@ export const ROUTES = {
   MECH_LIVE_TRACKING: 'MechanicLiveTracking',
   USER_PROFILE: 'UserProfile',
   ADMIN_DASHBOARD: 'AdminDashboard',
+
+  SPARE_PARTS_DASHBOARD: 'SparePartsDashboard',
+  SPARE_PARTS_TABS: 'SparePartsTabs',
+  SPARE_PARTS_PROFILE_SETUP: 'SparePartsProfileSetup',
+  SPARE_PARTS_UPLOAD_CAC: 'SparePartsUploadCac',
+  SPARE_PARTS_UPLOAD_NIN: 'SparePartsUploadNin',
+  SPARE_PARTS_BANK_DETAILS: 'SparePartsBankDetails',
+  SPARE_PARTS_ADD_PRODUCT: 'SparePartsAddProduct',
+  SPARE_PARTS_ORDERS: 'SparePartsOrders',
+  SPARE_PARTS_STORE: 'SparePartsStore',
+  SPARE_PARTS_WALLET: 'SparePartsWallet',
+  SPARE_PARTS_PROFILE: 'SparePartsProfile',
 };
