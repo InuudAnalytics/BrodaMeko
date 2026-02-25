@@ -25,7 +25,11 @@ const AppInput = ({
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      {label ? <AppText variant="muted" style={[styles.label, labelStyle]}>{label}</AppText> : null}
+      {label ? (
+        <AppText variant="muted" style={[styles.label, labelStyle]}>
+          {label}
+        </AppText>
+      ) : null}
 
       <View style={styles.inputWrap}>
         {left ? <View style={styles.left}>{left}</View> : null}

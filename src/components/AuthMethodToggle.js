@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { darkTheme } from '../theme';
 import AppText from './AppText';
 
@@ -8,7 +14,12 @@ const defaultOptions = [
   { label: 'Email Address', value: 'email' },
 ];
 
-const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', onChange, style }) => {
+const AuthMethodToggle = ({
+  options = defaultOptions,
+  initialValue = 'phone',
+  onChange,
+  style,
+}) => {
   const [selectedValue, setSelectedValue] = useState(initialValue);
   const [containerWidth, setContainerWidth] = useState(0);
   const slideX = useRef(new Animated.Value(0)).current;
@@ -23,11 +34,12 @@ const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', on
   }, [initialValue]);
 
   const activeIndex = useMemo(() => {
-    const index = options.findIndex((option) => option.value === selectedValue);
+    const index = options.findIndex(option => option.value === selectedValue);
     return index >= 0 ? index : 0;
   }, [options, selectedValue]);
 
-  const optionWidth = containerWidth > 0 ? containerWidth / Math.max(1, options.length) : 0;
+  const optionWidth =
+    containerWidth > 0 ? containerWidth / Math.max(1, options.length) : 0;
 
   useEffect(() => {
     if (!optionWidth) {
@@ -51,7 +63,7 @@ const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', on
   return (
     <View
       style={[styles.wrap, style]}
-      onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+      onLayout={event => setContainerWidth(event.nativeEvent.layout.width)}
     >
       {optionWidth ? (
         <Animated.View
@@ -66,7 +78,7 @@ const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', on
         />
       ) : null}
 
-      {options.map((option) => {
+      {options.map(option => {
         const isActive = option.value === selectedValue;
 
         return (
@@ -76,7 +88,12 @@ const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', on
             onPress={() => setSelectedValue(option.value)}
             style={styles.option}
           >
-            <AppText style={[styles.label, isActive ? styles.labelActive : styles.labelInactive]}>
+            <AppText
+              style={[
+                styles.label,
+                isActive ? styles.labelActive : styles.labelInactive,
+              ]}
+            >
               {option.label}
             </AppText>
           </TouchableOpacity>
@@ -88,7 +105,7 @@ const AuthMethodToggle = ({ options = defaultOptions, initialValue = 'phone', on
 
 const styles = StyleSheet.create({
   wrap: {
-    height: 60,
+    height: 56,
     borderRadius: 26,
     borderWidth: 1,
     borderColor: darkTheme.colors.inputBorder,
@@ -114,7 +131,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   label: {
-    fontWeight: darkTheme.typography.fontWeights.semibold,
+    fontWeight: darkTheme.typography.fontWeights.regular,
   },
   labelActive: {
     color: darkTheme.colors.background,

@@ -23,7 +23,15 @@ const AppButton = ({
       {...rest}
     >
       {left ? <View style={styles.side}>{left}</View> : null}
-      <Text style={[styles.label, disabled ? styles.labelDisabled : null, textStyle]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          disabled ? styles.labelDisabled : null,
+          textStyle,
+        ]}
+      >
+        {label}
+      </Text>
       {right ? <View style={styles.side}>{right}</View> : null}
     </TouchableOpacity>
   );
@@ -46,7 +54,7 @@ const styles = StyleSheet.create({
   label: {
     color: darkTheme.colors.background,
     fontSize: darkTheme.typography.fontSizes.md,
-    fontWeight: darkTheme.typography.fontWeights.bold,
+    fontWeight: darkTheme.typography.fontWeights.regular,
     textAlign: 'center',
   },
   labelDisabled: {
