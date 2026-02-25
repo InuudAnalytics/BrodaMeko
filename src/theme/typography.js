@@ -1,4 +1,12 @@
-export const fontFamily = 'SF Pro Rounded';
+import { Platform } from 'react-native';
+
+export const headerFontFamily = Platform.select({
+  ios: 'SF Pro Rounded',
+  default: 'VarelaRound-Regular',
+});
+
+export const bodyFontFamily = 'Raleway-Regular';
+export const fontFamily = bodyFontFamily;
 
 export const fontSizes = {
   xs: 12,
@@ -18,25 +26,25 @@ export const fontWeights = {
 
 export const textVariants = {
   title: {
-    fontFamily,
+    fontFamily: headerFontFamily,
     fontSize: fontSizes.xl,
     fontWeight: fontWeights.bold,
     lineHeight: 34,
   },
   subtitle: {
-    fontFamily,
+    fontFamily: headerFontFamily,
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.semibold,
     lineHeight: 26,
   },
   body: {
-    fontFamily,
+    fontFamily: bodyFontFamily,
     fontSize: fontSizes.md,
     fontWeight: fontWeights.regular,
     lineHeight: 24,
   },
   muted: {
-    fontFamily,
+    fontFamily: bodyFontFamily,
     fontSize: fontSizes.sm,
     fontWeight: fontWeights.regular,
     lineHeight: 20,
