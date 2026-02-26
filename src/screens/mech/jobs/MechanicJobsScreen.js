@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, ScreenContainer, ScrollableTabs } from '../../../components';
 import {
   getMechanicAssignedJobs,
   getMechanicPendingJobRequests,
@@ -220,21 +220,16 @@ const MechanicJobsScreen = ({ navigation, route }) => {
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.tabWrap}>
-          {TABS.map((tab) => {
-            const isActive = tab.key === activeTab;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                activeOpacity={0.85}
-                onPress={() => setActiveTab(tab.key)}
-                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-              >
-                <AppText style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <ScrollableTabs
+          tabs={TABS}
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          containerStyle={styles.tabWrap}
+          tabStyle={styles.tabBtn}
+          activeTabStyle={styles.tabBtnActive}
+          textStyle={styles.tabText}
+          activeTextStyle={styles.tabTextActive}
+        />
 
         <AppText style={styles.heading}>Nearby requests</AppText>
 
@@ -292,17 +287,16 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   tabWrap: {
-    flexDirection: 'row',
     borderRadius: 8,
     backgroundColor: 'rgba(245,245,245,0.16)',
     padding: 6,
   },
   tabBtn: {
-    flex: 1,
     minHeight: 36,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 14,
   },
   tabBtnActive: {
     backgroundColor: darkTheme.colors.accent,

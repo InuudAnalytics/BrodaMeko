@@ -9,7 +9,7 @@ import {
   Shield01Icon,
   Wallet01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppText, ScreenContainer } from '../../components';
+import { AppText, ScreenContainer, ScrollableTabs } from '../../components';
 import { useAuth, useMechanicProfile } from '../../context';
 import {
   deleteNotification,
@@ -214,19 +214,7 @@ const NotificationsScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.tabsWrap}>
-          {TABS.map((tab) => {
-            const isActive = tab.key === activeTab;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.tabBtn, isActive ? styles.tabBtnActive : null]}
-                activeOpacity={0.85}
-                onPress={() => setActiveTab(tab.key)}
-              >
-                <AppText style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</AppText>
-              </TouchableOpacity>
-            );
-          })}
+          <ScrollableTabs tabs={TABS} activeKey={activeTab} onChange={setActiveTab} />
         </View>
 
         {loading ? (
@@ -296,6 +284,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
   },
+  tabsWrap: {
+    marginTop: 10,
+  },
   header: {
     minHeight: 44,
     alignItems: 'center',
@@ -328,35 +319,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  tabsWrap: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 8,
-    padding: 5,
-    columnGap: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    minHeight: 30,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 6,
-  },
-  tabBtnActive: {
-    backgroundColor: darkTheme.colors.accent,
-  },
-  tabText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  tabTextActive: {
-    color: 'rgba(26,26,26,0.92)',
   },
   list: {
     paddingTop: 12,

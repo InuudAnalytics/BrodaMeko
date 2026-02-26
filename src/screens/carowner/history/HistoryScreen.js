@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
-import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppButton, AppText, ScreenContainer, ScrollableTabs } from '../../../components';
 import { getCarOwnerJobs } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
@@ -331,19 +331,7 @@ const HistoryScreen = ({ navigation }) => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.tabsWrap}>
-            {HISTORY_TABS.map((tab) => {
-              const isActive = tab.key === activeTab;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={[styles.tabBtn, isActive ? styles.tabBtnActive : null]}
-                  activeOpacity={0.85}
-                  onPress={() => setActiveTab(tab.key)}
-                >
-                  <AppText style={[styles.tabText, isActive ? styles.tabTextActive : null]}>{tab.label}</AppText>
-                </TouchableOpacity>
-              );
-            })}
+            <ScrollableTabs tabs={HISTORY_TABS} activeKey={activeTab} onChange={setActiveTab} />
           </View>
           {content}
         </ScrollView>
@@ -399,32 +387,6 @@ const styles = StyleSheet.create({
   },
   tabsWrap: {
     marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 8,
-    padding: 5,
-    columnGap: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    minHeight: 30,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 6,
-  },
-  tabBtnActive: {
-    backgroundColor: darkTheme.colors.accent,
-  },
-  tabText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  tabTextActive: {
-    color: 'rgba(26,26,26,0.92)',
   },
   list: {
     rowGap: 12,

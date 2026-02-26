@@ -1,5 +1,6 @@
 export { default as AnimatedLogo } from './AnimatedLogo';
 export { default as AppBottomNav } from './AppBottomNav';
+export { default as ScrollableTabs } from './ScrollableTabs';
 export { default as SuccessModal } from './SuccessModal';
 export { default as AppText } from './AppText';
 export { default as AppButton } from './AppButton';
