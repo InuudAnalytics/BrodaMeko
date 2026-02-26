@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  BackHandler,
   Image,
+  InteractionManager,
   PanResponder,
   StyleSheet,
   TouchableOpacity,
@@ -187,6 +189,24 @@ const DashboardScreen = ({ navigation, route }) => {
       refreshOnce();
       return undefined;
     }, [hasLocationPermission, refreshOnce])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => subscription.remove();
+    }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => {
+        panelY.setValue(0);
+        panelYRef.current = 0;
+      });
+
+      return () => task?.cancel?.();
+    }, [panelY])
   );
 
   useFocusEffect(

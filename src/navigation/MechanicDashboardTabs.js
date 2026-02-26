@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { BackHandler, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ScreenContainer } from '../components';
 import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
@@ -21,6 +22,13 @@ const MechanicDashboardTabs = ({ navigation, route }) => {
     setActiveTab(requestedTab);
     navigation.setParams?.({ tab: undefined });
   }, [navigation, route?.params?.tab]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => subscription.remove();
+    }, [])
+  );
 
   const renderTabScreen = () => {
     if (activeTab === 'home') {

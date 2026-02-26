@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Image, Pressable, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, BackHandler, FlatList, Image, Pressable, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { ClipPath, Defs, Image as SvgImage, Path, Rect } from 'react-native-svg';
 import { AppButton, AppText, ScreenContainer } from '../../components';
 import { useAuth } from '../../context';
@@ -135,6 +136,13 @@ const OnboardingCarouselScreen = ({ navigation, route }) => {
       clearInterval(intervalId);
     };
   }, [advanceSlide]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => subscription.remove();
+    }, [])
+  );
 
   const handleRolePress = async (nextRole) => {
     await setSelectedRole(nextRole);

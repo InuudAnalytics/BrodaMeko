@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { BackHandler, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import SparePartsTabBar from '../components/navigation/SparePartsTabBar';
 import SellerDashboardScreen from '../screens/spareparts/home/SellerDashboardScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
@@ -17,6 +18,13 @@ const SparePartsTabs = ({ navigation, route }) => {
     }
     setActiveTab(requestedTab);
   }, [route?.params?.tab]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+      return () => subscription.remove();
+    }, [])
+  );
 
   const renderTabScreen = () => {
     if (activeTab === 'home') {
