@@ -16,12 +16,13 @@ const OTP_LENGTH = 6;
 const MAX_OTP_ATTEMPTS = 3;
 
 const OTPVerificationScreen = ({ route, navigation }) => {
-  const { verifyOtp, resendOtp, updateUserData, error, clearError, pendingVerification } = useAuth();
+  const { verifyOtp, resendOtp, requestPasswordReset, updateUserData, error, clearError, pendingVerification } = useAuth();
   const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
 
   const routeParams = route.params || {};
   const flow = String(routeParams.flow || 'signup').trim();
   const isAddContactFlow = flow === 'add_contact';
+  const isForgotPasswordFlow = flow === 'forgot_password';
   const method = isAddContactFlow
     ? (routeParams.contactType === 'email' ? 'email' : 'phone')
     : (routeParams.method || pendingVerification?.method || 'phone');
@@ -137,6 +138,11 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     setIsVerifying(true);
 
     try {
+      if (isForgotPasswordFlow) {
+        navigation.navigate(ROUTES.RESET_PASSWORD, { method, destination, otp: otpValue });
+        return;
+      }
+
       if (isAddContactFlow) {
         const response = await verifyConfirmContactService({ otp: otpValue });
         const ok = response?.success !== false;
@@ -205,15 +211,20 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     setIsResending(true);
 
     try {
-      const ok = isAddContactFlow
-        ? await (async () => {
-            await resendOtpService({
-              email: method === 'email' ? destination : '',
-              phoneNumber: method === 'phone' ? destination : '',
-            });
-            return true;
-          })()
-        : await resendOtp();
+    const ok = isAddContactFlow
+      ? await (async () => {
+          await resendOtpService({
+            email: method === 'email' ? destination : '',
+            phoneNumber: method === 'phone' ? destination : '',
+          });
+          return true;
+        })()
+      : isForgotPasswordFlow
+      ? await requestPasswordReset({
+          email: method === 'email' ? destination : '',
+          phoneNumber: method === 'phone' ? destination : '',
+        })
+      : await resendOtp();
 
       if (ok) {
         setInfo('OTP resent successfully.');
@@ -229,6 +240,11 @@ const OTPVerificationScreen = ({ route, navigation }) => {
   const handleCancel = () => {
     if (isAddContactFlow) {
       navigation.goBack();
+      return;
+    }
+
+    if (isForgotPasswordFlow) {
+      navigation.navigate(ROUTES.FORGOT_PASSWORD);
       return;
     }
 
@@ -287,7 +303,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
 
         <View style={styles.verifyButtonWrap}>
           <AppButton
-            label={isVerifying ? 'Verifying...' : 'Verify'}
+            label={isVerifying ? 'Verifying...' : isForgotPasswordFlow ? 'Continue' : 'Verify'}
             onPress={handleVerify}
             disabled={isVerifying || isResending || isLockedOut}
           />

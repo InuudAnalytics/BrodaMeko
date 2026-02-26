@@ -106,7 +106,7 @@ export const resetPassword = async ({ email, phoneNumber, otp, newPassword, conf
     payload.phone_number = phoneNumber;
   }
 
-  const response = await api.post(ENDPOINTS.auth.resetPassword, payload, PUBLIC_AUTH_CONFIG);
+  const response = await api.patch(ENDPOINTS.auth.resetPassword, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 

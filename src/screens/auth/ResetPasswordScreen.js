@@ -25,6 +25,7 @@ import {
   AppInput,
   AppText,
   ScreenContainer,
+  SuccessModal,
 } from '../../components';
 import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
@@ -39,14 +40,16 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   const { targetRef, animatedStyle } = useKeyboardLift({
     extraOffset: darkTheme.spacing.sm,
   });
-  const { method = 'email', destination = '' } = route.params || {};
+  const { method = 'email', destination = '', otp: initialOtp = '' } = route.params || {};
 
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState(String(initialOtp || ''));
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [showRestart, setShowRestart] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const mergedError = localError || error;
   const passwordChecks = useMemo(
@@ -63,6 +66,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   const clearAllErrors = () => {
     if (localError) setLocalError('');
     if (error) clearError();
+    if (showRestart) setShowRestart(false);
   };
 
   const renderRule = (label, isMet) => {
@@ -132,7 +136,12 @@ const ResetPasswordScreen = ({ navigation, route }) => {
       confirmPassword,
     });
 
-    if (ok) navigation.navigate(ROUTES.LOGIN);
+    if (ok) {
+      setShowSuccess(true);
+      return;
+    }
+
+    setShowRestart(true);
   };
 
   return (
@@ -156,7 +165,7 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={styles.headerIcon}
                   activeOpacity={0.85}
-                  onPress={() => navigation.goBack()}
+                  onPress={() => navigation.replace(ROUTES.LOGIN)}
                 >
                   <HugeiconsIcon
                     icon={ArrowLeft01Icon}
@@ -267,6 +276,13 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                 {mergedError ? (
                   <AppText style={styles.errorText}>{mergedError}</AppText>
                 ) : null}
+                {showRestart ? (
+                  <TouchableOpacity style={styles.restartLink} onPress={() => navigation.replace(ROUTES.FORGOT_PASSWORD)}>
+                    <AppText variant="muted" color={darkTheme.colors.accent}>
+                      Start again
+                    </AppText>
+                  </TouchableOpacity>
+                ) : null}
 
                 <View style={styles.primaryCta}>
                   <AppButton
@@ -288,6 +304,16 @@ const ResetPasswordScreen = ({ navigation, route }) => {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      <SuccessModal
+        visible={showSuccess}
+        title="Password successfully updated"
+        message="Your password has been updated, would you like to save or proceed?"
+        onDismiss={() => {
+          setShowSuccess(false);
+          navigation.replace(ROUTES.LOGIN);
+        }}
+      />
     </ScreenContainer>
   );
 };
@@ -348,6 +374,10 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.xs,
     lineHeight: 16,
     marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
+  },
+  restartLink: {
+    alignItems: 'center',
     marginBottom: darkTheme.spacing.sm,
   },
   primaryCta: { marginTop: darkTheme.spacing.md },
