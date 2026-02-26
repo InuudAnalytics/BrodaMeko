@@ -8,6 +8,7 @@ import { ROLES, ROUTES } from '../../utils';
 const LOGO_ENTRY_OFFSET = 120;
 const BUTTONS_ENTRY_OFFSET = 34;
 
+// Deprecated: Role selection now happens in OnboardingCarouselScreen. Keep this file for reference only.
 const RoleSelectionScreen = ({ navigation, route }) => {
   const { token, setSelectedRole } = useAuth();
   const shouldAnimateIntro = route?.params?.animateIntro === true;

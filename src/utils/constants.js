@@ -2,7 +2,7 @@ export const ROLES = {
   CAR_OWNER: 'CAR_OWNER',
   MECH: 'MECH',
   ADMIN: 'ADMIN',
-  SPARE_PARTS_SELLER: 'SPARE_PARTS_SELLER',
+  SPARE_PARTS_SELLER: 'seller',
 };
 
 export const ROUTES = {

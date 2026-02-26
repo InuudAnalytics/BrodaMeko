@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -14,6 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   AppleIcon,
@@ -50,6 +52,12 @@ const SUCCESS_COLOR = '#40C67A';
 const NEUTRAL_COLOR = 'rgba(255,255,255,0.45)';
 const METHODS = { PHONE: 'phone', EMAIL: 'email' };
 const TERMS_SHEET_HEIGHT_RATIO = 0.7;
+const ROLE_LABELS = {
+  [ROLES.CAR_OWNER]: 'Car Owner',
+  [ROLES.MECH]: 'Mechanic',
+  [ROLES.ADMIN]: 'Admin',
+  [ROLES.SPARE_PARTS_SELLER]: 'Spare parts seller',
+};
 
 const maskEmail = value => {
   const email = String(value || '').trim();
@@ -110,6 +118,16 @@ const SignUpScreen = ({ navigation, route }) => {
     if (localError) setLocalError('');
     if (error) clearError();
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => true,
+      );
+      return () => subscription.remove();
+    }, []),
+  );
 
   const openTermsSheet = () => {
     const sheetHeight = screenHeight * TERMS_SHEET_HEIGHT_RATIO;
@@ -245,6 +263,22 @@ const SignUpScreen = ({ navigation, route }) => {
               <AppText variant="muted" style={styles.subtitle}>
                 Are you ready for the road?
               </AppText>
+              <View style={styles.roleRow}>
+                <AppText variant="muted" style={styles.roleText}>
+                  Signing up as {ROLE_LABELS[selectedRole] || 'Car Owner'}
+                </AppText>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate(ROUTES.ONBOARDING_CAROUSEL, {
+                      returnToLogin: false,
+                    })
+                  }
+                >
+                  <AppText variant="muted" color={darkTheme.colors.accent}>
+                    Change role
+                  </AppText>
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.form}>
                 <AuthMethodToggle
@@ -470,10 +504,23 @@ const styles = StyleSheet.create({
     marginBottom: darkTheme.spacing.xl,
   },
   logoScale: { transform: [{ scale: 1.4 }] },
-  heading: { color: darkTheme.colors.text, marginBottom: darkTheme.spacing.xs },
+  heading: {
+    fontSize: darkTheme.typography.fontSizes.xl,
+    color: darkTheme.colors.text,
+    marginBottom: darkTheme.spacing.xs,
+  },
   subtitle: {
     color: darkTheme.colors.muted,
     marginBottom: darkTheme.spacing.xl,
+  },
+  roleRow: {
+    marginBottom: darkTheme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  roleText: {
+    color: darkTheme.colors.muted,
   },
   rulesWrap: {
     marginTop: -darkTheme.spacing.xs,
