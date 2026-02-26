@@ -7,6 +7,7 @@ import { AppButton, AppText } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { getAvailableJobs } from '../../../services/jobs.service';
+import { getNotifications } from '../../../services/notifications.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme, withAlpha } from '../../../theme';
 
@@ -95,6 +96,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const [totalJobs, setTotalJobs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
   const avatarUri = readAvatarUri(user);
@@ -151,6 +153,29 @@ const MechanicDashboardScreen = ({ navigation }) => {
     }, [])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      const fetchUnread = async () => {
+        try {
+          const response = await getNotifications({ page: 1, limit: 1 });
+          const payload = response?.data || response || {};
+          const count = Number(payload?.unread_count || 0);
+          if (active) setUnreadCount(Number.isFinite(count) ? count : 0);
+        } catch {
+          if (active) setUnreadCount(0);
+        }
+      };
+
+      fetchUnread();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
@@ -169,6 +194,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
         </View>
         <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
           <HugeiconsIcon icon={Notification01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2} />
+          {unreadCount > 0 ? (
+            <View style={styles.bellBadge}>
+              <AppText style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
+            </View>
+          ) : null}
         </TouchableOpacity>
       </View>
 
@@ -337,6 +367,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.background,
+  },
+  bellBadgeText: {
+    color: '#1A1A1A',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   earningsCard: {
     backgroundColor: 'rgba(255,255,255,0.04)',

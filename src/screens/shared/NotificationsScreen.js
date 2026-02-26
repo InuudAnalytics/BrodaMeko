@@ -102,7 +102,6 @@ const NotificationsScreen = ({ navigation }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const hasPendingProfileReminder = role === ROLES.MECH && !mechanicProfileComplete;
 
@@ -121,7 +120,6 @@ const NotificationsScreen = ({ navigation }) => {
       const data = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
 
       setNotifications(data);
-      setUnreadCount(Number(payload?.unread_count || 0));
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load notifications.');
       setNotifications([]);
@@ -170,7 +168,6 @@ const NotificationsScreen = ({ navigation }) => {
     try {
       await markNotificationRead(notificationId);
       setNotifications((prev) => prev.map((entry) => (entry.id === notificationId ? { ...entry, is_read: true } : entry)));
-      setUnreadCount((prev) => Math.max(0, prev - (item?.is_read ? 0 : 1)));
     } catch {
       // Ignore mark-read failures to preserve navigation.
     }
@@ -187,9 +184,6 @@ const NotificationsScreen = ({ navigation }) => {
     try {
       await deleteNotification(notificationId);
       setNotifications((prev) => prev.filter((entry) => entry.id !== notificationId));
-      if (!item?.is_read) {
-        setUnreadCount((prev) => Math.max(0, prev - 1));
-      }
     } catch (deleteError) {
       Alert.alert('Delete failed', deleteError?.message || 'Could not delete notification.');
     }
@@ -199,7 +193,6 @@ const NotificationsScreen = ({ navigation }) => {
     try {
       await markAllNotificationsRead();
       setNotifications((prev) => prev.map((item) => ({ ...item, is_read: true })));
-      setUnreadCount(0);
     } catch (markAllError) {
       Alert.alert('Action failed', markAllError?.message || 'Could not mark all notifications as read.');
     }
@@ -218,10 +211,6 @@ const NotificationsScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.markAllBtn} activeOpacity={0.85} onPress={handleMarkAllRead}>
             <AppText style={styles.markAllText}>Mark all read</AppText>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.unreadWrap}>
-          <AppText style={styles.unreadText}>{unreadCount} unread</AppText>
         </View>
 
         <View style={styles.tabsWrap}>
@@ -339,14 +328,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  unreadWrap: {
-    marginTop: 4,
-    alignItems: 'center',
-  },
-  unreadText: {
-    color: darkTheme.colors.muted,
-    fontSize: 12,
   },
   tabsWrap: {
     marginTop: 10,

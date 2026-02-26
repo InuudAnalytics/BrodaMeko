@@ -1,14 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Image, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   DollarCircleIcon,
   Invoice01Icon,
+  Notification01Icon,
   PackageIcon,
   PlusSignIcon,
 } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
+import { getNotifications } from '../../../services/notifications.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -27,6 +30,7 @@ const SCREEN_BG = '#000033';
 
 const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
   const firstName = getFirstName(user);
   const avatarUri =
     user?.avatar ||
@@ -55,6 +59,29 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
     []
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      const fetchUnread = async () => {
+        try {
+          const response = await getNotifications({ page: 1, limit: 1 });
+          const payload = response?.data || response || {};
+          const count = Number(payload?.unread_count || 0);
+          if (active) setUnreadCount(Number.isFinite(count) ? count : 0);
+        } catch {
+          if (active) setUnreadCount(0);
+        }
+      };
+
+      fetchUnread();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
   const handleSeeMore = () => {
     if (typeof onTabPress === 'function') {
       onTabPress('orders');
@@ -68,19 +95,29 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <View style={styles.avatarWrap}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-            ) : (
-              <AppText style={styles.avatarFallback}>{firstName.charAt(0).toUpperCase()}</AppText>
-            )}
+          <View style={styles.headerLeft}>
+            <View style={styles.avatarWrap}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <AppText style={styles.avatarFallback}>{firstName.charAt(0).toUpperCase()}</AppText>
+              )}
+            </View>
+            <View style={styles.greetingTextWrap}>
+              <AppText style={styles.greetingTitle}>Good morning {firstName}</AppText>
+              <AppText variant="muted" style={styles.greetingSubtitle}>
+                Welcome back
+              </AppText>
+            </View>
           </View>
-          <View style={styles.greetingTextWrap}>
-            <AppText style={styles.greetingTitle}>Good morning {firstName}</AppText>
-            <AppText variant="muted" style={styles.greetingSubtitle}>
-              Welcome back
-            </AppText>
-          </View>
+          <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
+            <HugeiconsIcon icon={Notification01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2} />
+            {unreadCount > 0 ? (
+              <View style={styles.bellBadge}>
+                <AppText style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
+              </View>
+            ) : null}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.statsRow}>
@@ -174,6 +211,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   avatarWrap: {
     width: 40,
@@ -198,6 +240,36 @@ const styles = StyleSheet.create({
   },
   greetingTextWrap: {
     marginLeft: 12,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: SCREEN_BG,
+  },
+  bellBadgeText: {
+    color: '#1A1A1A',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   greetingTitle: {
     color: darkTheme.colors.text,
