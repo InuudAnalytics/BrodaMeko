@@ -30,11 +30,22 @@ export const ENDPOINTS = {
       serviceUpdate: (serviceId) => `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}`,
       serviceDelete: (serviceId) =>
         `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}/delete`,
+      addressList: '/api/v1/me/mechanic/address',
+      addressAdd: '/api/v1/me/mechanic/address',
+      addressUpdate: (addressId) =>
+        `/api/v1/me/mechanic/address/${encodeURIComponent(String(addressId || ''))}`,
       bankAdd: '/api/v1/me/mechanic/bank',
       bankVerify: '/api/v1/me/mechanic/bank/verify',
       bankDelete: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
       bankSetPrimary: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
       bankList: '/api/v1/me/mechanic/bank/list',
+    },
+    spareParts: {
+      // TODO: Confirm spare parts address endpoints with backend.
+      addressList: '/api/v1/me/spare-parts/address',
+      addressAdd: '/api/v1/me/spare-parts/address',
+      addressUpdate: (addressId) =>
+        `/api/v1/me/spare-parts/address/${encodeURIComponent(String(addressId || ''))}`,
     },
   },
   jobs: {

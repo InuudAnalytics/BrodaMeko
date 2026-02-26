@@ -13,6 +13,7 @@ import {
   BankDetailsScreen,
   EditProfileScreen as MechanicEditProfileScreen,
   KycUploadScreen,
+  MechanicAddressScreen,
   MechanicProfileSetupScreen,
   ServicePricingScreen,
   UploadCertificateScreen,
@@ -20,9 +21,10 @@ import {
 } from '../screens/mech/profile';
 import MechanicChatScreen from '../screens/mech/chat/MechanicChatScreen';
 import MechanicJobDetailsScreen from '../screens/mech/jobs/MechanicJobDetailsScreen';
+import SetServicesScreen from '../screens/mech/home/SetServicesScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
-import { useMechanicProfile } from '../context';
+import { useAuth, useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
@@ -30,7 +32,10 @@ import { ROUTES } from '../utils';
 const Stack = createNativeStackNavigator();
 
 const MechStack = () => {
+  const { user } = useAuth();
   const { isComplete, isHydrated } = useMechanicProfile();
+  const isApproved = String(user?.status || '').toLowerCase() === 'approved';
+  // TODO: Ask backend for a dedicated isProfileSetupComplete flag on /auth/me.
 
   if (!isHydrated) {
     return <ScreenContainer padded={false} />;
@@ -38,7 +43,7 @@ const MechStack = () => {
 
   return (
     <Stack.Navigator
-      initialRouteName={isComplete ? ROUTES.MECH_DASHBOARD_TABS : ROUTES.MECH_PROFILE_SETUP}
+      initialRouteName={isComplete || isApproved ? ROUTES.MECH_DASHBOARD_TABS : ROUTES.MECH_PROFILE_SETUP}
       screenOptions={{
         animation: 'slide_from_right',
         headerStyle: { backgroundColor: darkTheme.colors.background },
@@ -73,6 +78,11 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name={ROUTES.MECH_ADDRESS}
+        component={MechanicAddressScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name={ROUTES.MECH_BANK_DETAILS}
         component={BankDetailsScreen}
         options={{ headerShown: false }}
@@ -85,6 +95,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.MECH_JOB_DETAILS}
         component={MechanicJobDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.MECH_SET_SERVICES}
+        component={SetServicesScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -122,7 +137,7 @@ const MechStack = () => {
         component={AddContactSuccessScreen}
         options={{ headerShown: false }}
       />
-      {isComplete ? (
+      {isComplete || isApproved ? (
         <Stack.Screen
           name={ROUTES.MECH_DASHBOARD_TABS}
           component={MechanicDashboardTabs}

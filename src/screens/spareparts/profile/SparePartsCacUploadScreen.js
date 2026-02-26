@@ -5,7 +5,7 @@ import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useSparePartsProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
-import { getSparePartsOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
+import { getSparePartsOnboardingStepIndex, pickSingleImageFromGallery, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
 
 const SparePartsCacUploadScreen = ({ navigation, route }) => {
   const { sparePartsProfile, setCac } = useSparePartsProfile();
@@ -13,7 +13,8 @@ const SparePartsCacUploadScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
   const stepIndex = getSparePartsOnboardingStepIndex(ROUTES.SPARE_PARTS_UPLOAD_CAC);
-  const progressPercent = useMemo(() => (stepIndex / 3) * 100, [stepIndex]);
+  const totalSteps = SPARE_PARTS_ONBOARDING_STEPS.length;
+  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
 
   const canUpload = useMemo(() => cacImages.length > 0, [cacImages.length]);
 
@@ -69,7 +70,7 @@ const SparePartsCacUploadScreen = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <AppText style={styles.subTitle}>Please upload a clear photo of your documents</AppText>
-          <AppText style={styles.stepLabel}>Step {stepIndex} of 3</AppText>
+          <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>

@@ -5,7 +5,7 @@ import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
-import { getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
+import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const UploadCertificateScreen = ({ navigation, route }) => {
   const { mechanicProfile, setCertificateImages, completedSteps } = useMechanicProfile();
@@ -13,7 +13,8 @@ const UploadCertificateScreen = ({ navigation, route }) => {
   const [openingPicker, setOpeningPicker] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
   const stepIndex = getOnboardingStepIndex(ROUTES.MECH_UPLOAD_CERTIFICATE);
-  const progressPercent = useMemo(() => (stepIndex / 5) * 100, [stepIndex]);
+  const totalSteps = MECH_ONBOARDING_STEPS.length;
+  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
   React.useEffect(() => {
     if (!isOnboarding) {
       return;
@@ -59,7 +60,7 @@ const UploadCertificateScreen = ({ navigation, route }) => {
     setCertificateImages(images);
 
     if (isOnboarding) {
-      navigation.replace(ROUTES.MECH_BANK_DETAILS, { onboarding: true });
+      navigation.replace(ROUTES.MECH_ADDRESS, { onboarding: true });
       return;
     }
 
@@ -78,7 +79,7 @@ const UploadCertificateScreen = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <AppText style={styles.subTitle}>Please upload your certificate</AppText>
-          <AppText style={styles.stepLabel}>Step {stepIndex} of 5</AppText>
+          <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>

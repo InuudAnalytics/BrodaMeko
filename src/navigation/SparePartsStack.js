@@ -9,6 +9,7 @@ import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import {
   SparePartsBankDetailsScreen,
   SparePartsCacUploadScreen,
+  SparePartsAddressScreen,
   SparePartsNinUploadScreen,
   SparePartsProfileSetupScreen,
 } from '../screens/spareparts/profile';
@@ -23,7 +24,7 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
-import { useSparePartsProfile } from '../context';
+import { useAuth, useSparePartsProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
@@ -31,7 +32,10 @@ import { ROUTES } from '../utils';
 const Stack = createNativeStackNavigator();
 
 const SparePartsStack = () => {
+  const { user } = useAuth();
   const { isComplete, isHydrated } = useSparePartsProfile();
+  const isApproved = String(user?.status || '').toLowerCase() === 'approved';
+  // TODO: Ask backend for a dedicated isProfileSetupComplete flag on /auth/me.
 
   if (!isHydrated) {
     return <ScreenContainer padded={false} />;
@@ -39,7 +43,7 @@ const SparePartsStack = () => {
 
   return (
     <Stack.Navigator
-      initialRouteName={isComplete ? ROUTES.SPARE_PARTS_TABS : ROUTES.SPARE_PARTS_PROFILE_SETUP}
+      initialRouteName={isComplete || isApproved ? ROUTES.SPARE_PARTS_TABS : ROUTES.SPARE_PARTS_PROFILE_SETUP}
       screenOptions={{
         animation: 'slide_from_right',
         headerStyle: { backgroundColor: darkTheme.colors.background },
@@ -69,6 +73,11 @@ const SparePartsStack = () => {
       <Stack.Screen
         name={ROUTES.SPARE_PARTS_UPLOAD_NIN}
         component={SparePartsNinUploadScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.SPARE_PARTS_ADDRESS}
+        component={SparePartsAddressScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

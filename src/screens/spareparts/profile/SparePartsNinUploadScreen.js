@@ -5,7 +5,7 @@ import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useSparePartsProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
-import { getSparePartsOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
+import { getSparePartsOnboardingStepIndex, pickSingleImageFromGallery, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
 
 const SparePartsNinUploadScreen = ({ navigation, route }) => {
   const { sparePartsProfile, setNin, completedSteps } = useSparePartsProfile();
@@ -13,7 +13,8 @@ const SparePartsNinUploadScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
   const stepIndex = getSparePartsOnboardingStepIndex(ROUTES.SPARE_PARTS_UPLOAD_NIN);
-  const progressPercent = useMemo(() => (stepIndex / 3) * 100, [stepIndex]);
+  const totalSteps = SPARE_PARTS_ONBOARDING_STEPS.length;
+  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
 
   React.useEffect(() => {
     if (!isOnboarding) {
@@ -61,7 +62,7 @@ const SparePartsNinUploadScreen = ({ navigation, route }) => {
     setNin(ninImages);
 
     if (isOnboarding) {
-      navigation.replace(ROUTES.SPARE_PARTS_BANK_DETAILS, { onboarding: true });
+      navigation.replace(ROUTES.SPARE_PARTS_ADDRESS, { onboarding: true });
       return;
     }
 
@@ -80,7 +81,7 @@ const SparePartsNinUploadScreen = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <AppText style={styles.subTitle}>Please upload a clear photo of your documents</AppText>
-          <AppText style={styles.stepLabel}>Step {stepIndex} of 3</AppText>
+          <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>

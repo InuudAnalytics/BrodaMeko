@@ -139,6 +139,22 @@ export const deleteMechanicService = async (serviceId) => {
   return response.data;
 };
 
+export const getMechanicAddresses = async () => {
+  const response = await api.get(ENDPOINTS.me.mechanic.addressList);
+  return response.data;
+};
+
+export const addMechanicAddress = async (payload) => {
+  const response = await api.post(ENDPOINTS.me.mechanic.addressAdd, payload);
+  return response.data;
+};
+
+export const updateMechanicAddress = async (addressId, payload) => {
+  const safeAddressId = toId(addressId, 'addressId');
+  const response = await api.patch(ENDPOINTS.me.mechanic.addressUpdate(safeAddressId), payload);
+  return response.data;
+};
+
 export const addMechanicBank = async ({ account_name, account_number, bank_code, bank_name }) => {
   const response = await api.post(ENDPOINTS.me.mechanic.bankAdd, {
     account_name: String(account_name || '').trim(),
@@ -180,6 +196,9 @@ export default {
   getMyMechanicServices,
   updateMechanicService,
   deleteMechanicService,
+  getMechanicAddresses,
+  addMechanicAddress,
+  updateMechanicAddress,
   addMechanicBank,
   verifyMechanicBank,
   deleteMechanicBank,

@@ -3,6 +3,7 @@ import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   DocumentValidationIcon,
+  Location01Icon,
   Notification01Icon,
   Shield01Icon,
   Tick04Icon,
@@ -26,6 +27,11 @@ const CHECKLIST_ITEMS = [
     icon: Shield01Icon,
   },
   {
+    key: 'address',
+    label: 'Add address',
+    icon: Location01Icon,
+  },
+  {
     key: 'bank',
     label: 'Add bank details',
     icon: Wallet01Icon,
@@ -35,6 +41,7 @@ const CHECKLIST_ITEMS = [
 const STEP_ROUTE_BY_KEY = {
   cac: ROUTES.SPARE_PARTS_UPLOAD_CAC,
   nin: ROUTES.SPARE_PARTS_UPLOAD_NIN,
+  address: ROUTES.SPARE_PARTS_ADDRESS,
   bank: ROUTES.SPARE_PARTS_BANK_DETAILS,
 };
 

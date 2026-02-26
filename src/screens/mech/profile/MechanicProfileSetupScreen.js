@@ -5,6 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   Camera01Icon,
   DollarCircleIcon,
+  Location01Icon,
   Notification01Icon,
   Shield01Icon,
   Tick04Icon,
@@ -34,6 +35,11 @@ const CHECKLIST_ITEMS = [
     icon: Shield01Icon,
   },
   {
+    key: 'address',
+    label: 'Add address',
+    icon: Location01Icon,
+  },
+  {
     key: 'bank',
     label: 'Add bank details',
     icon: Wallet01Icon,
@@ -49,6 +55,7 @@ const STEP_ROUTE_BY_KEY = {
   photo: ROUTES.MECH_UPLOAD_PROFILE_PHOTO,
   id: ROUTES.MECH_KYC_UPLOAD,
   certificate: ROUTES.MECH_UPLOAD_CERTIFICATE,
+  address: ROUTES.MECH_ADDRESS,
   bank: ROUTES.MECH_BANK_DETAILS,
   services: ROUTES.MECH_SERVICE_PRICING,
 };

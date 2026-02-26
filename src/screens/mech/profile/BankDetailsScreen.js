@@ -3,10 +3,10 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, Vie
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
-import { useMechanicProfile } from '../../../context';
+import { useAuth, useMechanicProfile } from '../../../context';
 import { addMechanicBank, getMechanicBankList, verifyMechanicBank } from '../../../services/mechanic.service';
 import { darkTheme, withAlpha } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
 
 const normalizeBankItems = (payload) => {
   if (Array.isArray(payload)) {
@@ -35,20 +35,41 @@ const normalizeBankItems = (payload) => {
 const sanitizeDigits = (value) => String(value || '').replace(/\D/g, '');
 
 const BankDetailsScreen = ({ navigation, route }) => {
+  const { user } = useAuth();
   const { mechanicProfile, setBankDetails, completedSteps } = useMechanicProfile();
 
   const existing = mechanicProfile.bankDetails || {};
   const isOnboarding = Boolean(route?.params?.onboarding);
+  const bankFromUser = useMemo(() => {
+    const rawList = user?.bank_details || user?.bankDetails;
+    const raw =
+      (Array.isArray(rawList) ? rawList[0] : null) ||
+      user?.bank ||
+      user?.bank_account ||
+      user?.bankAccount ||
+      user?.bank_info ||
+      {};
+
+    // TODO: Confirm /auth/me bank fields with backend and map explicitly.
+    return {
+      id: String(raw?.id || raw?._id || '').trim(),
+      bankName: String(raw?.bank_name || raw?.bankName || raw?.name || '').trim(),
+      accountNumber: String(raw?.account_number || raw?.accountNumber || '').trim(),
+      accountName: String(raw?.account_name || raw?.accountName || '').trim(),
+      bvn: String(raw?.bvn || raw?.bvn_number || '').trim(),
+    };
+  }, [user]);
+  const [didSeed, setDidSeed] = useState(false);
 
   const [allBanks, setAllBanks] = useState([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
-  const [bankSearch, setBankSearch] = useState(existing.bankName || '');
+  const [bankSearch, setBankSearch] = useState(existing.bankName || bankFromUser.bankName || '');
   const [selectedBank, setSelectedBank] = useState(null);
   const [showBankDropdown, setShowBankDropdown] = useState(false);
 
-  const [accountNumber, setAccountNumber] = useState(existing.accountNumber || '');
-  const [accountName, setAccountName] = useState(existing.accountName || '');
-  const [bvn, setBvn] = useState('');
+  const [accountNumber, setAccountNumber] = useState(existing.accountNumber || bankFromUser.accountNumber || '');
+  const [accountName, setAccountName] = useState(existing.accountName || bankFromUser.accountName || '');
+  const [bvn, setBvn] = useState(bankFromUser.bvn || '');
   const [nin, setNin] = useState('');
 
   const [fetchError, setFetchError] = useState('');
@@ -56,6 +77,9 @@ const BankDetailsScreen = ({ navigation, route }) => {
   const [savingError, setSavingError] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_BANK_DETAILS);
+  const totalSteps = MECH_ONBOARDING_STEPS.length;
+  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
 
   const verifyDebounce = React.useRef(null);
 
@@ -64,11 +88,32 @@ const BankDetailsScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (!completedSteps.certificate) {
-      Alert.alert('Complete previous step', 'Please upload your certificate first.');
+    if (!completedSteps.address) {
+      Alert.alert('Complete previous step', 'Please add your address first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
-  }, [completedSteps.certificate, isOnboarding, navigation]);
+  }, [completedSteps.address, isOnboarding, navigation]);
+
+  useEffect(() => {
+    if (didSeed) {
+      return;
+    }
+    if (!isOnboarding) {
+      if (!bankSearch && bankFromUser.bankName) {
+        setBankSearch(bankFromUser.bankName);
+      }
+      if (!accountNumber && bankFromUser.accountNumber) {
+        setAccountNumber(bankFromUser.accountNumber);
+      }
+      if (!accountName && bankFromUser.accountName) {
+        setAccountName(bankFromUser.accountName);
+      }
+      if (!bvn && bankFromUser.bvn) {
+        setBvn(bankFromUser.bvn);
+      }
+      setDidSeed(true);
+    }
+  }, [accountName, accountNumber, bankFromUser, bankSearch, bvn, didSeed, isOnboarding]);
 
   const filteredBanks = useMemo(() => {
     const query = String(bankSearch || '').trim().toLowerCase();
@@ -267,15 +312,19 @@ const BankDetailsScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.backBtn} activeOpacity={0.85} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
           </TouchableOpacity>
-          <AppText style={styles.headerTitle}>Verification screen</AppText>
+          <AppText style={styles.headerTitle}>{isOnboarding ? 'Verification screen' : 'Edit bank details'}</AppText>
         </View>
 
         <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
-          <AppText style={styles.helper}>Please upload a correct bank details</AppText>
-          <AppText style={styles.stepLabel}>Step 4 of 5</AppText>
-          <View style={styles.progressTrack}>
-            <View style={styles.progressFill} />
-          </View>
+          {isOnboarding ? (
+            <>
+              <AppText style={styles.helper}>Please upload a correct bank details</AppText>
+              <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+              </View>
+            </>
+          ) : null}
 
           <AppText style={styles.bankLabel}>Bank name</AppText>
           <TouchableOpacity
@@ -366,10 +415,13 @@ const BankDetailsScreen = ({ navigation, route }) => {
           <AppInput
             label="Account name"
             value={accountName}
-            onChangeText={() => {}}
+            onChangeText={(value) => {
+              setAccountName(value);
+              setSavingError('');
+            }}
             placeholder="Resolved account name"
-            editable={false}
-            inputStyle={styles.readOnlyInput}
+            editable={!verifying}
+            inputStyle={!verifying ? null : styles.readOnlyInput}
           />
 
           <AppInput
@@ -380,16 +432,18 @@ const BankDetailsScreen = ({ navigation, route }) => {
             keyboardType="number-pad"
           />
 
-          <AppInput
-            label="NIN"
-            value={nin}
-            onChangeText={(value) => {
-              setNin(sanitizeDigits(value));
-              setSavingError('');
-            }}
-            placeholder="Enter NIN"
-            keyboardType="number-pad"
-          />
+          {isOnboarding ? (
+            <AppInput
+              label="NIN"
+              value={nin}
+              onChangeText={(value) => {
+                setNin(sanitizeDigits(value));
+                setSavingError('');
+              }}
+              placeholder="Enter NIN"
+              keyboardType="number-pad"
+            />
+          ) : null}
 
           {savingError ? <AppText style={styles.errorText}>{savingError}</AppText> : null}
 

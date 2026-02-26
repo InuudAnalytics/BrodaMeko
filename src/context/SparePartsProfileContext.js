@@ -8,6 +8,7 @@ const INITIAL_PROFILE = {
   cacImages: [],
   ninImages: [],
   bankDetails: null,
+  addresses: [],
   skippedSteps: [],
 };
 
@@ -16,6 +17,7 @@ const SparePartsProfileContext = createContext(undefined);
 const sanitizeProfile = (value) => {
   const next = value && typeof value === 'object' ? value : {};
   const bank = next.bankDetails && typeof next.bankDetails === 'object' ? next.bankDetails : null;
+  const addresses = Array.isArray(next.addresses) ? next.addresses : [];
 
   return {
     cacImages: Array.isArray(next.cacImages) ? next.cacImages.filter(Boolean) : [],
@@ -29,6 +31,20 @@ const sanitizeProfile = (value) => {
           isPrimary: Boolean(bank.isPrimary),
         }
       : null,
+    addresses: addresses
+      .map((address) => ({
+        id: String(address?.id || address?._id || '').trim(),
+        addressType: String(address?.addressType || address?.address_type || '').trim(),
+        label: String(address?.label || '').trim(),
+        street: String(address?.street || '').trim(),
+        city: String(address?.city || '').trim(),
+        state: String(address?.state || '').trim(),
+        country: String(address?.country || '').trim(),
+        latitude: String(address?.latitude ?? '').trim(),
+        longitude: String(address?.longitude ?? '').trim(),
+        isPrimary: Boolean(address?.isPrimary || address?.is_primary),
+      }))
+      .filter((address) => address.id || address.label || address.street || address.city),
     skippedSteps: Array.isArray(next.skippedSteps) ? next.skippedSteps.filter(Boolean) : [],
   };
 };
@@ -117,6 +133,28 @@ export const SparePartsProfileProvider = ({ children }) => {
     }));
   }, []);
 
+  const setAddresses = useCallback((items = []) => {
+    const normalized = Array.isArray(items)
+      ? items.map((address) => ({
+          id: String(address?.id || address?._id || '').trim(),
+          addressType: String(address?.addressType || address?.address_type || '').trim(),
+          label: String(address?.label || '').trim(),
+          street: String(address?.street || '').trim(),
+          city: String(address?.city || '').trim(),
+          state: String(address?.state || '').trim(),
+          country: String(address?.country || '').trim(),
+          latitude: String(address?.latitude ?? '').trim(),
+          longitude: String(address?.longitude ?? '').trim(),
+          isPrimary: Boolean(address?.isPrimary || address?.is_primary),
+        }))
+      : [];
+
+    setSparePartsProfile((prev) => ({
+      ...prev,
+      addresses: normalized,
+    }));
+  }, []);
+
   const resetSparePartsProfile = useCallback(() => {
     setSparePartsProfile(INITIAL_PROFILE);
   }, []);
@@ -159,13 +197,14 @@ export const SparePartsProfileProvider = ({ children }) => {
     return {
       cac: sparePartsProfile.cacImages.length > 0,
       nin: sparePartsProfile.ninImages.length > 0,
+      address: sparePartsProfile.addresses.length > 0,
       bank: hasBank,
     };
   }, [sparePartsProfile]);
 
   const completionPercent = useMemo(() => {
     const completedCount = Object.values(completedSteps).filter(Boolean).length;
-    return Math.round((completedCount / 3) * 100);
+    return Math.round((completedCount / 4) * 100);
   }, [completedSteps]);
 
   const isComplete = completionPercent >= 100;
@@ -180,6 +219,7 @@ export const SparePartsProfileProvider = ({ children }) => {
       setCac,
       setNin,
       setBankDetails,
+      setAddresses,
       markStepSkipped,
       clearSkippedStep,
       resetSkippedSteps,
@@ -195,6 +235,7 @@ export const SparePartsProfileProvider = ({ children }) => {
       setCac,
       setNin,
       setBankDetails,
+      setAddresses,
       markStepSkipped,
       clearSkippedStep,
       resetSkippedSteps,

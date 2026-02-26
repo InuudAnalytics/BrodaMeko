@@ -14,13 +14,16 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
+  BankIcon,
   Briefcase01Icon,
   Cancel01Icon,
   Edit01Icon,
   HelpCircleIcon,
+  Location01Icon,
   Notification01Icon,
   StarIcon,
   User02Icon,
+  Wrench01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
@@ -29,11 +32,24 @@ import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '.
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
 
-const SETTINGS_ROWS = [
-  { key: 'personal', label: 'Personal information', icon: User02Icon },
-  { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
-  { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
-];
+const getSettingsRows = (role) => {
+  const rows = [
+    { key: 'personal', label: 'Personal information', icon: User02Icon },
+    { key: 'bank', label: 'Bank details', icon: BankIcon },
+    { key: 'address', label: 'Address', icon: Location01Icon },
+  ];
+
+  if (role === ROLES.MECH) {
+    rows.push({ key: 'services', label: 'Services offered', icon: Wrench01Icon });
+  }
+
+  rows.push(
+    { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
+    { key: 'help', label: 'Help & Support', icon: HelpCircleIcon }
+  );
+
+  return rows;
+};
 
 const normalizeAvatarUri = (value) => {
   const raw = String(value || '').trim();
@@ -225,12 +241,12 @@ const UserProfileScreen = ({ navigation }) => {
 
         <AppText style={styles.settingsTitle}>Settings</AppText>
         <View style={styles.settingsCard}>
-          {SETTINGS_ROWS.map((row, index) => (
+          {getSettingsRows(role).map((row, index, array) => (
             <SettingRow
               key={row.key}
               label={row.label}
               icon={row.icon}
-              isLast={index === SETTINGS_ROWS.length - 1}
+              isLast={index === array.length - 1}
               onPress={() => {
                 if (row.key === 'help') {
                   setShowSupportSheet(true);
@@ -238,6 +254,34 @@ const UserProfileScreen = ({ navigation }) => {
                 }
                 if (row.key === 'personal') {
                   handlePersonalInfo();
+                  return;
+                }
+                if (row.key === 'bank') {
+                  if (role === ROLES.MECH) {
+                    navigation.navigate(ROUTES.MECH_BANK_DETAILS);
+                    return;
+                  }
+                  if (role === ROLES.SPARE_PARTS_SELLER) {
+                    navigation.navigate(ROUTES.SPARE_PARTS_BANK_DETAILS);
+                    return;
+                  }
+                  navigation.navigate('Placeholder', { title: 'Bank details' });
+                  return;
+                }
+                if (row.key === 'address') {
+                  if (role === ROLES.MECH) {
+                    navigation.navigate(ROUTES.MECH_ADDRESS);
+                    return;
+                  }
+                  if (role === ROLES.SPARE_PARTS_SELLER) {
+                    navigation.navigate(ROUTES.SPARE_PARTS_ADDRESS);
+                    return;
+                  }
+                  navigation.navigate('Placeholder', { title: 'Address' });
+                  return;
+                }
+                if (row.key === 'services') {
+                  navigation.navigate(ROUTES.MECH_SET_SERVICES);
                   return;
                 }
                 if (row.key === 'notifications') {

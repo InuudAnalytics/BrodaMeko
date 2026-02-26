@@ -5,7 +5,7 @@ import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
-import { getOnboardingStepIndex, pickSingleImageFromGallery, ROUTES } from '../../../utils';
+import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
 const KycUploadScreen = ({ navigation, route }) => {
   const { mechanicProfile, setKyc, completedSteps } = useMechanicProfile();
@@ -13,7 +13,8 @@ const KycUploadScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
   const isOnboarding = Boolean(route?.params?.onboarding);
   const stepIndex = getOnboardingStepIndex(ROUTES.MECH_KYC_UPLOAD);
-  const progressPercent = useMemo(() => (stepIndex / 5) * 100, [stepIndex]);
+  const totalSteps = MECH_ONBOARDING_STEPS.length;
+  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
 
   React.useEffect(() => {
     if (!isOnboarding) {
@@ -80,7 +81,7 @@ const KycUploadScreen = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <AppText style={styles.subTitle}>Please upload a clear photo of your documents</AppText>
-          <AppText style={styles.stepLabel}>Step {stepIndex} of 5</AppText>
+          <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>

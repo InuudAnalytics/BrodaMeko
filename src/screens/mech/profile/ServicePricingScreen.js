@@ -20,7 +20,7 @@ import {
   updateMechanicService,
 } from '../../../services/mechanic.service';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
 
 const SERVICE_OPTIONS = [
   { label: 'Flat tyres', value: 'flat_tyres' },
@@ -208,6 +208,8 @@ const ServicePricingScreen = ({ navigation, route }) => {
   const [rowErrors, setRowErrors] = useState({});
   const [openRowId, setOpenRowId] = useState('');
   const [searchText, setSearchText] = useState('');
+  const stepIndex = getOnboardingStepIndex(ROUTES.MECH_SERVICE_PRICING);
+  const totalSteps = MECH_ONBOARDING_STEPS.length;
   React.useEffect(() => {
     if (!isOnboarding) {
       return;
@@ -570,9 +572,9 @@ const ServicePricingScreen = ({ navigation, route }) => {
         <AppText style={styles.note}>Please select your service offered</AppText>
         {isOnboarding ? (
           <>
-            <AppText style={styles.stepLabel}>Step 5 of 5</AppText>
+            <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
             <View style={styles.progressTrack}>
-              <View style={styles.progressFill} />
+              <View style={[styles.progressFill, { width: `${(stepIndex / totalSteps) * 100}%` }]} />
             </View>
           </>
         ) : null}

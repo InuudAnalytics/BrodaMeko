@@ -6,7 +6,7 @@ import { AppButton, AppInput, AppText, ScreenContainer } from '../../../componen
 import { useSparePartsProfile } from '../../../context';
 import { addMechanicBank, getMechanicBankList, verifyMechanicBank } from '../../../services/mechanic.service';
 import { darkTheme, withAlpha } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { getSparePartsOnboardingStepIndex, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
 
 const normalizeBankItems = (payload) => {
   if (Array.isArray(payload)) {
@@ -55,6 +55,9 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
   const [savingError, setSavingError] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const stepIndex = getSparePartsOnboardingStepIndex(ROUTES.SPARE_PARTS_BANK_DETAILS);
+  const totalSteps = SPARE_PARTS_ONBOARDING_STEPS.length;
+  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
 
   const verifyDebounce = React.useRef(null);
 
@@ -63,11 +66,11 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (!completedSteps.nin) {
-      Alert.alert('Complete previous step', 'Please upload your NIN first.');
+    if (!completedSteps.address) {
+      Alert.alert('Complete previous step', 'Please add your address first.');
       navigation.replace(ROUTES.SPARE_PARTS_PROFILE_SETUP);
     }
-  }, [completedSteps.nin, isOnboarding, navigation]);
+  }, [completedSteps.address, isOnboarding, navigation]);
 
   const filteredBanks = useMemo(() => {
     const query = String(bankSearch || '').trim().toLowerCase();
@@ -265,9 +268,9 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
 
         <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
           <AppText style={styles.helper}>Please upload a correct bank details</AppText>
-          <AppText style={styles.stepLabel}>Step 3 of 3</AppText>
+          <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
           <View style={styles.progressTrack}>
-            <View style={styles.progressFill} />
+            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
           </View>
 
           <AppText style={styles.bankLabel}>Bank name</AppText>
