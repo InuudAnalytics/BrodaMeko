@@ -43,8 +43,8 @@ const ResetPasswordScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (otp.trim().length !== 4) {
-      setLocalError('OTP must be 4 digits.');
+    if (otp.trim().length !== 6) {
+      setLocalError('OTP must be 6 characters.');
       return;
     }
 
@@ -79,19 +79,21 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                 RESET PASSWORD
               </AppText>
               <AppText variant="muted" style={styles.subtitle}>
-                Enter the 4-digit OTP sent to {destination || method}.
+                Enter the 6-character OTP sent to {destination || method}.
               </AppText>
 
               <View style={styles.form}>
                 <AppInput
                   label="OTP"
-                  placeholder="1234"
+                  placeholder="ABC123"
                   value={otp}
                   onChangeText={(text) => {
-                    setOtp(text.replace(/\D/g, '').slice(0, 4));
+                    setOtp(text.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6));
                     clearAllErrors();
                   }}
-                  keyboardType="number-pad"
+                  keyboardType="default"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
                 />
 
                 <AppInput
