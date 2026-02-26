@@ -331,6 +331,7 @@ const DashboardScreen = ({ navigation, route }) => {
     }
     setSyncing(true);
     try {
+      // TODO: Confirm backend allows car owners to mark arrival/repairing.
       await updateJobStatus(jobId, 'repairing');
       setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'repairing' } : prev));
     } catch (error) {
@@ -347,8 +348,9 @@ const DashboardScreen = ({ navigation, route }) => {
     }
     setSyncing(true);
     try {
+      // TODO: Confirm escrow debit/release result from API response.
       await confirmJob(jobId);
-      setActiveSession(null);
+      setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'completed' } : prev));
       Alert.alert('Success', 'Job completion confirmed.');
     } catch (error) {
       Alert.alert('Error', error?.message || 'Could not confirm completion.');
@@ -375,6 +377,7 @@ const DashboardScreen = ({ navigation, route }) => {
     const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
     const currentStepIndex = TRACKER_STEPS.findIndex((item) => item.key === progressStatus);
     const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
+    const isCompleted = progressStatus === 'completed';
 
     return (
       <>
@@ -407,6 +410,7 @@ const DashboardScreen = ({ navigation, route }) => {
             </View>
           </View>
 
+        {!isCompleted ? (
           <View style={styles.trackActions}>
             <AppButton label="Message" onPress={handleOpenChat} style={styles.trackBtn} />
             <TouchableOpacity style={styles.callBtn} activeOpacity={0.88} onPress={handleCancelJob} disabled={cancelling}>
@@ -414,35 +418,58 @@ const DashboardScreen = ({ navigation, route }) => {
               <AppText style={styles.callBtnText}>{cancelling ? 'Cancelling...' : 'Cancel'}</AppText>
             </TouchableOpacity>
           </View>
+        ) : null}
         </View>
 
         <View style={styles.trackFooterActions}>
-          {progressStatus === 'arrived' ? (
+          {!isCompleted && (progressStatus === 'en_route' || progressStatus === 'arrived') ? (
             <AppButton
-              label={syncing ? 'Updating...' : 'Confirm mechanic is repairing'}
+              label={syncing ? 'Updating...' : 'Confirm arrived & started repairing'}
               onPress={handleConfirmRepairing}
               disabled={syncing}
             />
           ) : null}
-          <AppButton
-            label={syncing ? 'Confirming...' : 'Confirm completion (after payment)'}
-            onPress={handleConfirmCompletion}
-            disabled={syncing || progressStatus !== 'repairing'}
-          />
-          <TouchableOpacity
-            style={styles.secondaryAction}
-            activeOpacity={0.88}
-            onPress={() =>
-              navigation.navigate(ROUTES.CAR_OWNER_RATE_MECHANIC, {
-                mechanicId: activeSession?.mechanicId || null,
-                mechanicName: mechanic.name,
-                issueName: activeSession?.issueSummary?.issueType || '',
-                jobId: activeSession?.jobId || null,
-              })
-            }
-          >
-            <AppText style={styles.secondaryActionText}>Rate mechanic</AppText>
-          </TouchableOpacity>
+          {!isCompleted ? (
+            <AppButton
+              label={syncing ? 'Confirming...' : 'Confirm completion (after payment)'}
+              onPress={handleConfirmCompletion}
+              disabled={syncing || progressStatus !== 'repairing'}
+            />
+          ) : null}
+          {isCompleted ? (
+            <>
+              <View style={styles.postCompleteRow}>
+                <TouchableOpacity
+                  style={styles.secondaryActionHalf}
+                  activeOpacity={0.88}
+                  onPress={() =>
+                    navigation.navigate(ROUTES.CAR_OWNER_RATE_MECHANIC, {
+                      mechanicId: activeSession?.mechanicId || null,
+                      mechanicName: mechanic.name,
+                      issueName: activeSession?.issueSummary?.issueType || '',
+                      jobId: activeSession?.jobId || null,
+                    })
+                  }
+                >
+                  <AppText style={styles.secondaryActionText}>Rate mechanic</AppText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryActionHalf}
+                  activeOpacity={0.88}
+                  onPress={() => setActiveSession(null)}
+                >
+                  <AppText style={styles.secondaryActionText}>Back to home</AppText>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.secondaryAction}
+                activeOpacity={0.88}
+                onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)}
+              >
+                <AppText style={styles.secondaryActionText}>Report an issue</AppText>
+              </TouchableOpacity>
+            </>
+          ) : null}
         </View>
       </>
     );
@@ -799,6 +826,19 @@ const styles = StyleSheet.create({
   },
   callBtnText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
   trackFooterActions: { marginTop: darkTheme.spacing.md, rowGap: darkTheme.spacing.sm },
+  postCompleteRow: {
+    flexDirection: 'row',
+    columnGap: darkTheme.spacing.sm,
+  },
+  secondaryActionHalf: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: darkTheme.radius.md,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   secondaryAction: {
     minHeight: 42,
     borderRadius: darkTheme.radius.md,
