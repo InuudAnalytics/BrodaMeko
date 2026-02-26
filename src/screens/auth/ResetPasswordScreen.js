@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -12,15 +12,33 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ViewIcon, ViewOffIcon } from '@hugeicons/core-free-icons';
-import { AppButton, AppInput, AppText, LogoLockup, ScreenContainer } from '../../components';
+import {
+  ArrowLeft01Icon,
+  CancelCircleIcon,
+  CheckmarkCircle02Icon,
+  Menu01Icon,
+  ViewIcon,
+  ViewOffIcon,
+} from '@hugeicons/core-free-icons';
+import {
+  AppButton,
+  AppInput,
+  AppText,
+  ScreenContainer,
+} from '../../components';
 import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
-import { ROUTES, useKeyboardLift } from '../../utils';
+import { ROUTES, useKeyboardLift, validatePasswordRules } from '../../utils';
+
+const ERROR_COLOR = '#FF7B8A';
+const SUCCESS_COLOR = '#40C67A';
+const NEUTRAL_COLOR = 'rgba(255,255,255,0.45)';
 
 const ResetPasswordScreen = ({ navigation, route }) => {
   const { resetPasswordWithOtp, isLoading, error, clearError } = useAuth();
-  const { targetRef, animatedStyle } = useKeyboardLift({ extraOffset: darkTheme.spacing.sm });
+  const { targetRef, animatedStyle } = useKeyboardLift({
+    extraOffset: darkTheme.spacing.sm,
+  });
   const { method = 'email', destination = '' } = route.params || {};
 
   const [otp, setOtp] = useState('');
@@ -31,10 +49,57 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   const [localError, setLocalError] = useState('');
 
   const mergedError = localError || error;
+  const passwordChecks = useMemo(
+    () => validatePasswordRules(newPassword),
+    [newPassword],
+  );
+  const lengthValid = newPassword.length >= 8 && newPassword.length <= 12;
+  const isPasswordValid =
+    lengthValid && passwordChecks.hasNumberOrSpecialCharacter;
+
+  const getRuleState = isMet =>
+    isMet ? 'success' : mergedError ? 'error' : 'neutral';
 
   const clearAllErrors = () => {
     if (localError) setLocalError('');
     if (error) clearError();
+  };
+
+  const renderRule = (label, isMet) => {
+    const state = getRuleState(isMet);
+    const isSuccess = state === 'success';
+    const isError = state === 'error';
+    const iconColor = isSuccess
+      ? SUCCESS_COLOR
+      : isError
+      ? ERROR_COLOR
+      : NEUTRAL_COLOR;
+
+    return (
+      <View style={styles.ruleRow} key={label}>
+        <HugeiconsIcon
+          icon={
+            isSuccess
+              ? CheckmarkCircle02Icon
+              : isError
+              ? CancelCircleIcon
+              : CheckmarkCircle02Icon
+          }
+          size={18}
+          color={iconColor}
+          strokeWidth={1.9}
+        />
+        <AppText
+          style={[
+            styles.ruleText,
+            isSuccess ? styles.ruleSuccess : null,
+            isError ? styles.ruleError : null,
+          ]}
+        >
+          {label}
+        </AppText>
+      </View>
+    );
   };
 
   const handleReset = async () => {
@@ -53,6 +118,11 @@ const ResetPasswordScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (!isPasswordValid) {
+      setLocalError('Password does not meet all requirements.');
+      return;
+    }
+
     setLocalError('');
     const ok = await resetPasswordWithOtp({
       email: method === 'email' ? destination : '',
@@ -66,20 +136,54 @@ const ResetPasswordScreen = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} keyboardAware={false}>
-      <KeyboardAvoidingView style={styles.keyboardContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <ScreenContainer
+      padded={false}
+      edges={['top', 'left', 'right', 'bottom']}
+      keyboardAware={false}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
             <Animated.View ref={targetRef} style={animatedStyle}>
-              <View style={styles.logoWrap}>
-                <LogoLockup style={styles.logoScale} markSize={44} stacked />
+              <View style={styles.headerRow}>
+                <TouchableOpacity
+                  style={styles.headerIcon}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.goBack()}
+                >
+                  <HugeiconsIcon
+                    icon={ArrowLeft01Icon}
+                    size={20}
+                    color={darkTheme.colors.text}
+                    strokeWidth={2.1}
+                  />
+                </TouchableOpacity>
+                <View style={styles.headerSpacer} />
+                {/* <TouchableOpacity
+                  style={styles.headerIcon}
+                  activeOpacity={0.85}
+                >
+                  <HugeiconsIcon
+                    icon={Menu01Icon}
+                    size={20}
+                    color={darkTheme.colors.text}
+                    strokeWidth={2.1}
+                  />
+                </TouchableOpacity> */}
               </View>
 
               <AppText variant="title" style={styles.heading}>
-                RESET PASSWORD
+                Enter your new password
               </AppText>
               <AppText variant="muted" style={styles.subtitle}>
-                Enter the 6-character OTP sent to {destination || method}.
+                Enter your new password to continue your progress.
               </AppText>
 
               <View style={styles.form}>
@@ -87,8 +191,13 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                   label="OTP"
                   placeholder="ABC123"
                   value={otp}
-                  onChangeText={(text) => {
-                    setOtp(text.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 6));
+                  onChangeText={text => {
+                    setOtp(
+                      text
+                        .replace(/[^a-z0-9]/gi, '')
+                        .toUpperCase()
+                        .slice(0, 6),
+                    );
                     clearAllErrors();
                   }}
                   keyboardType="default"
@@ -97,17 +206,19 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                 />
 
                 <AppInput
-                  label="New password"
-                  placeholder="Enter new password"
+                  label="Password"
+                  placeholder="Enter your new password"
                   value={newPassword}
-                  onChangeText={(text) => {
+                  onChangeText={text => {
                     setNewPassword(text);
                     clearAllErrors();
                   }}
                   secureTextEntry={!showNewPassword}
                   autoCapitalize="none"
                   right={
-                    <TouchableOpacity onPress={() => setShowNewPassword((prev) => !prev)}>
+                    <TouchableOpacity
+                      onPress={() => setShowNewPassword(prev => !prev)}
+                    >
                       <HugeiconsIcon
                         icon={showNewPassword ? ViewOffIcon : ViewIcon}
                         size={20}
@@ -118,18 +229,31 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                   }
                 />
 
+                <View style={styles.rulesWrap}>
+                  {renderRule(
+                    'Password should contain 8-12 characters',
+                    lengthValid,
+                  )}
+                  {renderRule(
+                    'Password should contain at least one symbol/number',
+                    passwordChecks.hasNumberOrSpecialCharacter,
+                  )}
+                </View>
+
                 <AppInput
                   label="Confirm password"
-                  placeholder="Confirm new password"
+                  placeholder="Confirm your new password"
                   value={confirmPassword}
-                  onChangeText={(text) => {
+                  onChangeText={text => {
                     setConfirmPassword(text);
                     clearAllErrors();
                   }}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                   right={
-                    <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
+                    <TouchableOpacity
+                      onPress={() => setShowConfirmPassword(prev => !prev)}
+                    >
                       <HugeiconsIcon
                         icon={showConfirmPassword ? ViewOffIcon : ViewIcon}
                         size={20}
@@ -140,22 +264,25 @@ const ResetPasswordScreen = ({ navigation, route }) => {
                   }
                 />
 
-                {mergedError ? <AppText style={styles.errorText}>{mergedError}</AppText> : null}
+                {mergedError ? (
+                  <AppText style={styles.errorText}>{mergedError}</AppText>
+                ) : null}
 
                 <View style={styles.primaryCta}>
                   <AppButton
                     label={isLoading ? 'Resetting...' : 'Reset password'}
                     onPress={handleReset}
                     disabled={isLoading}
-                    left={isLoading ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
+                    left={
+                      isLoading ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={darkTheme.colors.background}
+                        />
+                      ) : null
+                    }
                   />
                 </View>
-
-                <TouchableOpacity style={styles.backLink} onPress={() => navigation.navigate(ROUTES.LOGIN)}>
-                  <AppText variant="muted" color={darkTheme.colors.accent}>
-                    Back to Sign In
-                  </AppText>
-                </TouchableOpacity>
               </View>
             </Animated.View>
           </ScrollView>
@@ -167,15 +294,63 @@ const ResetPasswordScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   keyboardContainer: { flex: 1 },
-  scrollContent: { paddingHorizontal: darkTheme.spacing.xl, paddingBottom: darkTheme.spacing.xxl },
-  logoWrap: { alignItems: 'center', marginTop: darkTheme.spacing.md, marginBottom: darkTheme.spacing.xl },
-  logoScale: { transform: [{ scale: 1.4 }] },
-  heading: { color: darkTheme.colors.text, marginBottom: darkTheme.spacing.xs },
-  subtitle: { color: darkTheme.colors.muted, marginBottom: darkTheme.spacing.xl },
+  scrollContent: {
+    paddingHorizontal: darkTheme.spacing.xl,
+    paddingBottom: darkTheme.spacing.xxl,
+  },
+  headerRow: {
+    marginTop: darkTheme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSpacer: { flex: 1 },
+  heading: {
+    fontSize: darkTheme.typography.fontSizes.x,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    color: darkTheme.colors.text,
+    marginTop: darkTheme.spacing.lg,
+    marginBottom: darkTheme.spacing.xs,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: darkTheme.typography.fontSizes.sm,
+    color: darkTheme.colors.muted,
+    marginBottom: darkTheme.spacing.lg,
+    textAlign: 'center',
+  },
   form: { marginTop: darkTheme.spacing.xs },
-  errorText: { color: '#FF7B8A', fontSize: darkTheme.typography.fontSizes.xs, lineHeight: 16, marginTop: darkTheme.spacing.xs, marginBottom: darkTheme.spacing.sm },
+  rulesWrap: {
+    marginTop: -darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.md,
+    rowGap: darkTheme.spacing.xs,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: darkTheme.spacing.xs,
+  },
+  ruleText: {
+    fontSize: darkTheme.typography.fontSizes.xs,
+    color: NEUTRAL_COLOR,
+  },
+  ruleSuccess: { color: SUCCESS_COLOR },
+  ruleError: { color: ERROR_COLOR },
+  ruleNeutral: { color: NEUTRAL_COLOR },
+  errorText: {
+    color: ERROR_COLOR,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    lineHeight: 16,
+    marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.sm,
+  },
   primaryCta: { marginTop: darkTheme.spacing.md },
-  backLink: { alignItems: 'center', marginTop: darkTheme.spacing.md },
 });
 
 export default ResetPasswordScreen;

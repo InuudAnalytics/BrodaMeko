@@ -59,10 +59,9 @@ const styles = StyleSheet.create({
     marginBottom: darkTheme.spacing.md,
   },
   label: {
-    marginBottom: 8,
+    marginBottom: 4,
     fontFamily: 'Raleway-Regular',
-    fontSize: 18,
-    lineHeight: 30,
+    fontSize: 16,
     fontWeight: '400',
     color: darkTheme.colors.text,
   },

@@ -13,6 +13,7 @@ export const fontSizes = {
   sm: 14,
   md: 16,
   lg: 20,
+  x: 24,
   xl: 28,
   xxl: 34,
 };
