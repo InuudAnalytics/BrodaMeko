@@ -64,6 +64,12 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name={ROUTES.CAR_OWNER_MARKETPLACE}
+        component={PlaceholderScreen}
+        options={{ headerShown: false }}
+        initialParams={{ title: 'Market' }}
+      />
+      <Stack.Screen
         name={ROUTES.CAR_OWNER_REWARDS}
         component={CarOwnerRewardsScreen}
         options={{ headerShown: false }}

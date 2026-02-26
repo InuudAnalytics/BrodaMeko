@@ -360,8 +360,9 @@ const WalletScreen = ({ navigation }) => {
   });
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']}>
-      <View style={styles.content}>
+    <View style={styles.root}>
+      <ScreenContainer padded={false} edges={['top', 'left', 'right']}>
+        <View style={styles.content}>
         <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
 
         <View style={styles.header}>
@@ -464,7 +465,9 @@ const WalletScreen = ({ navigation }) => {
             </AppText>
           </View>
         ) : null}
-      </View>
+        </View>
+
+      </ScreenContainer>
 
       <Modal visible={isFilterVisible} transparent animationType="none" onRequestClose={closeFilterSheet}>
         <View style={styles.filterModalRoot}>
@@ -583,11 +586,15 @@ const WalletScreen = ({ navigation }) => {
         onTabPress={(routeName) => navigation.navigate(routeName)}
         style={styles.bottomNav}
       />
-    </ScreenContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: darkTheme.colors.background,
+  },
   content: {
     flex: 1,
     justifyContent: 'flex-start',
@@ -932,7 +939,6 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     borderTopWidth: 0,
-    paddingBottom: darkTheme.spacing.xl,
     paddingTop: darkTheme.spacing.xs,
   },
 });

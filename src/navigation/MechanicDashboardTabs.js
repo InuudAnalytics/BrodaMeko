@@ -48,14 +48,20 @@ const MechanicDashboardTabs = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-      <View style={styles.content}>{renderTabScreen()}</View>
+    <View style={styles.root}>
+      <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
+        <View style={styles.content}>{renderTabScreen()}</View>
+      </ScreenContainer>
       <MechanicTabBar activeTab={activeTab} onTabPress={handleTabPress} />
-    </ScreenContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: darkTheme.colors.background,
+  },
   screen: {
     flex: 1,
     backgroundColor: darkTheme.colors.background,

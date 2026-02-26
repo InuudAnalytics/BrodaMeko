@@ -32,7 +32,7 @@ const SparePartsTabs = ({ navigation, route }) => {
     }
 
     if (activeTab === 'wallet') {
-      return <MechanicWalletScreen navigation={navigation} />;
+      return <MechanicWalletScreen navigation={navigation} showTabBar={false} />;
     }
 
     if (activeTab === 'profile') {

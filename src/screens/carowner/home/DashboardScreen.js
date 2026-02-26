@@ -429,7 +429,8 @@ const DashboardScreen = ({ navigation, route }) => {
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <View style={styles.root}>
+      <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
       <View style={styles.mapBackdrop}>
         {hasLocationPermission ? (
           <>
@@ -492,12 +493,18 @@ const DashboardScreen = ({ navigation, route }) => {
         <View style={styles.peekPill} />
       </TouchableOpacity>
 
+      </ScreenContainer>
+
       <AppBottomNav activeTab={ROUTES.CAR_OWNER_DASHBOARD} onTabPress={handleTabPress} style={styles.stickyFooter} />
-    </ScreenContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: darkTheme.colors.background,
+  },
   screen: { flex: 1, backgroundColor: darkTheme.colors.background },
   mapBackdrop: { flex: 1, backgroundColor: '#2B2B31', overflow: 'hidden' },
   topBar: {

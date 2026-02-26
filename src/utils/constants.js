@@ -17,6 +17,7 @@ export const ROUTES = {
 
   CAR_OWNER_DASHBOARD: 'CarOwnerDashboard',
   CAR_OWNER_HISTORY: 'CarOwnerHistory',
+  CAR_OWNER_MARKETPLACE: 'CarOwnerMarketplace',
   CAR_OWNER_REWARDS: 'CarOwnerRewards',
   CAR_OWNER_FUND_WALLET: 'CarOwnerFundWallet',
   CAR_OWNER_ESCROW_FUNDING: 'CarOwnerEscrowFunding',

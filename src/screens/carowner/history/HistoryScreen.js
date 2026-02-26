@@ -318,8 +318,9 @@ const HistoryScreen = ({ navigation }) => {
   }, [loading, error, filteredJobs, usingFallback, fetchHistory, navigation]);
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-      <View style={styles.container}>
+    <View style={styles.root}>
+      <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
+        <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
@@ -346,14 +347,19 @@ const HistoryScreen = ({ navigation }) => {
           </View>
           {content}
         </ScrollView>
-      </View>
+        </View>
+      </ScreenContainer>
 
       <AppBottomNav activeTab={ROUTES.CAR_OWNER_HISTORY} onTabPress={(routeName) => navigation.navigate(routeName)} />
-    </ScreenContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#010037',
+  },
   screen: {
     flex: 1,
     backgroundColor: '#010037',
