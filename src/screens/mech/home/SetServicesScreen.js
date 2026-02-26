@@ -1,5 +1,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ArrowDown01Icon, ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import MechanicServicesContext from '../../../context/MechanicServicesContext';
 import {
@@ -9,18 +11,8 @@ import {
   getMyMechanicServices,
   updateMechanicService,
 } from '../../../services/mechanic.services.service';
-import { darkTheme } from '../../../theme';
-
-const hexToRgba = (hex, alpha) => {
-  const cleaned = String(hex || '').replace('#', '').trim();
-  if (cleaned.length !== 6) {
-    return `rgba(230,199,20,${alpha})`;
-  }
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-};
+import { darkTheme, withAlpha } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
 const formatIssueType = (value) =>
   String(value || '')
@@ -51,6 +43,8 @@ const extractServices = (payload) => {
   return [];
 };
 
+const sanitizeDigits = (value) => String(value || '').replace(/\D/g, '');
+
 const parsePrice = (value, fieldName) => {
   const parsed = Number(value);
 
@@ -65,70 +59,85 @@ const parsePrice = (value, fieldName) => {
   return null;
 };
 
-const IssueTypePicker = ({ selected, onSelect }) => {
-  return (
-    <View style={styles.issueWrap}>
-      {ISSUE_TYPES.map((type) => {
-        const isSelected = selected === type;
+const ServiceSelector = ({
+  value,
+  onChange,
+  options,
+  open,
+  onToggle,
+  search,
+  onSearch,
+  disabled,
+}) => {
+  const displayValue = value ? formatIssueType(value) : '';
 
-        return (
-          <Pressable
-            key={type}
-            onPress={() => onSelect(type)}
-            style={[styles.issuePill, isSelected ? styles.issuePillSelected : null]}
-          >
-            <AppText style={[styles.issuePillText, isSelected ? styles.issuePillTextSelected : null]}>
-              {formatIssueType(type)}
-            </AppText>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-};
-
-const ServiceRow = ({ item, onEdit, onDelete, isDeleting }) => {
   return (
-    <View style={styles.serviceRow}>
-      <View style={styles.serviceInfo}>
-        <AppText style={styles.serviceIssue}>{formatIssueType(item.issue_type)}</AppText>
-        <AppText variant="muted" style={styles.servicePrice}>
-          N {Number(item.min_price || 0).toLocaleString()} - N {Number(item.max_price || 0).toLocaleString()}
+    <View>
+      <TouchableOpacity
+        style={[styles.dropdownTrigger, disabled ? styles.dropdownDisabled : null]}
+        activeOpacity={0.85}
+        onPress={disabled ? undefined : onToggle}
+      >
+        <AppText style={[styles.dropdownTriggerText, !displayValue ? styles.dropdownPlaceholder : null]}>
+          {displayValue || 'No options selected yet'}
         </AppText>
-      </View>
-
-      <View style={styles.rowActions}>
-        <AppButton label="Edit" onPress={onEdit} style={styles.smallButton} />
-        <AppButton
-          label={isDeleting ? 'Deleting...' : 'Delete'}
-          onPress={onDelete}
-          disabled={isDeleting}
-          style={styles.smallButton}
-        />
-      </View>
+        <HugeiconsIcon icon={ArrowDown01Icon} size={18} color={darkTheme.colors.muted} strokeWidth={2} />
+      </TouchableOpacity>
+      {open ? (
+        <View style={styles.dropdownPanel}>
+          <AppInput
+            value={search}
+            onChangeText={onSearch}
+            placeholder="Search service"
+            autoCapitalize="words"
+            containerStyle={styles.dropdownSearch}
+          />
+          <ScrollView style={styles.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+            {options.map((option) => (
+              <TouchableOpacity
+                key={option}
+                activeOpacity={0.85}
+                style={[styles.dropdownItem, option === value ? styles.dropdownItemActive : null]}
+                onPress={() => {
+                  onChange(option);
+                  onToggle();
+                }}
+              >
+                <AppText style={[styles.dropdownItemText, option === value ? styles.dropdownItemTextActive : null]}>
+                  {formatIssueType(option)}
+                </AppText>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
     </View>
   );
 };
 
-const SetServicesScreen = () => {
+const SetServicesScreen = ({ navigation }) => {
   const mechanicServicesContext = useContext(MechanicServicesContext);
   const hasContext = Boolean(mechanicServicesContext);
 
   const [localServices, setLocalServices] = useState([]);
   const [loadingAction, setLoadingAction] = useState('');
   const [formError, setFormError] = useState('');
-
-  const [issueType, setIssueType] = useState(ISSUE_TYPES[0]);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-
-  const [editingServiceId, setEditingServiceId] = useState('');
-  const [editMinPrice, setEditMinPrice] = useState('');
-  const [editMaxPrice, setEditMaxPrice] = useState('');
-  const [editError, setEditError] = useState('');
+  const [rows, setRows] = useState([]);
+  const [openRowId, setOpenRowId] = useState('');
+  const [searchText, setSearchText] = useState('');
 
   const services = hasContext ? mechanicServicesContext.services : localServices;
   const contextError = hasContext ? mechanicServicesContext.error : '';
+
+  const serviceOptions = useMemo(() => {
+    const query = String(searchText || '').trim().toLowerCase();
+    const base = ISSUE_TYPES || [];
+    // TODO: Replace ISSUE_TYPES with backend-provided service list if available.
+    if (!query) {
+      return base;
+    }
+    return base.filter((entry) => formatIssueType(entry).toLowerCase().includes(query));
+  }, [searchText]);
 
   const fetchServices = useCallback(async () => {
     if (hasContext) {
@@ -176,7 +185,6 @@ const SetServicesScreen = () => {
 
     const bootstrap = async () => {
       setLoadingAction('fetch-services');
-
       try {
         await fetchServices();
       } catch (error) {
@@ -197,45 +205,68 @@ const SetServicesScreen = () => {
     };
   }, [fetchServices]);
 
-  const validateAddForm = () => {
-    if (!issueType) {
-      return 'Please select an issue type.';
-    }
+  useEffect(() => {
+    const nextRows = services.map((service) => ({
+      id: getServiceId(service) || `${service.issue_type}-${service.min_price}-${service.max_price}`,
+      serviceId: getServiceId(service),
+      issueType: service.issue_type || '',
+      minPrice: String(service.min_price ?? ''),
+      maxPrice: String(service.max_price ?? ''),
+      isExisting: true,
+      isEditing: false,
+      error: '',
+    }));
 
-    const minErr = parsePrice(minPrice, 'Min price');
+    setRows([
+      ...nextRows,
+      { id: 'new', serviceId: '', issueType: '', minPrice: '', maxPrice: '', isExisting: false, isEditing: true, error: '' },
+    ]);
+  }, [services]);
+
+  const updateRow = (rowId, patch) => {
+    setRows((prev) =>
+      prev.map((row) => (row.id === rowId ? { ...row, ...patch, error: patch.error ?? '' } : row))
+    );
+  };
+
+  const validateRow = (row) => {
+    if (!row.issueType) {
+      return 'Please select a service option.';
+    }
+    const minErr = parsePrice(row.minPrice, 'Min price');
     if (minErr) {
       return minErr;
     }
-
-    const maxErr = parsePrice(maxPrice, 'Max price');
+    const maxErr = parsePrice(row.maxPrice, 'Max price');
     if (maxErr) {
       return maxErr;
     }
-
-    if (Number(minPrice) > Number(maxPrice)) {
+    if (Number(row.minPrice) > Number(row.maxPrice)) {
       return 'Min price cannot be greater than max price.';
     }
-
     return '';
   };
 
   const handleAddService = async () => {
-    setFormError('');
-    setEditError('');
+    const draft = rows[rows.length - 1];
+    if (!draft) {
+      return;
+    }
 
-    const validationError = validateAddForm();
+    const validationError = validateRow(draft);
     if (validationError) {
       setFormError(validationError);
       return;
     }
 
+    setFormError('');
     setLoadingAction('add-service');
 
     try {
       const response = await addService({
-        issue_type: issueType,
-        min_price: Number(minPrice),
-        max_price: Number(maxPrice),
+        issue_type: draft.issueType,
+        min_price: Number(draft.minPrice),
+        max_price: Number(draft.maxPrice),
       });
 
       if (!response?.success && response?.message) {
@@ -243,8 +274,7 @@ const SetServicesScreen = () => {
         return;
       }
 
-      setMinPrice('');
-      setMaxPrice('');
+      await fetchServices();
     } catch (error) {
       setFormError(error?.message || 'Failed to add service.');
     } finally {
@@ -252,72 +282,82 @@ const SetServicesScreen = () => {
     }
   };
 
-  const startEdit = (service) => {
-    const id = getServiceId(service);
-
-    setEditingServiceId(id);
-    setEditMinPrice(String(service?.min_price ?? ''));
-    setEditMaxPrice(String(service?.max_price ?? ''));
-    setEditError('');
-  };
-
-  const handleUpdateService = async () => {
-    if (!editingServiceId) {
+  const handleUpdateService = async (row) => {
+    if (!row.serviceId) {
       return;
     }
 
-    const minErr = parsePrice(editMinPrice, 'Min price');
-    if (minErr) {
-      setEditError(minErr);
+    const validationError = validateRow(row);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
 
-    const maxErr = parsePrice(editMaxPrice, 'Max price');
-    if (maxErr) {
-      setEditError(maxErr);
-      return;
-    }
-
-    if (Number(editMinPrice) > Number(editMaxPrice)) {
-      setEditError('Min price cannot be greater than max price.');
-      return;
-    }
-
-    setLoadingAction(`update-${editingServiceId}`);
-    setEditError('');
+    setFormError('');
+    setLoadingAction(`update-${row.serviceId}`);
 
     try {
-      const response = await updateService(editingServiceId, {
-        min_price: Number(editMinPrice),
-        max_price: Number(editMaxPrice),
+      const response = await updateService(row.serviceId, {
+        min_price: Number(row.minPrice),
+        max_price: Number(row.maxPrice),
       });
 
       if (!response?.success && response?.message) {
-        setEditError(response.message);
+        setFormError(response.message);
         return;
       }
 
-      setEditingServiceId('');
-      setEditMinPrice('');
-      setEditMaxPrice('');
+      await fetchServices();
     } catch (error) {
-      setEditError(error?.message || 'Failed to update service.');
+      setFormError(error?.message || 'Failed to update service.');
     } finally {
       setLoadingAction('');
     }
   };
 
-  const handleDeleteService = async (serviceId) => {
-    if (!serviceId) {
+  const handleFinish = () => {
+    let hasEditingRows = false;
+    const draft = rows[rows.length - 1];
+
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.isExisting && row.isEditing) {
+          hasEditingRows = true;
+          return { ...row, error: 'Please save your edits before finishing.' };
+        }
+        if (row.id === 'new') {
+          const hasAnyValue = Boolean(row.issueType || row.minPrice || row.maxPrice);
+          if (hasAnyValue) {
+            return { ...row, error: 'Please save this service before finishing.' };
+          }
+        }
+        return row;
+      })
+    );
+
+    if (hasEditingRows) {
       return;
     }
 
-    setLoadingAction(`delete-${serviceId}`);
-    setFormError('');
-    setEditError('');
+    if (draft) {
+      const hasAnyValue = Boolean(draft.issueType || draft.minPrice || draft.maxPrice);
+      if (hasAnyValue) {
+        return;
+      }
+    }
 
+    navigation.navigate(ROUTES.USER_PROFILE);
+  };
+
+  const handleDeleteService = async (row) => {
+    if (!row.serviceId) {
+      return;
+    }
+    setFormError('');
+    setLoadingAction(`delete-${row.serviceId}`);
     try {
-      await removeService(serviceId);
+      await removeService(row.serviceId);
+      await fetchServices();
     } catch (error) {
       setFormError(error?.message || 'Failed to delete service.');
     } finally {
@@ -326,43 +366,124 @@ const SetServicesScreen = () => {
   };
 
   const inlineError = useMemo(() => formError || contextError || '', [formError, contextError]);
+  const lastRow = rows[rows.length - 1];
+  const canAddMore = Boolean(lastRow && lastRow.issueType && lastRow.minPrice && lastRow.maxPrice);
 
   return (
-    <ScreenContainer style={styles.screen} edges={['left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <AppText variant="title" style={styles.heading}>
-          Set Services
-        </AppText>
+    <ScreenContainer padded={false} style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
+          </TouchableOpacity>
+          <AppText style={styles.heading}>Services Offered</AppText>
+        </View>
         <AppText variant="muted" style={styles.subheading}>
-          Add and manage your pricing estimates
+          Set your services and pricing ranges
         </AppText>
 
-        <AppText variant="muted" style={styles.fieldLabel}>
-          Issue type
-        </AppText>
-        <IssueTypePicker selected={issueType} onSelect={setIssueType} />
-
-        <AppInput
-          label="Min price"
-          value={minPrice}
-          onChangeText={setMinPrice}
-          keyboardType="numeric"
-          placeholder="75000"
-        />
-        <AppInput
-          label="Max price"
-          value={maxPrice}
-          onChangeText={setMaxPrice}
-          keyboardType="numeric"
-          placeholder="100000"
-        />
+        {loadingAction === 'fetch-services' ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            <AppText style={styles.loadingText}>Loading services...</AppText>
+          </View>
+        ) : null}
 
         {inlineError ? <AppText style={styles.errorText}>{inlineError}</AppText> : null}
 
+        <View style={styles.servicesList}>
+          {rows.map((row, index) => {
+            const isLast = index === rows.length - 1;
+            const isBusy = row.serviceId && loadingAction.includes(row.serviceId);
+            const readOnly = row.isExisting && !row.isEditing;
+            return (
+              <View key={row.id} style={styles.serviceBlock}>
+                <AppText style={styles.sectionLabel}>Service</AppText>
+                <ServiceSelector
+                  value={row.issueType}
+                  onChange={(value) => updateRow(row.id, { issueType: value })}
+                  options={serviceOptions}
+                  open={openRowId === row.id}
+                  onToggle={() => {
+                    if (row.isExisting) {
+                      return;
+                    }
+                    setSearchText('');
+                    setOpenRowId((prev) => (prev === row.id ? '' : row.id));
+                  }}
+                  search={searchText}
+                  onSearch={setSearchText}
+                  disabled={row.isExisting}
+                />
+
+                <View style={styles.priceRow}>
+                  <View style={styles.priceInput}>
+                    <AppText style={styles.sectionLabel}>Min price</AppText>
+                    <AppInput
+                      value={row.minPrice}
+                      onChangeText={(value) => updateRow(row.id, { minPrice: sanitizeDigits(value) })}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      editable={!readOnly}
+                      containerStyle={readOnly ? styles.readOnlyInput : null}
+                      inputStyle={readOnly ? styles.readOnlyInputText : null}
+                    />
+                  </View>
+                  <View style={styles.priceInput}>
+                    <AppText style={styles.sectionLabel}>Max price</AppText>
+                    <AppInput
+                      value={row.maxPrice}
+                      onChangeText={(value) => updateRow(row.id, { maxPrice: sanitizeDigits(value) })}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      editable={!readOnly}
+                      containerStyle={readOnly ? styles.readOnlyInput : null}
+                      inputStyle={readOnly ? styles.readOnlyInputText : null}
+                    />
+                  </View>
+                </View>
+
+                {!isLast ? (
+                  <View style={styles.rowActions}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.removeBtn]}
+                      activeOpacity={0.85}
+                      onPress={() => handleDeleteService(row)}
+                      disabled={isBusy}
+                    >
+                      <HugeiconsIcon icon={Cancel01Icon} size={14} color="#FFFFFF" strokeWidth={2} />
+                      <AppText style={styles.actionText}>{isBusy ? 'Removing...' : 'Remove'}</AppText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.editBtn]}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        if (row.isEditing) {
+                          handleUpdateService(row);
+                          return;
+                        }
+                        updateRow(row.id, { isEditing: true });
+                      }}
+                      disabled={isBusy}
+                    >
+                      <AppText style={styles.editText}>
+                        {isBusy ? 'Saving...' : row.isEditing ? 'Save' : 'Edit'}
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {row.error ? <AppText style={styles.rowErrorText}>{row.error}</AppText> : null}
+              </View>
+            );
+          })}
+        </View>
+
         <AppButton
-          label={loadingAction === 'add-service' ? 'Adding...' : 'Add Service'}
+          label={loadingAction === 'add-service' ? 'Adding...' : 'Add more'}
           onPress={handleAddService}
-          disabled={Boolean(loadingAction)}
+          disabled={!canAddMore || Boolean(loadingAction)}
+          style={styles.addMoreBtn}
           left={
             loadingAction === 'add-service' ? (
               <ActivityIndicator size="small" color={darkTheme.colors.background} />
@@ -370,83 +491,15 @@ const SetServicesScreen = () => {
           }
         />
 
-        <View style={styles.listHeader}>
-          <AppText variant="subtitle" style={styles.listTitle}>
-            Current Services
-          </AppText>
-          {loadingAction === 'fetch-services' ? (
-            <ActivityIndicator size="small" color={darkTheme.colors.accent} />
-          ) : null}
-        </View>
-
-        {!services.length ? (
-          <AppText variant="muted" style={styles.emptyText}>
-            No services yet.
-          </AppText>
-        ) : (
-          services.map((service) => {
-            const serviceId = getServiceId(service);
-            const isEditing = editingServiceId && editingServiceId === serviceId;
-            const isDeleting = loadingAction === `delete-${serviceId}`;
-            const isUpdating = loadingAction === `update-${serviceId}`;
-
-            return (
-              <View key={serviceId || `${service.issue_type}-${service.min_price}-${service.max_price}`} style={styles.serviceBlock}>
-                <ServiceRow
-                  item={service}
-                  onEdit={() => startEdit(service)}
-                  onDelete={() => handleDeleteService(serviceId)}
-                  isDeleting={isDeleting}
-                />
-
-                {isEditing ? (
-                  <View style={styles.editBlock}>
-                    <AppInput
-                      label="Edit min price"
-                      value={editMinPrice}
-                      onChangeText={setEditMinPrice}
-                      keyboardType="numeric"
-                      placeholder="80000"
-                    />
-                    <AppInput
-                      label="Edit max price"
-                      value={editMaxPrice}
-                      onChangeText={setEditMaxPrice}
-                      keyboardType="numeric"
-                      placeholder="95000"
-                    />
-
-                    {editError ? <AppText style={styles.errorText}>{editError}</AppText> : null}
-
-                    <View style={styles.editActions}>
-                      <AppButton
-                        label={isUpdating ? 'Saving...' : 'Save'}
-                        onPress={handleUpdateService}
-                        disabled={Boolean(loadingAction)}
-                        left={
-                          isUpdating ? (
-                            <ActivityIndicator size="small" color={darkTheme.colors.background} />
-                          ) : null
-                        }
-                      />
-                      <AppButton
-                        label="Cancel"
-                        onPress={() => {
-                          setEditingServiceId('');
-                          setEditError('');
-                        }}
-                        disabled={Boolean(loadingAction)}
-                        style={styles.cancelButton}
-                        textStyle={styles.cancelText}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            );
-          })
-        )}
       </ScrollView>
+      <View style={styles.finishBar}>
+        <AppButton
+          label="Finish"
+          onPress={handleFinish}
+          disabled={Boolean(loadingAction)}
+          style={styles.finishBtn}
+        />
+      </View>
     </ScreenContainer>
   );
 };
@@ -457,110 +510,180 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   content: {
-    paddingHorizontal: darkTheme.spacing.xl,
-    paddingTop: darkTheme.spacing.lg,
-    paddingBottom: darkTheme.spacing.xxl,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 120,
+  },
+  header: {
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    height: 34,
+    width: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heading: {
-    color: darkTheme.colors.accent,
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: darkTheme.typography.fontWeights.regular,
   },
   subheading: {
     color: darkTheme.colors.muted,
-    marginTop: darkTheme.spacing.xs,
-    marginBottom: darkTheme.spacing.md,
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  fieldLabel: {
-    color: darkTheme.colors.text,
-    marginBottom: darkTheme.spacing.xs,
-  },
-  issueWrap: {
+  loadingRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: darkTheme.spacing.xs,
+    alignItems: 'center',
+    columnGap: 8,
     marginBottom: darkTheme.spacing.md,
   },
-  issuePill: {
+  loadingText: {
+    color: darkTheme.colors.muted,
+  },
+  servicesList: {
+    rowGap: 12,
+  },
+  serviceBlock: {
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    padding: 12,
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: darkTheme.radius.md,
-    paddingHorizontal: darkTheme.spacing.sm,
-    paddingVertical: darkTheme.spacing.xs,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  issuePillSelected: {
-    borderColor: darkTheme.colors.accent,
-    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.12),
+  sectionLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginBottom: 6,
   },
-  issuePillText: {
+  dropdownTrigger: {
+    minHeight: 46,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  dropdownDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  dropdownTriggerText: {
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.sm,
+    fontSize: 14,
   },
-  issuePillTextSelected: {
+  dropdownPlaceholder: {
+    color: 'rgba(255,255,255,0.55)',
+  },
+  dropdownPanel: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: '#0B0B34',
+    marginBottom: 10,
+  },
+  dropdownSearch: {
+    marginBottom: 8,
+  },
+  dropdownList: {
+    maxHeight: 160,
+  },
+  dropdownItem: {
+    minHeight: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  dropdownItemActive: {
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.2),
+  },
+  dropdownItemText: {
+    color: '#F5F5F5',
+  },
+  dropdownItemTextActive: {
     color: darkTheme.colors.accent,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    columnGap: 12,
+  },
+  priceInput: {
+    flex: 1,
   },
   errorText: {
     color: '#FF7B8A',
     marginBottom: darkTheme.spacing.sm,
   },
-  listHeader: {
-    marginTop: darkTheme.spacing.lg,
-    marginBottom: darkTheme.spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  listTitle: {
-    color: darkTheme.colors.text,
-  },
-  emptyText: {
-    color: darkTheme.colors.muted,
-  },
-  serviceBlock: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: darkTheme.radius.lg,
-    padding: darkTheme.spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    marginBottom: darkTheme.spacing.sm,
-  },
-  serviceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  serviceInfo: {
-    flex: 1,
-  },
-  serviceIssue: {
-    color: darkTheme.colors.text,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  servicePrice: {
-    color: darkTheme.colors.muted,
-    marginTop: darkTheme.spacing.xxs,
-  },
   rowActions: {
+    marginTop: 10,
     flexDirection: 'row',
-    columnGap: darkTheme.spacing.xs,
-    marginLeft: darkTheme.spacing.sm,
+    columnGap: 10,
   },
-  smallButton: {
-    minHeight: 38,
-    paddingHorizontal: darkTheme.spacing.sm,
+  actionBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    columnGap: 6,
   },
-  editBlock: {
-    marginTop: darkTheme.spacing.sm,
+  removeBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  editActions: {
-    rowGap: darkTheme.spacing.xs,
+  editBtn: {
+    backgroundColor: darkTheme.colors.accent,
   },
-  cancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
+  actionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
   },
-  cancelText: {
-    color: darkTheme.colors.text,
+  editText: {
+    color: '#1A1A1A',
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  addMoreBtn: {
+    marginTop: 16,
+  },
+  finishBtn: {
+    width: '100%',
+  },
+  finishBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 14,
+    paddingBottom: 16,
+    paddingTop: 10,
+    backgroundColor: darkTheme.colors.background,
+  },
+  readOnlyInput: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  readOnlyInputText: {
+    color: 'rgba(255,255,255,0.6)',
+  },
+  rowErrorText: {
+    color: '#FF7B8A',
+    marginTop: 8,
+    fontSize: 12,
   },
 });
 

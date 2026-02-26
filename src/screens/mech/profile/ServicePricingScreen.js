@@ -10,8 +10,8 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
+import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { AppButton, AppInput, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import {
   addMechanicService,
@@ -113,39 +113,59 @@ const mapServiceToRow = (service, index) => {
 
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
 
-const RowSelector = ({ value, options, onSelect, disabled = false }) => {
-  const [open, setOpen] = useState(false);
-  const currentLabel = options.find((item) => item.value === value)?.label || 'Select service';
+const ServiceSelector = ({
+  value,
+  options,
+  onSelect,
+  open,
+  onToggle,
+  search,
+  onSearch,
+  disabled = false,
+}) => {
+  const currentLabel = options.find((item) => item.value === value)?.label || 'No options selected yet';
 
   return (
-    <View style={styles.selectorWrap}>
+    <View>
       <TouchableOpacity
-        style={[styles.selectorBtn, disabled ? styles.selectorBtnDisabled : null]}
+        style={[styles.dropdownTrigger, disabled ? styles.dropdownDisabled : null]}
         activeOpacity={0.85}
         disabled={disabled}
-        onPress={() => setOpen((prev) => !prev)}
+        onPress={disabled ? undefined : onToggle}
       >
-        <AppText style={[styles.selectorText, !value ? styles.selectorPlaceholder : null]}>{currentLabel}</AppText>
+        <AppText style={[styles.dropdownTriggerText, !value ? styles.dropdownPlaceholder : null]}>
+          {currentLabel}
+        </AppText>
+        <HugeiconsIcon icon={ArrowDown01Icon} size={18} color={darkTheme.colors.muted} strokeWidth={2} />
       </TouchableOpacity>
       {open ? (
-        <View style={styles.selectorList}>
-          {options.length ? (
-            options.map((item) => (
-              <TouchableOpacity
-                key={item.value}
-                activeOpacity={0.85}
-                style={styles.selectorItem}
-                onPress={() => {
-                  onSelect(item.value);
-                  setOpen(false);
-                }}
-              >
-                <AppText style={styles.selectorItemText}>{item.label}</AppText>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <AppText style={styles.noOptionsText}>No more options</AppText>
-          )}
+        <View style={styles.dropdownPanel}>
+          <AppInput
+            value={search}
+            onChangeText={onSearch}
+            placeholder="Search service"
+            autoCapitalize="words"
+            containerStyle={styles.dropdownSearch}
+          />
+          <ScrollView style={styles.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+            {options.length ? (
+              options.map((item) => (
+                <TouchableOpacity
+                  key={item.value}
+                  activeOpacity={0.85}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    onSelect(item.value);
+                    onToggle();
+                  }}
+                >
+                  <AppText style={styles.dropdownItemText}>{item.label}</AppText>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <AppText style={styles.noOptionsText}>No more options</AppText>
+            )}
+          </ScrollView>
         </View>
       ) : null}
     </View>
@@ -186,6 +206,8 @@ const ServicePricingScreen = ({ navigation, route }) => {
   const [rowLoadingMap, setRowLoadingMap] = useState({});
   const [globalErrorText, setGlobalErrorText] = useState('');
   const [rowErrors, setRowErrors] = useState({});
+  const [openRowId, setOpenRowId] = useState('');
+  const [searchText, setSearchText] = useState('');
   React.useEffect(() => {
     if (!isOnboarding) {
       return;
@@ -238,6 +260,8 @@ const ServicePricingScreen = ({ navigation, route }) => {
   }, []);
 
   const selectedServices = useMemo(() => rows.map((row) => row.issue_type).filter(Boolean), [rows]);
+  const lastRow = rows[rows.length - 1];
+  const canAddMore = Boolean(lastRow && lastRow.issue_type && lastRow.min_price && lastRow.max_price);
 
   const availableOptionsForRow = (rowId) => {
     const row = rows.find((item) => item.id === rowId);
@@ -568,15 +592,31 @@ const ServicePricingScreen = ({ navigation, route }) => {
           ) : null}
           {globalErrorText ? <AppText style={styles.errorText}>{globalErrorText}</AppText> : null}
           {rows.map((row, index) => {
-            const rowOptions = availableOptionsForRow(row.id);
+            const query = String(searchText || '').trim().toLowerCase();
+            const rowOptions = availableOptionsForRow(row.id).filter((option) => {
+              if (!query) {
+                return true;
+              }
+              return option.label.toLowerCase().includes(query);
+            });
             const busy = Boolean(rowLoadingMap[row.id]) || saving;
 
             return (
               <View key={row.id} style={styles.rowCard} onLayout={(event) => handleRowLayout(row.id, event)}>
-                <RowSelector
+                <ServiceSelector
                   value={row.issue_type}
                   options={rowOptions}
                   disabled={row.isExisting}
+                  open={openRowId === row.id}
+                  onToggle={() => {
+                    if (row.isExisting) {
+                      return;
+                    }
+                    setSearchText('');
+                    setOpenRowId((prev) => (prev === row.id ? '' : row.id));
+                  }}
+                  search={searchText}
+                  onSearch={setSearchText}
                   onSelect={(value) => updateRow(row.id, { issue_type: value })}
                 />
 
@@ -615,52 +655,41 @@ const ServicePricingScreen = ({ navigation, route }) => {
                     row.isEditing ? (
                       <TouchableOpacity
                         activeOpacity={0.85}
-                        style={styles.rowAction}
+                        style={[styles.actionBtn, styles.editBtn]}
                         disabled={busy}
                         onPress={() => upsertRow(row)}
                       >
-                        <AppText style={styles.rowActionText}>{busy ? 'Saving...' : 'Save'}</AppText>
+                        <AppText style={styles.editText}>{busy ? 'Saving...' : 'Save'}</AppText>
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
                         activeOpacity={0.85}
-                        style={styles.rowAction}
+                        style={[styles.actionBtn, styles.editBtn]}
                         disabled={busy}
                         onPress={() => updateRow(row.id, { isEditing: true })}
                       >
-                        <AppText style={styles.rowActionText}>Edit</AppText>
+                        <AppText style={styles.editText}>Edit</AppText>
                       </TouchableOpacity>
                     )
                   ) : (
                     <TouchableOpacity
                       activeOpacity={0.85}
-                      style={styles.rowAction}
+                      style={[styles.actionBtn, styles.editBtn]}
                       disabled={busy}
                       onPress={() => upsertRow(row)}
                     >
-                      <AppText style={styles.rowActionText}>{busy ? 'Saving...' : 'Save'}</AppText>
+                      <AppText style={styles.editText}>{busy ? 'Saving...' : 'Save'}</AppText>
                     </TouchableOpacity>
                   )}
 
                   <TouchableOpacity
                     activeOpacity={0.85}
-                    style={styles.rowActionDanger}
+                    style={[styles.actionBtn, styles.removeBtn]}
                     disabled={busy}
                     onPress={() => handleDeleteRow(row)}
                   >
-                    <AppText style={styles.rowActionDangerText}>{busy ? 'Removing...' : 'Remove'}</AppText>
+                    <AppText style={styles.actionText}>{busy ? 'Removing...' : 'Remove'}</AppText>
                   </TouchableOpacity>
-
-                  {index === rows.length - 1 ? (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      style={styles.rowAction}
-                      disabled={busy}
-                      onPress={() => handleAddMore(row)}
-                    >
-                      <AppText style={styles.rowActionText}>Add more</AppText>
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
 
                 {rowErrors[row.id] ? (
@@ -670,6 +699,13 @@ const ServicePricingScreen = ({ navigation, route }) => {
             );
           })}
         </ScrollView>
+
+        <AppButton
+          label="Add more"
+          onPress={() => handleAddMore(lastRow)}
+          disabled={!canAddMore || saving}
+          style={styles.addMoreBtn}
+        />
 
         <AppButton
           label={saving ? 'Processing...' : (isOnboarding ? 'Continue' : 'Done')}
@@ -746,117 +782,121 @@ const styles = StyleSheet.create({
   list: {
     marginTop: 16,
     paddingBottom: 12,
+    rowGap: 12,
   },
   rowCard: {
-    borderRadius: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    padding: 12,
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    padding: 10,
-    marginBottom: 12,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  selectorWrap: {
-    position: 'relative',
-    zIndex: 2,
-  },
-  selectorBtn: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
+  dropdownTrigger: {
+    minHeight: 46,
     borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
     paddingHorizontal: 12,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  selectorBtnDisabled: {
-    opacity: 0.7,
+  dropdownDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  selectorText: {
+  dropdownTriggerText: {
     color: darkTheme.colors.text,
     fontSize: 14,
   },
-  selectorPlaceholder: {
-    color: darkTheme.colors.muted,
+  dropdownPlaceholder: {
+    color: 'rgba(255,255,255,0.55)',
   },
-  selectorList: {
-    marginTop: 6,
+  dropdownPanel: {
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 10,
-    backgroundColor: '#0B0B56',
-    overflow: 'hidden',
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: '#0B0B34',
+    marginBottom: 10,
   },
-  selectorItem: {
-    minHeight: 38,
+  dropdownSearch: {
+    marginBottom: 8,
+  },
+  dropdownList: {
+    maxHeight: 160,
+  },
+  dropdownItem: {
+    minHeight: 40,
+    borderRadius: 8,
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  selectorItemText: {
-    color: darkTheme.colors.text,
-    fontSize: 13,
+  dropdownItemText: {
+    color: '#F5F5F5',
   },
   noOptionsText: {
     color: darkTheme.colors.muted,
     fontSize: 13,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
   },
   priceRow: {
-    marginTop: 10,
     flexDirection: 'row',
+    columnGap: 12,
   },
   priceCell: {
     flex: 1,
   },
   priceLabel: {
-    color: darkTheme.colors.muted,
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   priceInput: {
     minHeight: 44,
     borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
+    borderColor: 'rgba(255,255,255,0.1)',
     borderRadius: 10,
     paddingHorizontal: 12,
     color: darkTheme.colors.text,
     fontSize: 14,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-  },
-  rowAction: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
-  },
-  rowActionText: {
-    color: darkTheme.colors.accent,
-    fontSize: 12,
-    fontWeight: darkTheme.typography.fontWeights.medium,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   rowActions: {
     marginTop: 10,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    columnGap: 10,
   },
-  rowActionDanger: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF7F7F',
+  actionBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    columnGap: 6,
   },
-  rowActionDangerText: {
-    color: '#FF7F7F',
+  removeBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  editBtn: {
+    backgroundColor: darkTheme.colors.accent,
+  },
+  actionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  editText: {
+    color: '#1A1A1A',
     fontSize: 12,
     fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  addMoreBtn: {
+    marginTop: 12,
   },
   loadingWrap: {
     marginTop: 8,
