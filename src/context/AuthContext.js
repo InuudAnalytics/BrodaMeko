@@ -68,13 +68,7 @@ const normalizeRole = value => {
     return ROLES.CAR_OWNER;
   }
 
-  if (
-    role === 'spare_parts_seller' ||
-    role === 'spareparts_seller' ||
-    role === 'spare_parts' ||
-    role === 'spareparts' ||
-    role === 'parts_seller'
-  ) {
+  if (role === 'seller') {
     return ROLES.SPARE_PARTS_SELLER;
   }
 
@@ -422,9 +416,16 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     clearError();
 
-    const normalizedSelectedRole =
-      normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) ||
-      ROLES.CAR_OWNER;
+    const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole);
+    if (!normalizedSelectedRole) {
+      setError('Invalid role selected. Please choose a role to continue.');
+      setIsLoading(false);
+      return makeAuthResult({
+        ok: false,
+        status: 'error',
+        message: 'Invalid role selected.',
+      });
+    }
     const pendingData = {
       method: email ? 'email' : 'phone',
       email: email || '',
@@ -454,15 +455,14 @@ export const AuthProvider = ({ children }) => {
       const isTransportFailure = Number(signUpError?.statusCode || 0) === 0;
 
       if (isTransportFailure) {
-        setPendingVerification(pendingData);
+        setPendingVerification(null);
         setError(
-          'Could not confirm sign up due to network issues. If you received OTP, continue verification.',
+          'Network error. Please check your connection and try again.',
         );
         return makeAuthResult({
           ok: false,
-          status: 'uncertain',
-          message:
-            'Could not confirm sign up. If OTP was sent, continue to verification.',
+          status: 'error',
+          message: 'Network error. Please try again.',
         });
       }
 
@@ -492,11 +492,15 @@ export const AuthProvider = ({ children }) => {
         );
       }
 
+      const nextRole = authPayload.role || pendingVerification?.role;
+      if (!nextRole) {
+        throw new Error('Role could not be determined. Please log in again.');
+      }
+
       await setAuthedState({
         nextToken: authPayload.token,
         nextUser: authPayload.user,
-        nextRole:
-          authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
+        nextRole,
       });
       await refreshUserProfile(authPayload.token).catch(() => {});
       registerCurrentDevice();
@@ -558,8 +562,10 @@ export const AuthProvider = ({ children }) => {
       const normalizedSelectedRole = normalizeRole(
         selectedRoleInput || selectedRole,
       );
-      const nextRole =
-        authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER;
+      const nextRole = authPayload.role || normalizedSelectedRole;
+      if (!nextRole) {
+        throw new Error('Role could not be determined. Please select a role and try again.');
+      }
 
       await setAuthedState({
         nextToken: authPayload.token,
@@ -605,9 +611,10 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Failed to get Google ID token.');
       }
 
-      const normalizedSelectedRole =
-        normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) ||
-        ROLES.CAR_OWNER;
+      const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole);
+      if (!normalizedSelectedRole) {
+        throw new Error('Role could not be determined. Please select a role and try again.');
+      }
       const response = await googleLoginService({
         idToken,
         role: normalizedSelectedRole,
@@ -624,7 +631,7 @@ export const AuthProvider = ({ children }) => {
       await setAuthedState({
         nextToken: authPayload.token,
         nextUser: authPayload.user,
-        nextRole: authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER,
+        nextRole: authPayload.role || normalizedSelectedRole,
       });
       await refreshUserProfile(authPayload.token).catch(() => {});
       registerCurrentDevice();

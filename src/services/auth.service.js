@@ -14,6 +14,10 @@ const mapRoleToBackend = (role) => {
     return 'admin';
   }
 
+  if (normalized === 'SELLER' || normalized === 'SPARE_PARTS_SELLER' || normalized === 'SPARE_PARTS') {
+    return 'seller';
+  }
+
   return 'car_owner';
 };
 
@@ -124,6 +128,21 @@ export const updatePassword = async ({ currentPassword, newPassword }) => {
   return response.data;
 };
 
+export const deleteAccount = async ({ password }) => {
+  const safePassword = String(password || '').trim();
+  if (!safePassword) {
+    const error = new Error('password is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.delete(ENDPOINTS.auth.deleteUser, {
+    data: { password: safePassword },
+  });
+  return response.data;
+};
+
 export const uploadAvatar = async (avatarFile) => {
   const uri = String(avatarFile?.uri || avatarFile?.path || '').trim();
 
@@ -229,6 +248,7 @@ export default {
   resetPassword,
   getCurrentUser,
   updatePassword,
+  deleteAccount,
   uploadAvatar,
   verifyAddContact,
   verifyConfirmContact,
