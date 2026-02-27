@@ -1,70 +1,125 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import { ArrowLeft01Icon, ArrowRight01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
+import {
+  AppButton,
+  AppInput,
+  AppText,
+  ScreenContainer,
+} from '../../../components';
 import { useSparePartsProfile } from '../../../context';
-import { addSparePartsAddress, getSparePartsAddresses, updateSparePartsAddress } from '../../../services/spareParts.service';
-import { darkTheme } from '../../../theme';
-import { getSparePartsOnboardingStepIndex, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
+import {
+  createSellerStore,
+  getSellerStore,
+  updateSellerStore,
+  uploadSellerStoreBanner,
+} from '../../../services/spareParts.service';
+import { darkTheme, withAlpha } from '../../../theme';
+import {
+  getSparePartsOnboardingStepIndex,
+  pickSingleImageFromGallery,
+  ROUTES,
+  SPARE_PARTS_ONBOARDING_STEPS,
+} from '../../../utils';
 
-const buildEmptyAddress = () => ({
-  id: `new-${Date.now()}-${Math.random()}`,
-  addressType: 'shop',
-  label: '',
-  street: '',
-  city: '',
-  state: '',
-  country: '',
-  latitude: '',
-  longitude: '',
-  isPrimary: false,
-  isExisting: false,
-  isEditing: true,
-  error: '',
+const DAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+const DELIVERY_TYPES = ['pickup', 'delivery', 'both'];
+const DELIVERY_SCOPES = ['state', 'nationwide'];
+const TIME_OPTIONS = Array.from({ length: 24 * 60 }, (_, index) => {
+  const hours = String(Math.floor(index / 60)).padStart(2, '0');
+  const minutes = String(index % 60).padStart(2, '0');
+  return `${hours}:${minutes}`;
 });
 
-const normalizeAddresses = (payload) => {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
+const normalizeStorePayload = payload => {
+  const root = payload?.data || payload || {};
+  const store = root?.store || root?.data || root;
 
-  if (Array.isArray(payload?.addresses)) {
-    return payload.addresses;
-  }
-
-  if (Array.isArray(payload?.data)) {
-    return payload.data;
-  }
-
-  if (Array.isArray(payload?.items)) {
-    return payload.items;
-  }
-
-  if (Array.isArray(payload?.results)) {
-    return payload.results;
-  }
-
-  if (Array.isArray(payload?.address)) {
-    return payload.address;
-  }
-
-  return [];
+  return store && typeof store === 'object' ? store : null;
 };
 
-const toDigits = (value) => String(value || '').replace(/[^0-9.-]/g, '');
+const toNumberString = value => String(value || '').replace(/[^0-9.-]/g, '');
 
 const SparePartsAddressScreen = ({ navigation, route }) => {
-  const { setAddresses, completedSteps } = useSparePartsProfile();
+  const { setStoreDetails, sparePartsProfile, completedSteps } =
+    useSparePartsProfile();
   const isOnboarding = Boolean(route?.params?.onboarding);
-  const stepIndex = getSparePartsOnboardingStepIndex(ROUTES.SPARE_PARTS_ADDRESS);
+  const stepIndex = getSparePartsOnboardingStepIndex(
+    ROUTES.SPARE_PARTS_ADDRESS,
+  );
   const totalSteps = SPARE_PARTS_ONBOARDING_STEPS.length;
-  const progressPercent = useMemo(() => (stepIndex / totalSteps) * 100, [stepIndex, totalSteps]);
+  const progressPercent = useMemo(
+    () => (stepIndex / totalSteps) * 100,
+    [stepIndex, totalSteps],
+  );
 
-  const [rows, setRows] = useState([buildEmptyAddress()]);
   const [loading, setLoading] = useState(false);
-  const [savingId, setSavingId] = useState('');
-  const [globalError, setGlobalError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [errorText, setErrorText] = useState('');
+  const [bannerUri, setBannerUri] = useState(
+    sparePartsProfile.storeDetails?.bannerUrl || '',
+  );
+
+  const [storeName, setStoreName] = useState(
+    sparePartsProfile.storeDetails?.storeName || '',
+  );
+  const [description, setDescription] = useState(
+    sparePartsProfile.storeDetails?.description || '',
+  );
+  const [street, setStreet] = useState(
+    sparePartsProfile.storeDetails?.street || '',
+  );
+  const [city, setCity] = useState(sparePartsProfile.storeDetails?.city || '');
+  const [stateName, setStateName] = useState(
+    sparePartsProfile.storeDetails?.state || '',
+  );
+  const [country, setCountry] = useState(
+    sparePartsProfile.storeDetails?.country || '',
+  );
+  const [latitude, setLatitude] = useState(
+    sparePartsProfile.storeDetails?.latitude || '',
+  );
+  const [longitude, setLongitude] = useState(
+    sparePartsProfile.storeDetails?.longitude || '',
+  );
+  const [openingTime, setOpeningTime] = useState(
+    sparePartsProfile.storeDetails?.openingTime || '',
+  );
+  const [closingTime, setClosingTime] = useState(
+    sparePartsProfile.storeDetails?.closingTime || '',
+  );
+  const [openDays, setOpenDays] = useState(
+    sparePartsProfile.storeDetails?.openDays || [],
+  );
+  const [deliveryType, setDeliveryType] = useState(
+    sparePartsProfile.storeDetails?.deliveryType || 'both',
+  );
+  const [deliveryScope, setDeliveryScope] = useState(
+    sparePartsProfile.storeDetails?.deliveryScope || 'state',
+  );
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [timeTarget, setTimeTarget] = useState('opening');
+
+  const [storeExists, setStoreExists] = useState(false);
 
   useEffect(() => {
     if (!isOnboarding) {
@@ -77,178 +132,221 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
     }
   }, [completedSteps.nin, isOnboarding, navigation]);
 
-  const fetchAddresses = useCallback(async () => {
-    setLoading(true);
-    setGlobalError('');
-
-    try {
-      const response = await getSparePartsAddresses();
-      const list = normalizeAddresses(response?.data || response);
-      const mapped = list.map((item, index) => ({
-        id: String(item?.id || item?._id || `${index}`),
-        addressType: String(item?.address_type || item?.addressType || 'shop'),
-        label: String(item?.label || ''),
-        street: String(item?.street || ''),
-        city: String(item?.city || ''),
-        state: String(item?.state || ''),
-        country: String(item?.country || ''),
-        latitude: String(item?.latitude ?? ''),
-        longitude: String(item?.longitude ?? ''),
-        isPrimary: Boolean(item?.is_primary || item?.isPrimary),
-        isExisting: true,
-        isEditing: false,
-        error: '',
-      }));
-
-      setRows(mapped.length ? mapped : [buildEmptyAddress()]);
-      setAddresses(mapped);
-    } catch (error) {
-      setGlobalError(error?.message || 'Unable to fetch addresses.');
-      setRows([buildEmptyAddress()]);
-    } finally {
-      setLoading(false);
+  const seedFromStore = useCallback(store => {
+    if (!store) {
+      return;
     }
-  }, [setAddresses]);
+
+    setStoreName(String(store?.store_name || store?.storeName || ''));
+    setDescription(String(store?.description || ''));
+    setStreet(String(store?.street || ''));
+    setCity(String(store?.city || ''));
+    setStateName(String(store?.state || ''));
+    setCountry(String(store?.country || ''));
+    setLatitude(String(store?.latitude ?? ''));
+    setLongitude(String(store?.longitude ?? ''));
+    setOpeningTime(String(store?.opening_time || store?.openingTime || ''));
+    setClosingTime(String(store?.closing_time || store?.closingTime || ''));
+    setOpenDays(
+      Array.isArray(store?.open_days || store?.openDays)
+        ? store?.open_days || store?.openDays
+        : [],
+    );
+    setDeliveryType(
+      String(store?.delivery_type || store?.deliveryType || 'both'),
+    );
+    setDeliveryScope(
+      String(store?.delivery_scope || store?.deliveryScope || 'state'),
+    );
+    setBannerUri(String(store?.banner_url || store?.bannerUrl || ''));
+  }, []);
 
   useEffect(() => {
-    fetchAddresses();
-  }, [fetchAddresses]);
+    let active = true;
 
-  const updateRow = (rowId, patch) => {
-    setRows((prev) =>
-      prev.map((row) => (row.id === rowId ? { ...row, ...patch, error: patch.error ?? '' } : row))
+    const fetchStore = async () => {
+      setLoading(true);
+      setErrorText('');
+      try {
+        const response = await getSellerStore();
+        const store = normalizeStorePayload(response);
+        if (!active) {
+          return;
+        }
+        if (store) {
+          setStoreExists(true);
+          seedFromStore(store);
+          setStoreDetails(store);
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        // ignore if no store yet
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchStore();
+
+    return () => {
+      active = false;
+    };
+  }, [seedFromStore, setStoreDetails]);
+
+  const toggleDay = day => {
+    setOpenDays(prev =>
+      prev.includes(day) ? prev.filter(value => value !== day) : [...prev, day],
     );
   };
 
-  const togglePrimary = (rowId) => {
-    setRows((prev) =>
-      prev.map((row) => ({
-        ...row,
-        isPrimary: row.id === rowId,
-      }))
-    );
+  const openTimePicker = target => {
+    setTimeTarget(target);
+    setShowTimePicker(true);
   };
 
-  const validateRow = (row) => {
-    if (!row.label || !row.street || !row.city || !row.state || !row.country) {
-      return 'Please complete all address fields.';
+  const pickBanner = async () => {
+    const { cancelled, asset, error } = await pickSingleImageFromGallery();
+    if (cancelled) {
+      return;
     }
-
-    if (row.latitude && Number.isNaN(Number(row.latitude))) {
-      return 'Latitude must be a valid number.';
+    if (error) {
+      Alert.alert('Upload failed', error);
+      return;
     }
-
-    if (row.longitude && Number.isNaN(Number(row.longitude))) {
-      return 'Longitude must be a valid number.';
+    if (asset?.uri) {
+      setBannerUri(asset.uri);
     }
-
-    return '';
   };
 
-  const persistRow = async (row) => {
-    const validationError = validateRow(row);
-    if (validationError) {
-      updateRow(row.id, { error: validationError });
-      return false;
+  const handleSubmit = async () => {
+    if (!storeName || !street || !city || !stateName || !country) {
+      setErrorText('Please complete the store name and address fields.');
+      return;
     }
 
-    setSavingId(row.id);
-    setGlobalError('');
+    if (!openingTime || !closingTime) {
+      setErrorText('Please provide opening and closing time.');
+      return;
+    }
+
+    if (!openDays.length) {
+      setErrorText('Please select at least one open day.');
+      return;
+    }
+
+    setSaving(true);
+    setErrorText('');
 
     const payload = {
-      address_type: row.addressType,
-      label: row.label,
-      street: row.street,
-      city: row.city,
-      state: row.state,
-      country: row.country,
-      latitude: row.latitude ? Number(row.latitude) : undefined,
-      longitude: row.longitude ? Number(row.longitude) : undefined,
-      is_primary: Boolean(row.isPrimary),
+      store_name: storeName,
+      description,
+      street,
+      city,
+      state: stateName,
+      country,
+      latitude: latitude ? Number(latitude) : undefined,
+      longitude: longitude ? Number(longitude) : undefined,
+      opening_time: openingTime,
+      closing_time: closingTime,
+      open_days: openDays,
+      delivery_type: deliveryType,
+      delivery_scope: deliveryScope,
     };
 
     try {
-      if (row.isExisting) {
-        await updateSparePartsAddress(row.id, payload);
-        updateRow(row.id, { isEditing: false });
-        return true;
-      }
-
-      const response = await addSparePartsAddress(payload);
-      const payloadData = response?.data || response || {};
-      const created = payloadData?.address || payloadData?.data || payloadData;
-      const createdId = String(created?.id || created?._id || '').trim();
-      if (createdId) {
-        updateRow(row.id, { id: createdId, isExisting: true, isEditing: false });
+      if (storeExists) {
+        await updateSellerStore(payload);
       } else {
-        await fetchAddresses();
+        await createSellerStore(payload);
+        setStoreExists(true);
       }
-      return true;
+
+      if (bannerUri && !bannerUri.startsWith('http')) {
+        await uploadSellerStoreBanner({
+          uri: bannerUri,
+          fileName: 'store-banner.jpg',
+          type: 'image/jpeg',
+        });
+      }
+
+      setStoreDetails({
+        store_name: storeName,
+        description,
+        street,
+        city,
+        state: stateName,
+        country,
+        latitude,
+        longitude,
+        opening_time: openingTime,
+        closing_time: closingTime,
+        open_days: openDays,
+        delivery_type: deliveryType,
+        delivery_scope: deliveryScope,
+        banner_url: bannerUri,
+      });
+
+      if (isOnboarding) {
+        navigation.replace(ROUTES.SPARE_PARTS_BANK_DETAILS, {
+          onboarding: true,
+        });
+        return;
+      }
+
+      navigation.goBack();
     } catch (error) {
-      updateRow(row.id, { error: error?.message || 'Unable to save address.' });
-      return false;
+      setErrorText(error?.message || 'Unable to save store details.');
     } finally {
-      setSavingId('');
+      setSaving(false);
     }
-  };
-
-  const handleAddAnother = () => {
-    setRows((prev) => [...prev, buildEmptyAddress()]);
-  };
-
-  const handleFinish = () => {
-    let hasPending = false;
-
-    for (const row of rows) {
-      const hasAnyInput = Boolean(row.label || row.street || row.city || row.state || row.country);
-      if (row.isExisting && row.isEditing) {
-        updateRow(row.id, { error: 'Please save your edits before continuing.' });
-        hasPending = true;
-      }
-      if (!row.isExisting && hasAnyInput) {
-        updateRow(row.id, { error: 'Please save this address before continuing.' });
-        hasPending = true;
-      }
-    }
-
-    if (hasPending) {
-      return;
-    }
-
-    const persisted = rows.filter((row) => row.isExisting);
-    if (isOnboarding && !persisted.length) {
-      if (rows[0]) {
-        updateRow(rows[0].id, { error: 'Please add at least one address to continue.' });
-      }
-      return;
-    }
-    setAddresses(persisted);
-
-    if (isOnboarding) {
-      navigation.replace(ROUTES.SPARE_PARTS_BANK_DETAILS, { onboarding: true });
-      return;
-    }
-
-    navigation.goBack();
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer
+      padded={false}
+      edges={['top', 'left', 'right', 'bottom']}
+      style={styles.screen}
+    >
       <View style={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} activeOpacity={0.85} onPress={() => navigation.goBack()}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
+          <TouchableOpacity
+            style={styles.backBtn}
+            activeOpacity={0.85}
+            onPress={() => navigation.goBack()}
+          >
+            <HugeiconsIcon
+              icon={ArrowLeft01Icon}
+              size={20}
+              color={darkTheme.colors.text}
+              strokeWidth={2.1}
+            />
           </TouchableOpacity>
-          <AppText style={styles.headerTitle}>{isOnboarding ? 'Verification screen' : 'Address'}</AppText>
+          <AppText style={styles.headerTitle}>
+            {isOnboarding ? 'Store setup' : 'Manage store'}
+          </AppText>
         </View>
 
-        <ScrollView contentContainerStyle={styles.formContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.formContent}
+          showsVerticalScrollIndicator={false}
+        >
           {isOnboarding ? (
             <>
-              <AppText style={styles.helper}>Please add your store address</AppText>
-              <AppText style={styles.stepLabel}>Step {stepIndex} of {totalSteps}</AppText>
+              <AppText style={styles.helper}>Set up your store details</AppText>
+              <AppText style={styles.stepLabel}>
+                Step {stepIndex} of {totalSteps}
+              </AppText>
               <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${progressPercent}%` },
+                  ]}
+                />
               </View>
             </>
           ) : null}
@@ -259,145 +357,272 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
             </View>
           ) : null}
 
-          {globalError ? <AppText style={styles.errorText}>{globalError}</AppText> : null}
+          {errorText ? (
+            <AppText style={styles.errorText}>{errorText}</AppText>
+          ) : null}
 
-          <View style={styles.list}>
-            {rows.map((row, index) => {
-              const readOnly = row.isExisting && !row.isEditing;
-              const isSaving = savingId === row.id;
-              return (
-                <View key={`${row.id}-${index}`} style={styles.card}>
-                  <AppText style={styles.sectionLabel}>Address type</AppText>
-                  <View style={styles.typeRow}>
-                    {['home', 'shop'].map((type) => {
-                      const active = row.addressType === type;
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          activeOpacity={0.85}
-                          style={[styles.typeChip, active ? styles.typeChipActive : null]}
-                          onPress={() => updateRow(row.id, { addressType: type })}
-                          disabled={readOnly}
-                        >
-                          <AppText style={[styles.typeText, active ? styles.typeTextActive : null]}>
-                            {type === 'home' ? 'Home' : 'Shop'}
-                          </AppText>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+          <View style={styles.sectionHeader}>
+            <AppText style={styles.sectionTitle}>Store details</AppText>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+          </View>
+          <AppInput
+            label="Store name"
+            value={storeName}
+            onChangeText={setStoreName}
+            placeholder="Boda Auto Hub"
+          />
+          <AppInput
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Quality spare parts and certified mechanic services."
+            multiline
+            inputStyle={styles.multilineInput}
+          />
 
-                  <AppInput
-                    label="Label"
-                    value={row.label}
-                    onChangeText={(value) => updateRow(row.id, { label: value })}
-                    placeholder="Main workshop"
-                    editable={!readOnly}
+          <View style={styles.sectionHeader}>
+            <AppText style={styles.sectionTitle}>Store banner</AppText>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+          </View>
+          <TouchableOpacity
+            style={styles.bannerCard}
+            activeOpacity={0.85}
+            onPress={pickBanner}
+          >
+            {bannerUri ? (
+              <Image source={{ uri: bannerUri }} style={styles.bannerImage} />
+            ) : (
+              <>
+                <View style={styles.uploadIconBadge}>
+                  <HugeiconsIcon
+                    icon={ImageUploadIcon}
+                    size={22}
+                    color={darkTheme.colors.accent}
+                    strokeWidth={1.9}
                   />
-                  <AppInput
-                    label="Street"
-                    value={row.street}
-                    onChangeText={(value) => updateRow(row.id, { street: value })}
-                    placeholder="Street address"
-                    editable={!readOnly}
-                  />
-                  <View style={styles.rowInputs}>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="City"
-                        value={row.city}
-                        onChangeText={(value) => updateRow(row.id, { city: value })}
-                        placeholder="City"
-                        editable={!readOnly}
-                      />
-                    </View>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="State"
-                        value={row.state}
-                        onChangeText={(value) => updateRow(row.id, { state: value })}
-                        placeholder="State"
-                        editable={!readOnly}
-                      />
-                    </View>
-                  </View>
-                  <AppInput
-                    label="Country"
-                    value={row.country}
-                    onChangeText={(value) => updateRow(row.id, { country: value })}
-                    placeholder="Country"
-                    editable={!readOnly}
-                  />
-                  <View style={styles.rowInputs}>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="Latitude"
-                        value={row.latitude}
-                        onChangeText={(value) => updateRow(row.id, { latitude: toDigits(value) })}
-                        placeholder="0.00"
-                        keyboardType="decimal-pad"
-                        editable={!readOnly}
-                      />
-                    </View>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="Longitude"
-                        value={row.longitude}
-                        onChangeText={(value) => updateRow(row.id, { longitude: toDigits(value) })}
-                        placeholder="0.00"
-                        keyboardType="decimal-pad"
-                        editable={!readOnly}
-                      />
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.primaryRow}
-                    activeOpacity={0.85}
-                    onPress={() => togglePrimary(row.id)}
-                    disabled={readOnly}
-                  >
-                    <View style={[styles.primaryBox, row.isPrimary ? styles.primaryBoxActive : null]}>
-                      {row.isPrimary ? (
-                        <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
-                      ) : null}
-                    </View>
-                    <AppText style={styles.primaryText}>Set as primary address</AppText>
-                  </TouchableOpacity>
-
-                  <View style={styles.actionRow}>
-                    <AppButton
-                      label={isSaving ? 'Saving...' : row.isExisting ? (row.isEditing ? 'Save' : 'Edit') : 'Save'}
-                      onPress={() => {
-                        if (row.isExisting && !row.isEditing) {
-                          updateRow(row.id, { isEditing: true });
-                          return;
-                        }
-                        persistRow(row);
-                      }}
-                      disabled={isSaving}
-                      style={styles.actionBtn}
-                    />
-                  </View>
-
-                  {row.error ? <AppText style={styles.errorText}>{row.error}</AppText> : null}
                 </View>
+                <AppText style={styles.bannerTitle}>
+                  Upload store banner
+                </AppText>
+                <AppText style={styles.bannerSubtitle}>
+                  Add a wide banner image for your store
+                </AppText>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.sectionHeader}>
+            <AppText style={styles.sectionTitle}>Location</AppText>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+          </View>
+          <AppInput
+            label="Street"
+            value={street}
+            onChangeText={setStreet}
+            placeholder="12 Admiralty Way"
+          />
+          <View style={styles.rowInputs}>
+            <View style={styles.rowInputItem}>
+              <AppInput
+                label="City"
+                value={city}
+                onChangeText={setCity}
+                placeholder="Lekki"
+              />
+            </View>
+            <View style={styles.rowInputItem}>
+              <AppInput
+                label="State"
+                value={stateName}
+                onChangeText={setStateName}
+                placeholder="Lagos"
+              />
+            </View>
+          </View>
+          <AppInput
+            label="Country"
+            value={country}
+            onChangeText={setCountry}
+            placeholder="Nigeria"
+          />
+          <View style={styles.rowInputs}>
+            <View style={styles.rowInputItem}>
+              <AppInput
+                label="Latitude"
+                value={latitude}
+                onChangeText={value => setLatitude(toNumberString(value))}
+                placeholder="6.4698"
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={styles.rowInputItem}>
+              <AppInput
+                label="Longitude"
+                value={longitude}
+                onChangeText={value => setLongitude(toNumberString(value))}
+                placeholder="3.5852"
+                keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <AppText style={styles.sectionTitle}>Operating hours</AppText>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+          </View>
+          <View style={styles.rowInputs}>
+            <View style={styles.rowInputItem}>
+              <AppText style={styles.sectionLabel}>Opening time</AppText>
+              <TouchableOpacity
+                style={styles.timePickerTrigger}
+                activeOpacity={0.85}
+                onPress={() => openTimePicker('opening')}
+              >
+                <AppText style={[styles.timePickerText, !openingTime ? styles.timePlaceholder : null]}>
+                  {openingTime || '08:00'}
+                </AppText>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.rowInputItem}>
+              <AppText style={styles.sectionLabel}>Closing time</AppText>
+              <TouchableOpacity
+                style={styles.timePickerTrigger}
+                activeOpacity={0.85}
+                onPress={() => openTimePicker('closing')}
+              >
+                <AppText style={[styles.timePickerText, !closingTime ? styles.timePlaceholder : null]}>
+                  {closingTime || '18:00'}
+                </AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <AppText style={styles.sectionTitle}>Open days</AppText>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+          </View>
+          <View style={styles.chipRow}>
+            {DAYS.map(day => {
+              const active = openDays.includes(day);
+              return (
+                <TouchableOpacity
+                  key={day}
+                  style={[styles.dayChip, active ? styles.dayChipActive : null]}
+                  activeOpacity={0.85}
+                  onPress={() => toggleDay(day)}
+                >
+                  <AppText
+                    style={[
+                      styles.dayChipText,
+                      active ? styles.dayChipTextActive : null,
+                    ]}
+                  >
+                    {day.slice(0, 3)}
+                  </AppText>
+                </TouchableOpacity>
               );
             })}
           </View>
 
-          <TouchableOpacity style={styles.addMoreBtn} activeOpacity={0.85} onPress={handleAddAnother}>
-            <AppText style={styles.addMoreText}>Add another address</AppText>
-          </TouchableOpacity>
+          <View style={styles.sectionHeader}>
+            <AppText style={styles.sectionTitle}>Delivery</AppText>
+            <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+          </View>
+          <AppText style={styles.sectionLabel}>Delivery type</AppText>
+          <View style={styles.chipRow}>
+            {DELIVERY_TYPES.map(type => {
+              const active = deliveryType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.dayChip, active ? styles.dayChipActive : null]}
+                  activeOpacity={0.85}
+                  onPress={() => setDeliveryType(type)}
+                >
+                  <AppText
+                    style={[
+                      styles.dayChipText,
+                      active ? styles.dayChipTextActive : null,
+                    ]}
+                  >
+                    {type === 'pickup'
+                      ? 'Pickup'
+                      : type === 'delivery'
+                      ? 'Delivery'
+                      : 'Both'}
+                  </AppText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <AppText style={styles.sectionLabel}>Delivery scope</AppText>
+          <View style={styles.chipRow}>
+            {DELIVERY_SCOPES.map(scope => {
+              const active = deliveryScope === scope;
+              return (
+                <TouchableOpacity
+                  key={scope}
+                  style={[styles.dayChip, active ? styles.dayChipActive : null]}
+                  activeOpacity={0.85}
+                  onPress={() => setDeliveryScope(scope)}
+                >
+                  <AppText
+                    style={[
+                      styles.dayChipText,
+                      active ? styles.dayChipTextActive : null,
+                    ]}
+                  >
+                    {scope === 'state' ? 'State' : 'Nationwide'}
+                  </AppText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
           <AppButton
-            label={isOnboarding ? 'Continue' : 'Save'}
-            onPress={handleFinish}
-            style={styles.finishBtn}
-            disabled={Boolean(savingId)}
+            label={saving ? 'Saving...' : isOnboarding ? 'Continue' : 'Save'}
+            onPress={handleSubmit}
+            disabled={saving}
+            style={styles.saveBtn}
           />
         </ScrollView>
       </View>
+
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.timeModalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowTimePicker(false)} />
+          <View style={styles.timeModalCard}>
+            <AppText style={styles.timeModalTitle}>
+              {timeTarget === 'opening' ? 'Select opening time' : 'Select closing time'}
+            </AppText>
+            <ScrollView style={styles.timeList} showsVerticalScrollIndicator={false}>
+              {TIME_OPTIONS.map(time => (
+                <TouchableOpacity
+                  key={time}
+                  style={styles.timeRow}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (timeTarget === 'opening') {
+                      setOpeningTime(time);
+                    } else {
+                      setClosingTime(time);
+                    }
+                    setShowTimePicker(false);
+                  }}
+                >
+                  <AppText style={styles.timeRowText}>{time}</AppText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -465,46 +690,27 @@ const styles = StyleSheet.create({
   loadingRow: {
     marginBottom: 12,
   },
-  list: {
-    rowGap: 12,
+  errorText: {
+    marginBottom: 10,
+    color: '#FF7B8A',
+    fontSize: 12,
   },
-  card: {
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+  sectionTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 15,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 6,
   },
   sectionLabel: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
-    marginBottom: 8,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    columnGap: 10,
-    marginBottom: 10,
-  },
-  typeChip: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeChipActive: {
-    backgroundColor: darkTheme.colors.accent,
-    borderColor: darkTheme.colors.accent,
-  },
-  typeText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-  },
-  typeTextActive: {
-    color: '#1A1A1A',
-    fontWeight: darkTheme.typography.fontWeights.medium,
+    marginBottom: 6,
   },
   rowInputs: {
     flexDirection: 'row',
@@ -513,50 +719,126 @@ const styles = StyleSheet.create({
   rowInputItem: {
     flex: 1,
   },
-  primaryRow: {
+  chipRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 10,
-    marginTop: 6,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
   },
-  primaryBox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+  dayChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  primaryBoxActive: {
+  dayChipActive: {
+    backgroundColor: darkTheme.colors.accent,
     borderColor: darkTheme.colors.accent,
   },
-  primaryText: {
+  dayChipText: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
   },
-  actionRow: {
-    marginTop: 10,
+  dayChipTextActive: {
+    color: '#1A1A1A',
+    fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  actionBtn: {
-    minHeight: 42,
-  },
-  addMoreBtn: {
-    marginTop: 12,
+  bannerCard: {
+    minHeight: 140,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: withAlpha(darkTheme.colors.accent, 0.5),
+    borderStyle: 'dashed',
+    backgroundColor: '#727497',
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 10,
   },
-  addMoreText: {
-    color: darkTheme.colors.accent,
-    fontSize: 13,
-    textDecorationLine: 'underline',
+  bannerImage: {
+    width: '100%',
+    height: 140,
+    resizeMode: 'cover',
   },
-  finishBtn: {
-    marginTop: 14,
+  uploadIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  errorText: {
-    marginTop: 6,
-    color: '#FF7B8A',
+  bannerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 14,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  bannerSubtitle: {
+    marginTop: 4,
+    color: 'rgba(255,255,255,0.68)',
     fontSize: 12,
+    textAlign: 'center',
+  },
+  timePickerTrigger: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+  },
+  timePickerText: {
+    color: darkTheme.colors.text,
+    fontSize: 14,
+  },
+  timePlaceholder: {
+    color: darkTheme.colors.muted,
+  },
+  timeModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  timeModalCard: {
+    backgroundColor: '#11112E',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    maxHeight: '70%',
+  },
+  timeModalTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  timeList: {
+    maxHeight: 360,
+  },
+  timeRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  timeRowText: {
+    color: darkTheme.colors.text,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  saveBtn: {
+    marginTop: 12,
+  },
+  multilineInput: {
+    minHeight: 90,
+    textAlignVertical: 'top',
   },
 });
 

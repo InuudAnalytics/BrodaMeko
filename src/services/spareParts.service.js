@@ -1,30 +1,46 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
-export const getSparePartsAddresses = async () => {
-  const response = await api.get(ENDPOINTS.me.spareParts.addressList);
+export const getSellerStore = async () => {
+  const response = await api.get(ENDPOINTS.marketplace.sellerStoreMe);
   return response.data;
 };
 
-export const addSparePartsAddress = async (payload) => {
-  const response = await api.post(ENDPOINTS.me.spareParts.addressAdd, payload);
+export const createSellerStore = async (payload) => {
+  const response = await api.post(ENDPOINTS.marketplace.sellerStore, payload);
   return response.data;
 };
 
-export const updateSparePartsAddress = async (addressId, payload) => {
-  const safeId = String(addressId || '').trim();
-  if (!safeId) {
-    const error = new Error('addressId is required.');
+export const updateSellerStore = async (payload) => {
+  const response = await api.patch(ENDPOINTS.marketplace.sellerStore, payload);
+  return response.data;
+};
+
+export const uploadSellerStoreBanner = async (bannerFile) => {
+  const uri = String(bannerFile?.uri || bannerFile?.path || '').trim();
+  if (!uri) {
+    const error = new Error('banner file is required.');
     error.statusCode = 400;
     error.data = null;
     throw error;
   }
-  const response = await api.patch(ENDPOINTS.me.spareParts.addressUpdate(safeId), payload);
+
+  const formData = new FormData();
+  formData.append('banner', {
+    uri,
+    name: String(bannerFile?.fileName || bannerFile?.name || 'store-banner.jpg'),
+    type: String(bannerFile?.type || 'image/jpeg'),
+  });
+
+  const response = await api.post(ENDPOINTS.marketplace.sellerStoreBanner, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 
 export default {
-  getSparePartsAddresses,
-  addSparePartsAddress,
-  updateSparePartsAddress,
+  getSellerStore,
+  createSellerStore,
+  updateSellerStore,
+  uploadSellerStoreBanner,
 };

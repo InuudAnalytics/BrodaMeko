@@ -16,7 +16,7 @@ import {
   verifyOtp as verifyOtpService,
 } from '../services/auth.service';
 import { registerDevice as registerDeviceService } from '../services/device.service';
-import { TOKEN_STORAGE_KEY } from '../services/api';
+import { TOKEN_STORAGE_KEY, setUnauthorizedHandler } from '../services/api';
 import { ROLES } from '../utils';
 
 const AuthContext = createContext(undefined);
@@ -754,6 +754,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const forceSignOut = React.useCallback(async () => {
+    const currentSelectedRole = normalizeRole(selectedRole) || null;
+    await clearPersistedAuthState();
+    await AsyncStorage.multiSet([
+      [STORAGE_KEYS.selectedRole, currentSelectedRole || ''],
+      [STORAGE_KEYS.hasSeenOnboarding, 'true'],
+      [STORAGE_KEYS.hasSeenRoleSelectionLegacy, 'true'],
+    ]);
+    setToken(null);
+    setUser(null);
+    setRole(null);
+    setSelectedRoleState(currentSelectedRole);
+    setHasSeenOnboarding(true);
+    setPendingVerification(null);
+    setIsLoading(false);
+  }, [selectedRole]);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      forceSignOut();
+    });
+
+    return () => setUnauthorizedHandler(null);
+  }, [forceSignOut]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -782,6 +807,7 @@ export const AuthProvider = ({ children }) => {
         clearError,
         login: signIn,
         logout: signOut,
+        forceSignOut,
       }}
     >
       {children}

@@ -227,7 +227,7 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
       });
 
       if (isOnboarding) {
-        navigation.replace(ROUTES.SPARE_PARTS_DASHBOARD);
+        navigation.replace(ROUTES.SPARE_PARTS_TABS);
         return;
       }
 
@@ -249,7 +249,7 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
     });
 
     if (isOnboarding) {
-      navigation.replace(ROUTES.SPARE_PARTS_DASHBOARD);
+      navigation.replace(ROUTES.SPARE_PARTS_TABS);
       return;
     }
 

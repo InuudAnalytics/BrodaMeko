@@ -12,6 +12,7 @@ export const ENDPOINTS = {
     resetPassword: '/api/v1/auth/reset-password/reset',
     me: '/api/v1/auth/me',
     updatePassword: '/api/v1/auth/update-password',
+    deleteUser: '/api/v1/auth/users/delete',
     uploadAvatar: '/api/v1/auth/upload-avatar',
     verifyAddContact: '/api/v1/auth/verify/add-contact',
     verifyConfirmContact: '/api/v1/auth/verify/confirm-contact',
@@ -42,9 +43,13 @@ export const ENDPOINTS = {
     },
     spareParts: {
       // TODO: Confirm spare parts address endpoints with backend.
-      addressList: '/api/v1/me/spare-parts/address',
-      addressAdd: '/api/v1/me/spare-parts/address',
+      addressList: '/api/v1/me/seller/address',
+      addressAdd: '/api/v1/me/seller/address',
       addressUpdate: (addressId) =>
+        `/api/v1/me/seller/address/${encodeURIComponent(String(addressId || ''))}`,
+      addressListLegacy: '/api/v1/me/spare-parts/address',
+      addressAddLegacy: '/api/v1/me/spare-parts/address',
+      addressUpdateLegacy: (addressId) =>
         `/api/v1/me/spare-parts/address/${encodeURIComponent(String(addressId || ''))}`,
     },
   },
@@ -118,6 +123,12 @@ export const ENDPOINTS = {
     updateSetting: (settingKey) =>
       `/api/v1/admin/settings/${encodeURIComponent(String(settingKey || ''))}`,
     jobs: '/api/v1/admin/jobs',
+  },
+  marketplace: {
+    sellerStore: '/api/v1/marketplace/seller/store',
+    sellerStoreMe: '/api/v1/marketplace/seller/store/me',
+    sellerStoreLogo: '/api/v1/marketplace/seller/store/logo',
+    sellerStoreBanner: '/api/v1/marketplace/seller/store/banner',
   },
   ws: {
     chat: CHAT_WS_URL,

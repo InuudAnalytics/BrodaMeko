@@ -28,7 +28,7 @@ const CHECKLIST_ITEMS = [
   },
   {
     key: 'address',
-    label: 'Add address',
+    label: 'Store details',
     icon: Location01Icon,
   },
   {
@@ -81,7 +81,7 @@ const SparePartsProfileSetupScreen = ({ navigation }) => {
 
   const handlePrimaryAction = () => {
     if (isComplete) {
-      navigation.replace(ROUTES.SPARE_PARTS_DASHBOARD);
+      navigation.replace(ROUTES.SPARE_PARTS_TABS);
       return;
     }
 

@@ -3,6 +3,11 @@ import axios from 'axios';
 import { BASE_URL } from '../config/endpoints';
 
 export const TOKEN_STORAGE_KEY = '@brodameko/token';
+let onUnauthorized = null;
+
+export const setUnauthorizedHandler = (handler) => {
+  onUnauthorized = typeof handler === 'function' ? handler : null;
+};
 
 const pickErrorMessage = (payload) => {
   if (!payload) {
@@ -29,6 +34,9 @@ const normalizeError = (error) => {
     const isUnauthorized = statusCode === 401;
     const isPublicAuthRequest = Boolean(error?.config?.skipAuth);
     const serverMessage = pickErrorMessage(payload);
+    if (isUnauthorized && !isPublicAuthRequest && typeof onUnauthorized === 'function') {
+      onUnauthorized();
+    }
 
     return {
       message: isUnauthorized

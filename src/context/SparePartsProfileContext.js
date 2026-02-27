@@ -8,7 +8,7 @@ const INITIAL_PROFILE = {
   cacImages: [],
   ninImages: [],
   bankDetails: null,
-  addresses: [],
+  storeDetails: null,
   skippedSteps: [],
 };
 
@@ -17,7 +17,7 @@ const SparePartsProfileContext = createContext(undefined);
 const sanitizeProfile = (value) => {
   const next = value && typeof value === 'object' ? value : {};
   const bank = next.bankDetails && typeof next.bankDetails === 'object' ? next.bankDetails : null;
-  const addresses = Array.isArray(next.addresses) ? next.addresses : [];
+  const storeDetails = next.storeDetails && typeof next.storeDetails === 'object' ? next.storeDetails : null;
 
   return {
     cacImages: Array.isArray(next.cacImages) ? next.cacImages.filter(Boolean) : [],
@@ -31,20 +31,24 @@ const sanitizeProfile = (value) => {
           isPrimary: Boolean(bank.isPrimary),
         }
       : null,
-    addresses: addresses
-      .map((address) => ({
-        id: String(address?.id || address?._id || '').trim(),
-        addressType: String(address?.addressType || address?.address_type || '').trim(),
-        label: String(address?.label || '').trim(),
-        street: String(address?.street || '').trim(),
-        city: String(address?.city || '').trim(),
-        state: String(address?.state || '').trim(),
-        country: String(address?.country || '').trim(),
-        latitude: String(address?.latitude ?? '').trim(),
-        longitude: String(address?.longitude ?? '').trim(),
-        isPrimary: Boolean(address?.isPrimary || address?.is_primary),
-      }))
-      .filter((address) => address.id || address.label || address.street || address.city),
+    storeDetails: storeDetails
+      ? {
+          storeName: String(storeDetails?.storeName || storeDetails?.store_name || '').trim(),
+          description: String(storeDetails?.description || '').trim(),
+          street: String(storeDetails?.street || '').trim(),
+          city: String(storeDetails?.city || '').trim(),
+          state: String(storeDetails?.state || '').trim(),
+          country: String(storeDetails?.country || '').trim(),
+          latitude: String(storeDetails?.latitude ?? '').trim(),
+          longitude: String(storeDetails?.longitude ?? '').trim(),
+          openingTime: String(storeDetails?.openingTime || storeDetails?.opening_time || '').trim(),
+          closingTime: String(storeDetails?.closingTime || storeDetails?.closing_time || '').trim(),
+          openDays: Array.isArray(storeDetails?.openDays || storeDetails?.open_days) ? (storeDetails?.openDays || storeDetails?.open_days) : [],
+          deliveryType: String(storeDetails?.deliveryType || storeDetails?.delivery_type || '').trim(),
+          deliveryScope: String(storeDetails?.deliveryScope || storeDetails?.delivery_scope || '').trim(),
+          bannerUrl: String(storeDetails?.bannerUrl || storeDetails?.banner_url || '').trim(),
+        }
+      : null,
     skippedSteps: Array.isArray(next.skippedSteps) ? next.skippedSteps.filter(Boolean) : [],
   };
 };
@@ -133,25 +137,29 @@ export const SparePartsProfileProvider = ({ children }) => {
     }));
   }, []);
 
-  const setAddresses = useCallback((items = []) => {
-    const normalized = Array.isArray(items)
-      ? items.map((address) => ({
-          id: String(address?.id || address?._id || '').trim(),
-          addressType: String(address?.addressType || address?.address_type || '').trim(),
-          label: String(address?.label || '').trim(),
-          street: String(address?.street || '').trim(),
-          city: String(address?.city || '').trim(),
-          state: String(address?.state || '').trim(),
-          country: String(address?.country || '').trim(),
-          latitude: String(address?.latitude ?? '').trim(),
-          longitude: String(address?.longitude ?? '').trim(),
-          isPrimary: Boolean(address?.isPrimary || address?.is_primary),
-        }))
-      : [];
+  const setStoreDetails = useCallback((details) => {
+    const normalized = details && typeof details === 'object'
+      ? {
+          storeName: String(details?.storeName || details?.store_name || '').trim(),
+          description: String(details?.description || '').trim(),
+          street: String(details?.street || '').trim(),
+          city: String(details?.city || '').trim(),
+          state: String(details?.state || '').trim(),
+          country: String(details?.country || '').trim(),
+          latitude: String(details?.latitude ?? '').trim(),
+          longitude: String(details?.longitude ?? '').trim(),
+          openingTime: String(details?.openingTime || details?.opening_time || '').trim(),
+          closingTime: String(details?.closingTime || details?.closing_time || '').trim(),
+          openDays: Array.isArray(details?.openDays || details?.open_days) ? (details?.openDays || details?.open_days) : [],
+          deliveryType: String(details?.deliveryType || details?.delivery_type || '').trim(),
+          deliveryScope: String(details?.deliveryScope || details?.delivery_scope || '').trim(),
+          bannerUrl: String(details?.bannerUrl || details?.banner_url || '').trim(),
+        }
+      : null;
 
     setSparePartsProfile((prev) => ({
       ...prev,
-      addresses: normalized,
+      storeDetails: normalized,
     }));
   }, []);
 
@@ -197,7 +205,7 @@ export const SparePartsProfileProvider = ({ children }) => {
     return {
       cac: sparePartsProfile.cacImages.length > 0,
       nin: sparePartsProfile.ninImages.length > 0,
-      address: sparePartsProfile.addresses.length > 0,
+      address: Boolean(sparePartsProfile.storeDetails?.storeName),
       bank: hasBank,
     };
   }, [sparePartsProfile]);
@@ -219,7 +227,7 @@ export const SparePartsProfileProvider = ({ children }) => {
       setCac,
       setNin,
       setBankDetails,
-      setAddresses,
+      setStoreDetails,
       markStepSkipped,
       clearSkippedStep,
       resetSkippedSteps,
@@ -235,7 +243,7 @@ export const SparePartsProfileProvider = ({ children }) => {
       setCac,
       setNin,
       setBankDetails,
-      setAddresses,
+      setStoreDetails,
       markStepSkipped,
       clearSkippedStep,
       resetSkippedSteps,
