@@ -43,14 +43,17 @@ const getGoogleSigninClient = () => {
 
   try {
     // Lazy load to avoid crashing app startup when native module is not linked yet.
-    const { GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin');
+    const {
+      GoogleSignin,
+      statusCodes,
+    } = require('@react-native-google-signin/google-signin');
     return { GoogleSignin, statusCodes: statusCodes || GOOGLE_STATUS };
   } catch (error) {
     return null;
   }
 };
 
-const normalizeRole = (value) => {
+const normalizeRole = value => {
   const role = String(value || '').toLowerCase();
 
   if (role === 'mechanic' || role === 'mech') {
@@ -78,7 +81,7 @@ const normalizeRole = (value) => {
   return null;
 };
 
-const normalizeUserShape = (rawUser) => {
+const normalizeUserShape = rawUser => {
   if (!rawUser || typeof rawUser !== 'object' || Array.isArray(rawUser)) {
     return null;
   }
@@ -87,14 +90,14 @@ const normalizeUserShape = (rawUser) => {
   const avatarUrl =
     typeof avatarValue === 'string'
       ? avatarValue
-      : (avatarValue && typeof avatarValue === 'object'
-          ? String(
-              avatarValue?.url ||
-              avatarValue?.secure_url ||
-              avatarValue?.avatar_url ||
-              ''
-            ).trim()
-          : '');
+      : avatarValue && typeof avatarValue === 'object'
+      ? String(
+          avatarValue?.url ||
+            avatarValue?.secure_url ||
+            avatarValue?.avatar_url ||
+            '',
+        ).trim()
+      : '';
 
   return {
     ...rawUser,
@@ -113,7 +116,7 @@ const normalizeUserShape = (rawUser) => {
   };
 };
 
-const pickAuthPayload = (payload) => {
+const pickAuthPayload = payload => {
   const root = payload?.data || payload || {};
   const nested = root?.data || {};
   const token =
@@ -126,7 +129,9 @@ const pickAuthPayload = (payload) => {
     null;
 
   const rootLooksLikeUser = Boolean(root?.id || root?.full_name || root?.email);
-  const nestedLooksLikeUser = Boolean(nested?.id || nested?.full_name || nested?.email);
+  const nestedLooksLikeUser = Boolean(
+    nested?.id || nested?.full_name || nested?.email,
+  );
 
   const rawUser =
     root?.user ||
@@ -137,7 +142,9 @@ const pickAuthPayload = (payload) => {
     null;
 
   const user = normalizeUserShape(rawUser);
-  const role = normalizeRole(user?.role || root?.role || nested?.role || payload?.role);
+  const role = normalizeRole(
+    user?.role || root?.role || nested?.role || payload?.role,
+  );
 
   return { token, user, role };
 };
@@ -148,7 +155,7 @@ const makeAuthResult = ({ ok, status, message }) => ({
   message: message || '',
 });
 
-const parseStoredUser = (rawUser) => {
+const parseStoredUser = rawUser => {
   if (!rawUser) {
     return null;
   }
@@ -201,16 +208,23 @@ export const AuthProvider = ({ children }) => {
     ]);
   };
 
-  const persistRoleSelection = async (nextSelectedRole) => {
+  const persistRoleSelection = async nextSelectedRole => {
     await AsyncStorage.multiSet([
       [STORAGE_KEYS.selectedRole, nextSelectedRole || ''],
       [STORAGE_KEYS.hasSeenOnboarding, nextSelectedRole ? 'true' : 'false'],
-      [STORAGE_KEYS.hasSeenRoleSelectionLegacy, nextSelectedRole ? 'true' : 'false'],
+      [
+        STORAGE_KEYS.hasSeenRoleSelectionLegacy,
+        nextSelectedRole ? 'true' : 'false',
+      ],
     ]);
   };
 
   const clearPersistedAuthState = async () => {
-    await AsyncStorage.multiRemove([STORAGE_KEYS.token, STORAGE_KEYS.user, STORAGE_KEYS.role]);
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.token,
+      STORAGE_KEYS.user,
+      STORAGE_KEYS.role,
+    ]);
   };
 
   const setAuthedState = async ({ nextToken, nextUser, nextRole }) => {
@@ -250,8 +264,15 @@ export const AuthProvider = ({ children }) => {
     const me = await getCurrentUser();
     const mePayload = pickAuthPayload(me);
     const currentUser = user && typeof user === 'object' ? user : {};
-    const incomingUser = mePayload.user && typeof mePayload.user === 'object' ? mePayload.user : null;
-    const nextUser = incomingUser ? { ...currentUser, ...incomingUser } : (Object.keys(currentUser).length ? currentUser : null);
+    const incomingUser =
+      mePayload.user && typeof mePayload.user === 'object'
+        ? mePayload.user
+        : null;
+    const nextUser = incomingUser
+      ? { ...currentUser, ...incomingUser }
+      : Object.keys(currentUser).length
+      ? currentUser
+      : null;
     const nextRole = mePayload.role || role || null;
 
     setUser(nextUser);
@@ -282,7 +303,10 @@ export const AuthProvider = ({ children }) => {
     } catch (deviceError) {
       if (__DEV__) {
         // Non-blocking registration: auth flow should continue even when this fails.
-        console.log('[AuthContext] Device registration failed:', deviceError?.message || deviceError);
+        console.log(
+          '[AuthContext] Device registration failed:',
+          deviceError?.message || deviceError,
+        );
       }
     }
   };
@@ -303,10 +327,15 @@ export const AuthProvider = ({ children }) => {
       const nextToken = map?.[STORAGE_KEYS.token] || null;
       const storedUser = parseStoredUser(map?.[STORAGE_KEYS.user]);
       const storedRole = normalizeRole(map?.[STORAGE_KEYS.role]);
-      const storedSelectedRole = normalizeRole(map?.[STORAGE_KEYS.selectedRole]);
+      const storedSelectedRole = normalizeRole(
+        map?.[STORAGE_KEYS.selectedRole],
+      );
       const seenOnboarding =
-        String(map?.[STORAGE_KEYS.hasSeenOnboarding] || map?.[STORAGE_KEYS.hasSeenRoleSelectionLegacy] || '').toLowerCase() === 'true' ||
-        Boolean(storedSelectedRole);
+        String(
+          map?.[STORAGE_KEYS.hasSeenOnboarding] ||
+            map?.[STORAGE_KEYS.hasSeenRoleSelectionLegacy] ||
+            '',
+        ).toLowerCase() === 'true' || Boolean(storedSelectedRole);
 
       setSelectedRoleState(storedSelectedRole);
       setHasSeenOnboarding(seenOnboarding);
@@ -370,7 +399,7 @@ export const AuthProvider = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setSelectedRole = async (nextRoleValue) => {
+  const setSelectedRole = async nextRoleValue => {
     const normalized = normalizeRole(nextRoleValue);
 
     if (!normalized) {
@@ -383,11 +412,19 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  const signUp = async ({ fullName, email, phoneNumber, password, role: selectedRoleInput }) => {
+  const signUp = async ({
+    fullName,
+    email,
+    phoneNumber,
+    password,
+    role: selectedRoleInput,
+  }) => {
     setIsLoading(true);
     clearError();
 
-    const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) || ROLES.CAR_OWNER;
+    const normalizedSelectedRole =
+      normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) ||
+      ROLES.CAR_OWNER;
     const pendingData = {
       method: email ? 'email' : 'phone',
       email: email || '',
@@ -418,11 +455,14 @@ export const AuthProvider = ({ children }) => {
 
       if (isTransportFailure) {
         setPendingVerification(pendingData);
-        setError('Could not confirm sign up due to network issues. If you received OTP, continue verification.');
+        setError(
+          'Could not confirm sign up due to network issues. If you received OTP, continue verification.',
+        );
         return makeAuthResult({
           ok: false,
           status: 'uncertain',
-          message: 'Could not confirm sign up. If OTP was sent, continue to verification.',
+          message:
+            'Could not confirm sign up. If OTP was sent, continue to verification.',
         });
       }
 
@@ -447,13 +487,16 @@ export const AuthProvider = ({ children }) => {
       const authPayload = pickAuthPayload(response);
 
       if (!authPayload.token) {
-        throw new Error('Verification succeeded but no token was returned. Please log in.');
+        throw new Error(
+          'Verification succeeded but no token was returned. Please log in.',
+        );
       }
 
       await setAuthedState({
         nextToken: authPayload.token,
         nextUser: authPayload.user,
-        nextRole: authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
+        nextRole:
+          authPayload.role || pendingVerification?.role || ROLES.CAR_OWNER,
       });
       await refreshUserProfile(authPayload.token).catch(() => {});
       registerCurrentDevice();
@@ -475,7 +518,9 @@ export const AuthProvider = ({ children }) => {
 
     try {
       if (!pendingVerification?.email && !pendingVerification?.phoneNumber) {
-        throw new Error('No verification destination found. Please sign up again.');
+        throw new Error(
+          'No verification destination found. Please sign up again.',
+        );
       }
 
       await resendOtpService({
@@ -493,7 +538,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signIn = async ({ email, phoneNumber, password, role: selectedRoleInput }) => {
+  const signIn = async ({
+    email,
+    phoneNumber,
+    password,
+    role: selectedRoleInput,
+  }) => {
     setIsLoading(true);
     clearError();
 
@@ -505,8 +555,11 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Login response did not include an auth token.');
       }
 
-      const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole);
-      const nextRole = authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER;
+      const normalizedSelectedRole = normalizeRole(
+        selectedRoleInput || selectedRole,
+      );
+      const nextRole =
+        authPayload.role || normalizedSelectedRole || ROLES.CAR_OWNER;
 
       await setAuthedState({
         nextToken: authPayload.token,
@@ -552,16 +605,20 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Failed to get Google ID token.');
       }
 
-      const normalizedSelectedRole = normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) || ROLES.CAR_OWNER;
+      const normalizedSelectedRole =
+        normalizeRole(selectedRoleInput || selectedRole || ROLES.CAR_OWNER) ||
+        ROLES.CAR_OWNER;
       const response = await googleLoginService({
         idToken,
-        role: normalizedSelectedRole
+        role: normalizedSelectedRole,
       });
 
       const authPayload = pickAuthPayload(response);
 
       if (!authPayload.token) {
-        throw new Error('Google login succeeded but no app token was returned.');
+        throw new Error(
+          'Google login succeeded but no app token was returned.',
+        );
       }
 
       await setAuthedState({
@@ -605,7 +662,9 @@ export const AuthProvider = ({ children }) => {
     } catch (forgotError) {
       const statusCode = Number(forgotError?.statusCode || 0);
       if (statusCode === 401) {
-        setError('Could not send reset OTP. Please verify the email/phone and try again.');
+        setError(
+          'Could not send reset OTP. Please verify the email/phone and try again.',
+        );
       } else {
         setError(forgotError?.message || 'Failed to send reset OTP.');
       }
@@ -616,7 +675,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const resetPasswordWithOtp = async ({ email, phoneNumber, otp, newPassword, confirmPassword }) => {
+  const resetPasswordWithOtp = async ({
+    email,
+    phoneNumber,
+    otp,
+    newPassword,
+    confirmPassword,
+  }) => {
     setIsLoading(true);
     clearError();
 
@@ -726,4 +791,3 @@ export const useAuth = () => {
 
   return context;
 };
-
