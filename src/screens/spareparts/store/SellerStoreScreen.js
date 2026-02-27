@@ -28,7 +28,7 @@ const normalizeCategory = (value) => {
   return raw || 'All parts';
 };
 
-const SellerStoreScreen = ({ navigation }) => {
+const SellerStoreScreen = ({ navigation, onBack }) => {
   const { products, isHydrated } = useSellerStore();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState(CATEGORY_FILTERS[0]);
@@ -67,7 +67,17 @@ const SellerStoreScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
       <View style={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.85}
+            onPress={() => {
+              if (onBack) {
+                onBack();
+                return;
+              }
+              navigation.goBack();
+            }}
+          >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
           </TouchableOpacity>
           <AppText style={styles.headerTitle}>Store</AppText>

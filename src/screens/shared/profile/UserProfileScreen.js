@@ -14,6 +14,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
   ArrowRight01Icon,
+  Alert01Icon,
   BankIcon,
   Briefcase01Icon,
   Cancel01Icon,
@@ -25,9 +26,10 @@ import {
   User02Icon,
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
+import { deleteAccount as deleteAccountService } from '../../../services/auth.service';
 import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
@@ -45,7 +47,8 @@ const getSettingsRows = (role) => {
 
   rows.push(
     { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
-    { key: 'help', label: 'Help & Support', icon: HelpCircleIcon }
+    { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
+    { key: 'logout', label: 'Logout', icon: Alert01Icon, tone: 'danger' }
   );
 
   return rows;
@@ -91,24 +94,36 @@ const readUser = (user) => {
   };
 };
 
-const SettingRow = ({ label, icon, onPress, isLast }) => {
+const SettingRow = ({ label, icon, onPress, isLast, tone }) => {
+  const isDanger = tone === 'danger';
+  const iconColor = isDanger ? '#FF7B8A' : 'rgba(255,255,255,0.42)';
+  const labelStyle = isDanger ? styles.settingLabelDanger : styles.settingLabel;
+
   return (
-    <TouchableOpacity style={[styles.settingRow, isLast ? styles.settingRowLast : null]} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.settingRow, isDanger ? styles.settingRowDanger : null, isLast ? styles.settingRowLast : null]}
+      activeOpacity={0.85}
+      onPress={onPress}
+    >
       <View style={styles.settingLeft}>
-        <HugeiconsIcon icon={icon} size={20} color="rgba(255,255,255,0.42)" strokeWidth={1.9} />
-        <AppText style={styles.settingLabel}>{label}</AppText>
+        <HugeiconsIcon icon={icon} size={20} color={iconColor} strokeWidth={1.9} />
+        <AppText style={labelStyle}>{label}</AppText>
       </View>
       <HugeiconsIcon icon={ArrowRight01Icon} size={18} color="rgba(255,255,255,0.42)" strokeWidth={2.1} />
     </TouchableOpacity>
   );
 };
 
-const UserProfileScreen = ({ navigation }) => {
+const UserProfileScreen = ({ navigation, onBack }) => {
   const { user, role, signOut, isLoading } = useAuth();
   const [totalJobs, setTotalJobs] = useState(0);
   const [rating, setRating] = useState(0);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showSupportSheet, setShowSupportSheet] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const profile = readUser(user);
   const initials = profile.fullName
@@ -168,6 +183,32 @@ const UserProfileScreen = ({ navigation }) => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (isDeleting) {
+      return;
+    }
+
+    const password = String(deletePassword || '').trim();
+    if (!password) {
+      setDeleteError('Password is required.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      await deleteAccountService({ password });
+      await signOut();
+      setShowDeleteModal(false);
+      setDeletePassword('');
+    } catch (error) {
+      setDeleteError(error?.message || 'Could not delete account.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handlePersonalInfo = () => {
     if (role === ROLES.MECH) {
       navigation.navigate(ROUTES.MECH_EDIT_PROFILE);
@@ -193,7 +234,17 @@ const UserProfileScreen = ({ navigation }) => {
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.8}
+            onPress={() => {
+              if (onBack) {
+                onBack();
+                return;
+              }
+              navigation.goBack();
+            }}
+          >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
           </TouchableOpacity>
           <AppText style={styles.heading}>User profile</AppText>
@@ -246,6 +297,7 @@ const UserProfileScreen = ({ navigation }) => {
               key={row.key}
               label={row.label}
               icon={row.icon}
+              tone={row.tone}
               isLast={index === array.length - 1}
               onPress={() => {
                 if (row.key === 'help') {
@@ -286,6 +338,10 @@ const UserProfileScreen = ({ navigation }) => {
                 }
                 if (row.key === 'notifications') {
                   navigation.navigate('Notifications');
+                  return;
+                }
+                if (row.key === 'logout') {
+                  handleSignOut();
                 }
               }}
             />
@@ -293,10 +349,13 @@ const UserProfileScreen = ({ navigation }) => {
         </View>
 
         <AppButton
-          label={isSigningOut ? 'Logging out...' : 'Logout'}
-          onPress={handleSignOut}
-          disabled={isSigningOut || isLoading}
-          left={isSigningOut ? <ActivityIndicator size="small" color="#C73B4A" /> : null}
+          label={isDeleting ? 'Deleting...' : 'Delete my account'}
+          onPress={() => {
+            setShowDeleteModal(true);
+            setDeleteError('');
+          }}
+          disabled={isDeleting || isLoading}
+          left={isDeleting ? <ActivityIndicator size="small" color="#C73B4A" /> : null}
           style={styles.logoutButton}
           textStyle={styles.logoutText}
         />
@@ -316,6 +375,49 @@ const UserProfileScreen = ({ navigation }) => {
             <SettingRow label="Support center" icon={HelpCircleIcon} onPress={() => handleSupportAction('support_center')} />
             <SettingRow label="Chat with BrodaMeko" icon={Notification01Icon} onPress={() => handleSupportAction('chat')} />
             <SettingRow label="Privacy policy" icon={User02Icon} onPress={() => handleSupportAction('privacy')} isLast />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.deleteModalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowDeleteModal(false)} />
+          <View style={styles.deleteCard}>
+            <AppText style={styles.deleteTitle}>Delete account?</AppText>
+            <AppText style={styles.deleteSubtitle}>Input your password if you want to</AppText>
+
+            <AppInput
+              value={deletePassword}
+              onChangeText={(value) => {
+                setDeletePassword(value);
+                setDeleteError('');
+              }}
+              placeholder="Enter password"
+              secureTextEntry
+            />
+
+            {deleteError ? <AppText style={styles.deleteError}>{deleteError}</AppText> : null}
+
+            <View style={styles.deleteActions}>
+              <AppButton
+                label={isDeleting ? 'Deleting...' : 'Delete'}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+                style={styles.deleteButton}
+              />
+              <TouchableOpacity
+                style={styles.cancelDeleteBtn}
+                activeOpacity={0.85}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <AppText style={styles.cancelDeleteText}>Cancel</AppText>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -470,6 +572,9 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.06)',
     paddingHorizontal: 4,
   },
+  settingRowDanger: {
+    borderBottomColor: 'rgba(255,123,138,0.25)',
+  },
   settingRowLast: {
     borderBottomWidth: 0,
   },
@@ -480,6 +585,11 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     color: 'rgba(255,255,255,0.45)',
+    fontSize: 14,
+    lineHeight: 24,
+  },
+  settingLabelDanger: {
+    color: '#FF7B8A',
     fontSize: 14,
     lineHeight: 24,
   },
@@ -496,6 +606,56 @@ const styles = StyleSheet.create({
     color: '#CF3D3DF7',
     fontSize: 14,
     fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  deleteModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  deleteCard: {
+    backgroundColor: '#11112E',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  deleteTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    textAlign: 'center',
+  },
+  deleteSubtitle: {
+    marginTop: 6,
+    color: darkTheme.colors.muted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  deleteActions: {
+    marginTop: 6,
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(207,61,61,0.9)',
+  },
+  cancelDeleteBtn: {
+    marginTop: 10,
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  cancelDeleteText: {
+    color: darkTheme.colors.muted,
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  deleteError: {
+    color: '#FF7B8A',
+    marginTop: -6,
+    marginBottom: 8,
+    fontSize: 12,
+    textAlign: 'center',
   },
   modalRoot: {
     flex: 1,

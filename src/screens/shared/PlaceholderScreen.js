@@ -5,7 +5,7 @@ import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../components';
 import { darkTheme } from '../../theme';
 
-const PlaceholderScreen = ({ navigation, route }) => {
+const PlaceholderScreen = ({ navigation, route, onBack }) => {
   const { title = 'Coming soon', subtitle } = route?.params || {};
   const message = subtitle || `${title} is coming soon.`;
 
@@ -13,7 +13,17 @@ const PlaceholderScreen = ({ navigation, route }) => {
     <ScreenContainer padded={false} style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.85}
+            onPress={() => {
+              if (onBack) {
+                onBack();
+                return;
+              }
+              navigation.goBack();
+            }}
+          >
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
           </TouchableOpacity>
           <AppText style={styles.headerTitle}>{title}</AppText>

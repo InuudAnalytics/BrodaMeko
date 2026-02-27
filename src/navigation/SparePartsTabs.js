@@ -6,6 +6,7 @@ import SellerDashboardScreen from '../screens/spareparts/home/SellerDashboardScr
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import SellerStoreScreen from '../screens/spareparts/store/SellerStoreScreen';
+import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import { ROUTES } from '../utils';
 
 const SparePartsTabs = ({ navigation, route }) => {
@@ -32,11 +33,17 @@ const SparePartsTabs = ({ navigation, route }) => {
     }
 
     if (activeTab === 'orders') {
-      return <PlaceholderScreen navigation={navigation} route={{ params: { title: 'Orders' } }} />;
+      return (
+        <PlaceholderScreen
+          navigation={navigation}
+          route={{ params: { title: 'Orders' } }}
+          onBack={() => setActiveTab('home')}
+        />
+      );
     }
 
     if (activeTab === 'store') {
-      return <SellerStoreScreen navigation={navigation} />;
+      return <SellerStoreScreen navigation={navigation} onBack={() => setActiveTab('home')} />;
     }
 
     if (activeTab === 'wallet') {
@@ -44,7 +51,7 @@ const SparePartsTabs = ({ navigation, route }) => {
     }
 
     if (activeTab === 'profile') {
-      return <PlaceholderScreen navigation={navigation} route={{ params: { title: 'Profile' } }} />;
+      return <UserProfileScreen navigation={navigation} onBack={() => setActiveTab('home')} />;
     }
 
     return null;
