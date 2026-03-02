@@ -1,7 +1,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { AppButton, AppText, ScreenContainer, ScrollableTabs } from '../../../components';
+import {
+  AppButton,
+  AppText,
+  CenteredHeader,
+  ScreenContainer,
+  ScrollableTabs,
+} from '../../../components';
 import {
   getMechanicAssignedJobs,
   getMechanicPendingJobRequests,
@@ -18,15 +31,15 @@ const TABS = [
 
 const COMPLETED_STATUSES = new Set(['completed', 'done']);
 
-const initialsFromName = (name) =>
+const initialsFromName = name =>
   String(name || 'M')
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
+    .map(part => part[0].toUpperCase())
     .join('');
 
-const readList = (response) => {
+const readList = response => {
   const payload = response?.data || response || {};
   if (Array.isArray(payload)) {
     return payload;
@@ -59,7 +72,12 @@ const normalizePendingRequest = (item, index) => ({
 
 const normalizeAssignedJob = (item, index) => ({
   id: String(item?.id || item?._id || item?.job_id || `job-${index}`),
-  ownerName: String(item?.car_owner?.name || item?.owner?.name || item?.user?.name || 'Customer'),
+  ownerName: String(
+    item?.car_owner?.name ||
+      item?.owner?.name ||
+      item?.user?.name ||
+      'Customer',
+  ),
   issue: String(item?.issue_type || item?.title || 'Car issue'),
   carMake: String(item?.car_make || ''),
   status: String(item?.status || '').toLowerCase(),
@@ -72,7 +90,10 @@ const RequestCard = ({ item, busyAction, onAccept, onDecline }) => {
       <View style={styles.cardTop}>
         <View style={styles.avatar}>
           {item.avatarUri ? (
-            <Image source={{ uri: item.avatarUri }} style={styles.avatarImage} />
+            <Image
+              source={{ uri: item.avatarUri }}
+              style={styles.avatarImage}
+            />
           ) : (
             <AppText style={styles.avatarText}>{initials}</AppText>
           )}
@@ -111,10 +132,16 @@ const RequestCard = ({ item, busyAction, onAccept, onDecline }) => {
 };
 
 const AssignedCard = ({ item, onOpen }) => (
-  <TouchableOpacity activeOpacity={0.9} style={styles.card} onPress={() => onOpen(item)}>
+  <TouchableOpacity
+    activeOpacity={0.9}
+    style={styles.card}
+    onPress={() => onOpen(item)}
+  >
     <View style={styles.cardTop}>
       <View style={styles.avatar}>
-        <AppText style={styles.avatarText}>{initialsFromName(item.ownerName)}</AppText>
+        <AppText style={styles.avatarText}>
+          {initialsFromName(item.ownerName)}
+        </AppText>
       </View>
       <View style={styles.info}>
         <AppText style={styles.name}>{item.ownerName}</AppText>
@@ -124,7 +151,11 @@ const AssignedCard = ({ item, onOpen }) => (
         </AppText>
       </View>
     </View>
-    <AppButton label="View details" onPress={() => onOpen(item)} style={styles.acceptBtn} />
+    <AppButton
+      label="View details"
+      onPress={() => onOpen(item)}
+      style={styles.acceptBtn}
+    />
   </TouchableOpacity>
 );
 
@@ -153,8 +184,12 @@ const MechanicJobsScreen = ({ navigation, route }) => {
       const pending = readList(pendingRes).map(normalizePendingRequest);
       const assigned = readList(assignedRes).map(normalizeAssignedJob);
       setPendingRequests(pending);
-      setActiveJobs(assigned.filter((item) => !COMPLETED_STATUSES.has(item.status)));
-      setCompletedJobs(assigned.filter((item) => COMPLETED_STATUSES.has(item.status)));
+      setActiveJobs(
+        assigned.filter(item => !COMPLETED_STATUSES.has(item.status)),
+      );
+      setCompletedJobs(
+        assigned.filter(item => COMPLETED_STATUSES.has(item.status)),
+      );
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load jobs.');
       setPendingRequests([]);
@@ -171,7 +206,7 @@ const MechanicJobsScreen = ({ navigation, route }) => {
       if (requestedJobId) {
         setActiveTab('available');
       }
-    }, [fetchData, requestedJobId])
+    }, [fetchData, requestedJobId]),
   );
 
   const handleRespond = async (item, action) => {
@@ -203,7 +238,7 @@ const MechanicJobsScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleOpenJob = (item) => {
+  const handleOpenJob = item => {
     navigation.navigate(ROUTES.MECH_JOB_DETAILS, { jobId: item.id });
   };
 
@@ -218,17 +253,17 @@ const MechanicJobsScreen = ({ navigation, route }) => {
   }, [activeJobs, activeTab, completedJobs, pendingRequests]);
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer
+      padded={false}
+      edges={['left', 'right', 'bottom']}
+      style={styles.screen}
+    >
       <View style={styles.container}>
+        <CenteredHeader title="Jobs" />
         <ScrollableTabs
           tabs={TABS}
           activeKey={activeTab}
           onChange={setActiveTab}
-          containerStyle={styles.tabWrap}
-          tabStyle={styles.tabBtn}
-          activeTabStyle={styles.tabBtnActive}
-          textStyle={styles.tabText}
-          activeTextStyle={styles.tabTextActive}
         />
 
         <AppText style={styles.heading}>Nearby requests</AppText>
@@ -249,24 +284,33 @@ const MechanicJobsScreen = ({ navigation, route }) => {
         ) : null}
 
         {!loading && !error ? (
-          <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          >
             {activeTab === 'available'
-              ? currentItems.map((item) => (
+              ? currentItems.map(item => (
                   <RequestCard
                     key={item.id}
                     item={item}
                     busyAction={busyRequestId === item.id ? busyAction : ''}
-                    onAccept={(target) => handleRespond(target, 'accept')}
-                    onDecline={(target) => handleRespond(target, 'decline')}
+                    onAccept={target => handleRespond(target, 'accept')}
+                    onDecline={target => handleRespond(target, 'decline')}
                   />
                 ))
-              : currentItems.map((item) => (
-                  <AssignedCard key={item.id} item={item} onOpen={handleOpenJob} />
+              : currentItems.map(item => (
+                  <AssignedCard
+                    key={item.id}
+                    item={item}
+                    onOpen={handleOpenJob}
+                  />
                 ))}
 
             {!currentItems.length ? (
               <View style={styles.centerState}>
-                <AppText style={styles.emptyText}>No jobs in this tab right now.</AppText>
+                <AppText style={styles.emptyText}>
+                  No jobs in this tab right now.
+                </AppText>
               </View>
             ) : null}
           </ScrollView>
@@ -282,32 +326,8 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   container: {
-    flex: 1,
     paddingHorizontal: 14,
-    paddingTop: 14,
-  },
-  tabWrap: {
-    borderRadius: 8,
-    backgroundColor: 'rgba(245,245,245,0.16)',
-    padding: 6,
-  },
-  tabBtn: {
-    minHeight: 36,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  tabBtnActive: {
-    backgroundColor: darkTheme.colors.accent,
-  },
-  tabText: {
-    color: 'rgba(245,245,245,0.72)',
-    fontSize: 12,
-  },
-  tabTextActive: {
-    color: '#2A2A2A',
-    fontWeight: darkTheme.typography.fontWeights.medium,
+    paddingTop: 10,
   },
   heading: {
     marginTop: 14,
