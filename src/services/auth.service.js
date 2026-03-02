@@ -128,6 +128,11 @@ export const updatePassword = async ({ currentPassword, newPassword }) => {
   return response.data;
 };
 
+export const getContactStatus = async () => {
+  const response = await api.get(ENDPOINTS.auth.contactStatus);
+  return response.data;
+};
+
 export const deleteAccount = async ({ password }) => {
   const safePassword = String(password || '').trim();
   if (!safePassword) {
@@ -248,6 +253,7 @@ export default {
   resetPassword,
   getCurrentUser,
   updatePassword,
+  getContactStatus,
   deleteAccount,
   uploadAvatar,
   verifyAddContact,

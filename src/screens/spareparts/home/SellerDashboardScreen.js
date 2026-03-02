@@ -9,7 +9,7 @@ import {
   PackageIcon,
   PlusSignIcon,
 } from '@hugeicons/core-free-icons';
-import { AppText, ScreenContainer } from '../../../components';
+import { AppText, PersonalInfoAlert, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
 import { getNotifications } from '../../../services/notifications.service';
 import { darkTheme } from '../../../theme';
@@ -93,6 +93,7 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
+      <PersonalInfoAlert />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>

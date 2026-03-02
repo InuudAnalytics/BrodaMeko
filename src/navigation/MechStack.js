@@ -24,6 +24,7 @@ import MechanicJobDetailsScreen from '../screens/mech/jobs/MechanicJobDetailsScr
 import SetServicesScreen from '../screens/mech/home/SetServicesScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
+import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
 import { useAuth, useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -160,6 +161,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.PERSONAL_INFO}
         component={PersonalInfoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.PROFILE_BANK_DETAILS}
+        component={ProfileBankDetailsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

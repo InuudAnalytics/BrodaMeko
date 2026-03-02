@@ -4,7 +4,8 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useSparePartsProfile } from '../../../context';
-import { addMechanicBank, getMechanicBankList, verifyMechanicBank } from '../../../services/mechanic.service';
+import { getMechanicBankList } from '../../../services/mechanic.service';
+import { addSellerBank, verifySellerBank } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getSparePartsOnboardingStepIndex, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
 
@@ -130,7 +131,7 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
     setSavingError('');
 
     try {
-      const response = await verifyMechanicBank({
+      const response = await verifySellerBank({
         account_number: cleanAccount,
         bank_name: selectedBankName,
       });
@@ -206,7 +207,7 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
     setSavingError('');
 
     try {
-      const response = await addMechanicBank({
+      const response = await addSellerBank({
         account_name: String(accountName).trim(),
         account_number: cleanAccount,
         bank_code: selectedBankCode,

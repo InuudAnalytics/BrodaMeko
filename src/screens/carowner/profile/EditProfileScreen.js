@@ -24,8 +24,9 @@ import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { verifyAddContact as verifyAddContactService } from '../../../services/auth.service';
 import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
+import { uploadSellerStoreLogo } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
-import { isValidNigerianPhoneDigits, pickSingleImageFromGallery, ROUTES, withNigerianCountryCode } from '../../../utils';
+import { isValidNigerianPhoneDigits, pickSingleImageFromGallery, ROLES, ROUTES, withNigerianCountryCode } from '../../../utils';
 
 const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
   const raw = String(value || '').trim();
@@ -69,7 +70,7 @@ const SupportActionRow = ({ label, icon, onPress, isLast }) => {
 };
 
 const EditProfileScreen = ({ navigation }) => {
-  const { user, updateUserData } = useAuth();
+  const { user, role, updateUserData } = useAuth();
 
   const profile = useMemo(
     () => ({
@@ -164,7 +165,13 @@ const EditProfileScreen = ({ navigation }) => {
       let nextAvatar = avatarUri || '';
       const avatarChanged = Boolean(avatarUri) && avatarUri !== profile.avatarUri;
       if (avatarChanged) {
-        const uploadResponse = await uploadAvatarService({
+        const uploadResponse = role === ROLES.SPARE_PARTS_SELLER
+          ? await uploadSellerStoreLogo({
+              uri: avatarUri,
+              fileName: 'store-logo.jpg',
+              type: 'image/jpeg',
+            })
+          : await uploadAvatarService({
           uri: avatarUri,
           fileName: 'profile-avatar.jpg',
           type: 'image/jpeg',

@@ -15,7 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Location06Icon, Mail01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
-import { AppBottomNav, AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppButton, AppText, OpenStreetMapView, PersonalInfoAlert, ScreenContainer } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
@@ -478,6 +478,7 @@ const DashboardScreen = ({ navigation, route }) => {
   return (
     <View style={styles.root}>
       <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
+      <PersonalInfoAlert />
       <View style={styles.mapBackdrop}>
         {hasLocationPermission ? (
           <>

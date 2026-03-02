@@ -11,6 +11,7 @@ import {
   SparePartsCacUploadScreen,
   SparePartsAddressScreen,
   SparePartsNinUploadScreen,
+  SparePartsPersonalInfoScreen,
   SparePartsProfileSetupScreen,
 } from '../screens/spareparts/profile';
 import SparePartsTabs from './SparePartsTabs';
@@ -23,7 +24,7 @@ import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
-import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
+import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
 import { useAuth, useSparePartsProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -89,13 +90,22 @@ const SparePartsStack = () => {
       <Stack.Screen name={ROUTES.SPARE_PARTS_TABS} component={SparePartsTabs} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.SPARE_PARTS_ADD_PRODUCT} component={AddProductScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.SPARE_PARTS_DASHBOARD} component={PlaceholderScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.SPARE_PARTS_PERSONAL_INFO}
+        component={SparePartsPersonalInfoScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name={ROUTES.CHANGE_PASSWORD} component={ChangePasswordScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.SUPPORT_CHAT_MOCK} component={SupportChatMockScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.USER_PROFILE} component={UserProfileScreen} options={{ headerShown: false }} />
-      <Stack.Screen name={ROUTES.PERSONAL_INFO} component={PersonalInfoScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.PROFILE_BANK_DETAILS}
+        component={ProfileBankDetailsScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 };

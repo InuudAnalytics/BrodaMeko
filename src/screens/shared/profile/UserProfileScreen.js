@@ -214,6 +214,10 @@ const UserProfileScreen = ({ navigation, onBack }) => {
       navigation.navigate(ROUTES.MECH_EDIT_PROFILE);
       return;
     }
+    if (role === ROLES.SPARE_PARTS_SELLER) {
+      navigation.navigate(ROUTES.SPARE_PARTS_PERSONAL_INFO);
+      return;
+    }
     navigation.navigate(ROUTES.CAR_OWNER_EDIT_PROFILE);
   };
 
@@ -309,15 +313,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                   return;
                 }
                 if (row.key === 'bank') {
-                  if (role === ROLES.MECH) {
-                    navigation.navigate(ROUTES.MECH_BANK_DETAILS);
-                    return;
-                  }
-                  if (role === ROLES.SPARE_PARTS_SELLER) {
-                    navigation.navigate(ROUTES.SPARE_PARTS_BANK_DETAILS);
-                    return;
-                  }
-                  navigation.navigate('Placeholder', { title: 'Bank details' });
+                  navigation.navigate(ROUTES.PROFILE_BANK_DETAILS);
                   return;
                 }
                 if (row.key === 'address') {

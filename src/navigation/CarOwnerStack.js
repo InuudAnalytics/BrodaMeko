@@ -33,6 +33,7 @@ import SupportScreen from '../screens/shared/SupportScreen';
 import SupportChatMockScreen from '../screens/shared/SupportChatMockScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
+import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
 import MarketplaceScreen from '../screens/carowner/marketplace/MarketplaceScreen';
 import ProductDetailsScreen from '../screens/carowner/marketplace/ProductDetailsScreen';
 import CartScreen from '../screens/carowner/marketplace/CartScreen';
@@ -172,6 +173,11 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.PERSONAL_INFO}
         component={PersonalInfoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.PROFILE_BANK_DETAILS}
+        component={ProfileBankDetailsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
