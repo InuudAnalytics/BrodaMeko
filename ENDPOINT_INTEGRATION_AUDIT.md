@@ -1,8 +1,16 @@
 # BrodaMeko Endpoint Integration Audit
 
-Updated on 2026-02-27.
+Updated on 2026-03-02.
 
-## 1) Fully integrated (service + used in app flow/screens)
+This audit groups endpoints by **current app readiness**:
+1) Fully integrated (service + UI flow wired)
+2) Service exists but UI not wired (or partially wired)
+3) UI exists but still mocked (no service wired)
+4) Endpoint known, no service or UI yet
+
+---
+
+## 1) Fully integrated (service + UI flow wired)
 
 ### Authentication
 - `POST /api/v1/auth/verify-otp`
@@ -16,12 +24,17 @@ Updated on 2026-02-27.
 - `PATCH /api/v1/auth/update-password`
 - `POST /api/v1/auth/devices/register`
 - `POST /api/v1/auth/verify/add-contact`
+- `POST /api/v1/auth/verify/confirm-contact`
+- `DELETE /api/v1/auth/users/delete`
 - `POST /api/v1/auth/upload-avatar`
+- `GET /api/v1/auth/users/contact-status`
 
 ### Wallet
 - `POST /api/v1/wallets/top-up`
 - `GET /api/v1/wallets/verify/payment?reference=...&trxref=...`
 - `GET /api/v1/wallet/balance`
+- `POST /api/v1/wallets/request`
+- `GET /api/v1/wallets/withdrawals`
 
 ### Transactions
 - `GET /api/v1/transactions/list`
@@ -34,10 +47,27 @@ Updated on 2026-02-27.
 - `DELETE /api/v1/me/mechanic/:serviceId/delete`
 - `POST /api/v1/me/mechanic/bank`
 - `POST /api/v1/me/mechanic/bank/verify`
+- `POST /api/v1/me/mechanic/bank/:bankId/primary`
+- `DELETE /api/v1/me/mechanic/bank/:bankId/delete`
 - `GET /api/v1/me/mechanic/bank/list`
 - `GET /api/v1/me/mechanic/address`
 - `POST /api/v1/me/mechanic/address`
 - `PATCH /api/v1/me/mechanic/address/:addressId`
+- `DELETE /api/v1/me/mechanic/address/:addressId`
+- `POST /api/v1/me/mechanic/address/:addressId/primary`
+- `POST /api/v1/me/mechanic/online-status`
+
+### Car owner profile/settings
+- `POST /api/v1/me/car-owner/bank`
+- `POST /api/v1/me/car-owner/bank/verify`
+- `POST /api/v1/me/car-owner/bank/:bankId/primary`
+- `DELETE /api/v1/me/car-owner/bank/:bankId/delete`
+
+### Spare parts seller profile/settings
+- `POST /api/v1/seller/me/bank`
+- `POST /api/v1/seller/me/bank/verify`
+- `PATCH /api/v1/seller/me/bank/:bankId/primary`
+- `DELETE /api/v1/seller/me/bank/:bankId/delete`
 
 ### Jobs
 - `POST /api/v1/jobs/create`
@@ -59,6 +89,8 @@ Updated on 2026-02-27.
 - `GET /api/v1/jobs/mechanics/:mechanicId/stats`
 
 ### Chat
+- `POST /api/v1/chat/conversations/create`
+- `GET /api/v1/chat/conversations`
 - `GET /api/v1/chat/conversations/:conversationId/messages`
 - `PATCH /api/v1/chat/conversations/:conversationId/read`
 - `POST /api/v1/chat/conversations/images/upload/:conversationId`
@@ -71,56 +103,70 @@ Updated on 2026-02-27.
 - `PATCH /api/v1/notifications/:notificationId/read`
 - `DELETE /api/v1/notifications/:notificationId`
 
+### Mechanic reviews/ratings
+- `POST /api/v1/mechanic-reviews/:mechanicId/review`
+- `GET /api/v1/mechanic-reviews/:mechanicId/review`
+- `POST /api/v1/mechanic-reviews/:reviewId/reply`
+- `GET /api/v1/mechanic-reviews/:reviewId/replies`
+
 ### WebSocket
 - `wss://.../api/v1/chat/ws` (connect/send/receive implemented in `ws.service` + `ChatContext` + chat screens)
 
-## 2) Partially integrated (endpoint/service exists, but UI flow is incomplete or not wired)
+### Marketplace (car owner + mechanic)
+- `GET /api/v1/marketplace/parts`
+- `GET /api/v1/marketplace/parts/:partId`
 
-### Authentication
-- `POST /api/v1/auth/verify/confirm-contact`
-  - Endpoint exists in backend list; currently OTP flow reuses `/auth/verify-otp` for confirm-contact.
+### Order/cart system (car owner + mechanic)
+- `GET /api/v1/marketplace/cart`
+- `POST /api/v1/marketplace/cart/items`
+- `PATCH /api/v1/marketplace/cart/items/:itemId`
+- `DELETE /api/v1/marketplace/cart/items/:itemId`
+- `DELETE /api/v1/marketplace/cart/clear`
+- `POST /api/v1/marketplace/orders/checkout`
+- `GET /api/v1/marketplace/orders`
+- `GET /api/v1/marketplace/orders/:orderId`
+- `PATCH /api/v1/marketplace/orders/:orderId/items/:itemId/confirm`
+- `PATCH /api/v1/marketplace/orders/:orderId/items/:itemId/received`
 
-### Chat
-- `POST /api/v1/chat/conversations/create`
-  - Implemented in `chat.service` + `ChatContext.startNewConversation`, but no active screen flow currently calls it.
-- `GET /api/v1/chat/conversations`
-  - Implemented and used in `shared/ConversationsScreen`, but that screen is not wired into navigation stacks.
+### Spare parts seller (store setup)
+- `GET /api/v1/marketplace/seller/store/me`
+- `POST /api/v1/marketplace/seller/store`
+- `PATCH /api/v1/marketplace/seller/store`
+- `POST /api/v1/marketplace/seller/store/banner`
+- `POST /api/v1/marketplace/seller/store/logo`
 
-### Mechanic profile/settings
-- `DELETE /api/v1/me/mechanic/bank/:bankId/delete`
-  - Service exists (`deleteMechanicBank`), no UI action calls it.
-- `POST /api/v1/me/mechanic/bank/:bankId/primary`
-  - Service exists (`setPrimaryMechanicBank`), no UI action calls it.
-- `DELETE /api/v1/me/mechanic/address/:addressId`
-  - Endpoint in backend list; delete action not wired in UI yet.
-- `POST /api/v1/me/mechanic/address/:addressId/primary`
-  - Endpoint in backend list; primary toggle currently stored locally and sent on save, but no dedicated call.
-- `POST /api/v1/me/mechanic/online-status`
-  - Not wired into UI toggle yet.
+### Spare parts seller (products)
+- `POST /api/v1/marketplace/seller/parts`
+- `GET /api/v1/marketplace/seller/parts/me`
+- `PATCH /api/v1/marketplace/seller/parts/:partId`
+- `DELETE /api/v1/marketplace/seller/parts/:partId`
+- `DELETE /api/v1/marketplace/seller/parts/:partId/images?public_id=...`
+- `POST /api/v1/marketplace/seller/parts/:partId/images`
 
-### Wallet
-- `POST /api/v1/wallets/request`
-  - Withdrawal UI not wired.
-- `GET /api/v1/wallets/withdrawals`
-  - Withdrawal history UI not wired.
+### Spare parts seller (orders)
+- `GET /api/v1/marketplace/seller/orders`
 
-## 3) Not added yet, but there is an existing screen it can be integrated into
 
-### Authentication
-- `GET /api/v1/auth/users/contact-status`
-  - Can be integrated into profile settings (missing-contact banner/CTA).
-- `POST /api/v1/auth/users/delete`
-  - Can be integrated into profile settings (Delete account action).
+## ?? Request body uncertain (needs backend confirmation)
+- `POST /api/v1/marketplace/seller/parts`
+  - Form-data fields beyond `name`, `description`, `price` are assumed (`stock_quantity`, `category`, `condition`).
+- `POST /api/v1/marketplace/orders/checkout`
+  - Payload fields are based on current API notes; confirm required/optional fields and keys.
 
-### Mechanic reviews/ratings
-- `POST /api/v1/mechanic-reviews/:mechanicId/review`
-  - Can be integrated into `RateMechanicScreen` (currently local submit only).
-- `GET /api/v1/mechanic-reviews/:mechanicId/review`
-  - Can be integrated into `MechanicDetailsScreen` / `MechanicReviewsScreen` (currently reading reviews from job payload).
-- `POST /api/v1/mechanic-reviews/:reviewId/reply`
-  - No UI in mechanic or car owner flows yet.
-- `GET /api/v1/mechanic-reviews/:reviewId/replies`
-  - No UI in mechanic or car owner flows yet.
+---
+
+## 2) Service exists but UI not wired (or partially wired)
+
+### Marketplace orders (car owner + mechanic)
+- `PATCH /api/v1/marketplace/orders/:orderId/cancel`
+
+---
+
+## 3) UI exists but still mocked (no service wired)
+
+---
+
+## 4) Endpoint known, no service or UI yet
 
 ### Admin collection
 - `POST /api/v1/admin/auth/login`
@@ -136,47 +182,12 @@ Updated on 2026-02-27.
 - `PATCH /api/v1/admin/users/:userId/status`
 - `GET /api/v1/admin/users/:userId`
 - `DELETE /api/v1/admin/users/:userId`
-  - Admin screens exist only as placeholders; none of the endpoints above are wired into UI.
 
-### Car owner profile/settings
-- `POST /api/v1/me/car-owner/bank`
-- `POST /api/v1/me/car-owner/bank/verify`
-- `DELETE /api/v1/me/car-owner/bank/:bankId/delete`
-- `POST /api/v1/me/car-owner/bank/:bankId/primary`
-  - No car-owner bank UI wired yet.
-
-## 4) Not added and no screen currently available to integrate into
-
-### Spare parts marketplace
-- `POST /api/v1/marketplace/seller/store`
-- `PATCH /api/v1/marketplace/seller/store`
-- `GET /api/v1/marketplace/seller/store/me`
-- `POST /api/v1/marketplace/seller/store/logo`
-- `POST /api/v1/marketplace/seller/store/banner`
+### Spare parts marketplace (public)
 - `GET /api/v1/marketplace/stores/:storeId`
-- `GET /api/v1/marketplace/parts`
-- `POST /api/v1/marketplace/seller/parts`
-- `GET /api/v1/marketplace/parts/:partId`
-- `GET /api/v1/marketplace/seller/parts/me`
-- `DELETE /api/v1/marketplace/seller/parts/:partId`
-- `PATCH /api/v1/marketplace/seller/parts/:partId`
-- `DELETE /api/v1/marketplace/seller/parts/:partId/images?public_id=...`
-- `POST /api/v1/marketplace/seller/parts/:partId/images`
 
-### Order/cart system
-- `GET /api/v1/marketplace/cart`
-- `POST /api/v1/marketplace/cart/items`
-- `PATCH /api/v1/marketplace/cart/items/:itemId`
-- `DELETE /api/v1/marketplace/cart/items/:itemId`
-- `DELETE /api/v1/marketplace/cart/clear`
-- `POST /api/v1/marketplace/orders/checkout`
-- `PATCH /api/v1/marketplace/orders/:orderId/cancel`
-- `GET /api/v1/marketplace/orders`
-- `GET /api/v1/marketplace/orders/:orderId`
-- `PATCH /api/v1/marketplace/orders/:orderId/items/:itemId/confirm`
-- `GET /api/v1/marketplace/seller/orders`
-- `PATCH /api/v1/marketplace/orders/:orderId/items/:itemId/received`
+---
 
 ## Notes
-- Spare parts seller address endpoints are **assumed** as `/api/v1/me/spare-parts/address` (see `src/config/endpoints.js`). Confirm with backend if a different path is expected.
-- App also contains a Google auth endpoint not in this list.
+- App contains a Google auth endpoint (`POST /api/v1/auth/google`) that is assumed and may not exist on backend.
+- Bank details are read from `/api/v1/auth/me` (no dedicated GET bank endpoint documented).
