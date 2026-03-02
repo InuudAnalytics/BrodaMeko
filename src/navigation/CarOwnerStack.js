@@ -40,6 +40,7 @@ import CheckoutScreen from '../screens/carowner/marketplace/CheckoutScreen';
 import MarketplacePaymentSuccessScreen from '../screens/carowner/marketplace/PaymentSuccessScreen';
 import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
 import OrderTrackingScreen from '../screens/carowner/marketplace/OrderTrackingScreen';
+import RateProductScreen from '../screens/carowner/marketplace/RateProductScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -90,6 +91,7 @@ const CarOwnerStack = () => {
         component={OrderTrackingScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="RateProduct" component={RateProductScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REWARDS}
         component={CarOwnerRewardsScreen}
