@@ -1,10 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, Delete02Icon, Location01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
-import { addMechanicAddress, getMechanicAddresses, updateMechanicAddress } from '../../../services/mechanic.service';
+import {
+  addMechanicAddress,
+  deleteMechanicAddress,
+  getMechanicAddresses,
+  setPrimaryMechanicAddress,
+  updateMechanicAddress,
+} from '../../../services/mechanic.service';
 import { darkTheme } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
 
@@ -64,7 +70,9 @@ const MechanicAddressScreen = ({ navigation, route }) => {
   const [rows, setRows] = useState([buildEmptyAddress()]);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState('');
+  const [actionId, setActionId] = useState('');
   const [globalError, setGlobalError] = useState('');
+  const [showForm, setShowForm] = useState(isOnboarding);
 
   useEffect(() => {
     if (!isOnboarding) {
@@ -100,11 +108,17 @@ const MechanicAddressScreen = ({ navigation, route }) => {
         error: '',
       }));
 
-      setRows(mapped.length ? mapped : [buildEmptyAddress()]);
+      if (mapped.length) {
+        setRows(mapped);
+      } else {
+        setRows(isOnboarding ? [buildEmptyAddress()] : []);
+      }
+      setShowForm(isOnboarding);
       setAddresses(mapped);
     } catch (error) {
       setGlobalError(error?.message || 'Unable to fetch addresses.');
-      setRows([buildEmptyAddress()]);
+      setRows(isOnboarding ? [buildEmptyAddress()] : []);
+      setShowForm(isOnboarding);
     } finally {
       setLoading(false);
     }
@@ -127,6 +141,23 @@ const MechanicAddressScreen = ({ navigation, route }) => {
         isPrimary: row.id === rowId,
       }))
     );
+  };
+
+  const handleSetPrimary = async (row) => {
+    if (!row?.id || actionId) {
+      return;
+    }
+
+    setActionId(row.id);
+    setGlobalError('');
+    try {
+      await setPrimaryMechanicAddress(row.id);
+      togglePrimary(row.id);
+    } catch (error) {
+      setGlobalError(error?.message || 'Unable to set primary address.');
+    } finally {
+      setActionId('');
+    }
   };
 
   const validateRow = (row) => {
@@ -171,6 +202,9 @@ const MechanicAddressScreen = ({ navigation, route }) => {
       if (row.isExisting) {
         await updateMechanicAddress(row.id, payload);
         updateRow(row.id, { isEditing: false });
+        if (!isOnboarding) {
+          setShowForm(false);
+        }
         return true;
       }
 
@@ -183,6 +217,9 @@ const MechanicAddressScreen = ({ navigation, route }) => {
       } else {
         await fetchAddresses();
       }
+      if (!isOnboarding) {
+        setShowForm(false);
+      }
       return true;
     } catch (error) {
       updateRow(row.id, { error: error?.message || 'Unable to save address.' });
@@ -194,6 +231,41 @@ const MechanicAddressScreen = ({ navigation, route }) => {
 
   const handleAddAnother = () => {
     setRows((prev) => [...prev, buildEmptyAddress()]);
+    setShowForm(true);
+  };
+
+  const handleAddFirst = () => {
+    if (rows.length === 0) {
+      setRows([buildEmptyAddress()]);
+    }
+    setShowForm(true);
+  };
+
+  const handleDeleteRow = (row) => {
+    if (!row?.isExisting) {
+      setRows((prev) => prev.filter((item) => item.id !== row.id));
+      return;
+    }
+
+    Alert.alert('Delete address?', 'This address will be removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setActionId(row.id);
+          setGlobalError('');
+          try {
+            await deleteMechanicAddress(row.id);
+            setRows((prev) => prev.filter((item) => item.id !== row.id));
+          } catch (error) {
+            setGlobalError(error?.message || 'Unable to delete address.');
+          } finally {
+            setActionId('');
+          }
+        },
+      },
+    ]);
   };
 
   const handleFinish = async () => {
@@ -261,141 +333,215 @@ const MechanicAddressScreen = ({ navigation, route }) => {
 
           {globalError ? <AppText style={styles.errorText}>{globalError}</AppText> : null}
 
-          <View style={styles.list}>
-            {rows.map((row, index) => {
-              const readOnly = row.isExisting && !row.isEditing;
-              const isSaving = savingId === row.id;
-              return (
-                <View key={`${row.id}-${index}`} style={styles.card}>
-                  <AppText style={styles.sectionLabel}>Address type</AppText>
-                  <View style={styles.typeRow}>
-                    {['home', 'shop'].map((type) => {
-                      const active = row.addressType === type;
-                      return (
+          {!isOnboarding && !rows.length && !loading && !showForm ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <HugeiconsIcon icon={Location01Icon} size={28} color={darkTheme.colors.accent} strokeWidth={2} />
+              </View>
+              <AppText style={styles.emptyTitle}>No addresses added yet</AppText>
+              <AppText variant="muted" style={styles.emptySubtitle}>
+                Add your workshop or home address to appear in searches.
+              </AppText>
+              <AppButton label="Add address" onPress={handleAddFirst} style={styles.emptyButton} />
+            </View>
+          ) : null}
+
+          {rows.length ? (
+            <View style={styles.list}>
+              {rows.map((row, index) => {
+                const readOnly = row.isExisting && !row.isEditing;
+                const isSaving = savingId === row.id;
+                const showFormCard = isOnboarding || showForm || row.isEditing || !row.isExisting;
+                const isPrimary = Boolean(row.isPrimary);
+
+                if (!showFormCard && row.isExisting) {
+                  return (
+                    <View key={`${row.id}-${index}`} style={styles.summaryCard}>
+                      <View style={styles.summaryHeader}>
+                        <View>
+                          <AppText style={styles.summaryTitle}>
+                            {row.label || 'Address'}
+                          </AppText>
+                          <AppText variant="muted" style={styles.summarySubtitle} numberOfLines={2}>
+                            {row.street}, {row.city}, {row.state}, {row.country}
+                          </AppText>
+                        </View>
                         <TouchableOpacity
-                          key={type}
+                          onPress={() => handleDeleteRow(row)}
                           activeOpacity={0.85}
-                          style={[styles.typeChip, active ? styles.typeChipActive : null]}
-                          onPress={() => updateRow(row.id, { addressType: type })}
-                          disabled={readOnly}
+                          disabled={actionId === row.id}
+                          style={styles.deleteBtn}
                         >
-                          <AppText style={[styles.typeText, active ? styles.typeTextActive : null]}>
-                            {type === 'home' ? 'Home' : 'Shop'}
+                          <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={styles.summaryFooter}>
+                        <TouchableOpacity
+                          style={styles.primaryRow}
+                          activeOpacity={0.85}
+                          onPress={() => handleSetPrimary(row)}
+                          disabled={isPrimary || actionId === row.id}
+                        >
+                          <View style={[styles.primaryBox, isPrimary ? styles.primaryBoxActive : null]}>
+                            {isPrimary ? (
+                              <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                            ) : null}
+                          </View>
+                          <AppText style={styles.primaryText}>
+                            {isPrimary ? 'Primary address' : 'Set as primary'}
                           </AppText>
                         </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                      </View>
+                    </View>
+                  );
+                }
 
-                  <AppInput
-                    label="Label"
-                    value={row.label}
-                    onChangeText={(value) => updateRow(row.id, { label: value })}
-                    placeholder="Main workshop"
-                    editable={!readOnly}
-                  />
-                  <AppInput
-                    label="Street"
-                    value={row.street}
-                    onChangeText={(value) => updateRow(row.id, { street: value })}
-                    placeholder="Street address"
-                    editable={!readOnly}
-                  />
-                  <View style={styles.rowInputs}>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="City"
-                        value={row.city}
-                        onChangeText={(value) => updateRow(row.id, { city: value })}
-                        placeholder="City"
-                        editable={!readOnly}
-                      />
+                return (
+                  <View key={`${row.id}-${index}`} style={styles.card}>
+                    <AppText style={styles.sectionLabel}>Address type</AppText>
+                    <View style={styles.typeRow}>
+                      {['home', 'shop'].map((type) => {
+                        const active = row.addressType === type;
+                        return (
+                          <TouchableOpacity
+                            key={type}
+                            activeOpacity={0.85}
+                            style={[styles.typeChip, active ? styles.typeChipActive : null]}
+                            onPress={() => updateRow(row.id, { addressType: type })}
+                            disabled={readOnly}
+                          >
+                            <AppText style={[styles.typeText, active ? styles.typeTextActive : null]}>
+                              {type === 'home' ? 'Home' : 'Shop'}
+                            </AppText>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="State"
-                        value={row.state}
-                        onChangeText={(value) => updateRow(row.id, { state: value })}
-                        placeholder="State"
-                        editable={!readOnly}
-                      />
-                    </View>
-                  </View>
-                  <AppInput
-                    label="Country"
-                    value={row.country}
-                    onChangeText={(value) => updateRow(row.id, { country: value })}
-                    placeholder="Country"
-                    editable={!readOnly}
-                  />
-                  <View style={styles.rowInputs}>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="Latitude"
-                        value={row.latitude}
-                        onChangeText={(value) => updateRow(row.id, { latitude: toDigits(value) })}
-                        placeholder="0.00"
-                        keyboardType="decimal-pad"
-                        editable={!readOnly}
-                      />
-                    </View>
-                    <View style={styles.rowInputItem}>
-                      <AppInput
-                        label="Longitude"
-                        value={row.longitude}
-                        onChangeText={(value) => updateRow(row.id, { longitude: toDigits(value) })}
-                        placeholder="0.00"
-                        keyboardType="decimal-pad"
-                        editable={!readOnly}
-                      />
-                    </View>
-                  </View>
 
-                  <TouchableOpacity
-                    style={styles.primaryRow}
-                    activeOpacity={0.85}
-                    onPress={() => togglePrimary(row.id)}
-                    disabled={readOnly}
-                  >
-                    <View style={[styles.primaryBox, row.isPrimary ? styles.primaryBoxActive : null]}>
-                      {row.isPrimary ? (
-                        <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                    <AppInput
+                      label="Label"
+                      value={row.label}
+                      onChangeText={(value) => updateRow(row.id, { label: value })}
+                      placeholder="Main workshop"
+                      editable={!readOnly}
+                    />
+                    <AppInput
+                      label="Street"
+                      value={row.street}
+                      onChangeText={(value) => updateRow(row.id, { street: value })}
+                      placeholder="Street address"
+                      editable={!readOnly}
+                    />
+                    <View style={styles.rowInputs}>
+                      <View style={styles.rowInputItem}>
+                        <AppInput
+                          label="City"
+                          value={row.city}
+                          onChangeText={(value) => updateRow(row.id, { city: value })}
+                          placeholder="City"
+                          editable={!readOnly}
+                        />
+                      </View>
+                      <View style={styles.rowInputItem}>
+                        <AppInput
+                          label="State"
+                          value={row.state}
+                          onChangeText={(value) => updateRow(row.id, { state: value })}
+                          placeholder="State"
+                          editable={!readOnly}
+                        />
+                      </View>
+                    </View>
+                    <AppInput
+                      label="Country"
+                      value={row.country}
+                      onChangeText={(value) => updateRow(row.id, { country: value })}
+                      placeholder="Country"
+                      editable={!readOnly}
+                    />
+                    <View style={styles.rowInputs}>
+                      <View style={styles.rowInputItem}>
+                        <AppInput
+                          label="Latitude"
+                          value={row.latitude}
+                          onChangeText={(value) => updateRow(row.id, { latitude: toDigits(value) })}
+                          placeholder="0.00"
+                          keyboardType="decimal-pad"
+                          editable={!readOnly}
+                        />
+                      </View>
+                      <View style={styles.rowInputItem}>
+                        <AppInput
+                          label="Longitude"
+                          value={row.longitude}
+                          onChangeText={(value) => updateRow(row.id, { longitude: toDigits(value) })}
+                          placeholder="0.00"
+                          keyboardType="decimal-pad"
+                          editable={!readOnly}
+                        />
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.primaryRow}
+                      activeOpacity={0.85}
+                      onPress={() => togglePrimary(row.id)}
+                      disabled={readOnly}
+                    >
+                      <View style={[styles.primaryBox, row.isPrimary ? styles.primaryBoxActive : null]}>
+                        {row.isPrimary ? (
+                          <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                        ) : null}
+                      </View>
+                      <AppText style={styles.primaryText}>Set as primary address</AppText>
+                    </TouchableOpacity>
+
+                    <View style={styles.actionRow}>
+                      <AppButton
+                        label={isSaving ? 'Saving...' : row.isExisting ? (row.isEditing ? 'Save' : 'Edit') : 'Save'}
+                        onPress={() => {
+                          if (row.isExisting && !row.isEditing) {
+                            updateRow(row.id, { isEditing: true });
+                            return;
+                          }
+                          persistRow(row);
+                        }}
+                        disabled={isSaving}
+                        style={styles.actionBtn}
+                      />
+                      {!isOnboarding ? (
+                        <TouchableOpacity
+                          style={styles.inlineDelete}
+                          activeOpacity={0.85}
+                          onPress={() => handleDeleteRow(row)}
+                        >
+                          <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
+                        </TouchableOpacity>
                       ) : null}
                     </View>
-                    <AppText style={styles.primaryText}>Set as primary address</AppText>
-                  </TouchableOpacity>
 
-                  <View style={styles.actionRow}>
-                    <AppButton
-                      label={isSaving ? 'Saving...' : row.isExisting ? (row.isEditing ? 'Save' : 'Edit') : 'Save'}
-                      onPress={() => {
-                        if (row.isExisting && !row.isEditing) {
-                          updateRow(row.id, { isEditing: true });
-                          return;
-                        }
-                        persistRow(row);
-                      }}
-                      disabled={isSaving}
-                      style={styles.actionBtn}
-                    />
+                    {row.error ? <AppText style={styles.errorText}>{row.error}</AppText> : null}
                   </View>
+                );
+              })}
+            </View>
+          ) : null}
 
-                  {row.error ? <AppText style={styles.errorText}>{row.error}</AppText> : null}
-                </View>
-              );
-            })}
-          </View>
+          {!isOnboarding ? (
+            <TouchableOpacity style={styles.addMoreBtn} activeOpacity={0.85} onPress={handleAddAnother}>
+              <AppText style={styles.addMoreText}>Add address</AppText>
+            </TouchableOpacity>
+          ) : null}
 
-          <TouchableOpacity style={styles.addMoreBtn} activeOpacity={0.85} onPress={handleAddAnother}>
-            <AppText style={styles.addMoreText}>Add another address</AppText>
-          </TouchableOpacity>
-
-          <AppButton
-            label={isOnboarding ? 'Continue' : 'Save'}
-            onPress={handleFinish}
-            style={styles.finishBtn}
-            disabled={Boolean(savingId)}
-          />
+          {isOnboarding ? (
+            <AppButton
+              label="Continue"
+              onPress={handleFinish}
+              style={styles.finishBtn}
+              disabled={Boolean(savingId)}
+            />
+          ) : null}
         </ScrollView>
       </View>
     </ScreenContainer>
@@ -468,12 +614,73 @@ const styles = StyleSheet.create({
   list: {
     rowGap: 12,
   },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  emptyTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    maxWidth: 240,
+  },
+  emptyButton: {
+    marginTop: 14,
+    minWidth: 160,
+  },
   card: {
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.06)',
     padding: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
+  },
+  summaryCard: {
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    columnGap: 12,
+  },
+  summaryTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 14,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  summarySubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+    maxWidth: 240,
+  },
+  summaryFooter: {
+    marginTop: 12,
+  },
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(248,113,113,0.12)',
   },
   sectionLabel: {
     color: 'rgba(255,255,255,0.6)',
@@ -537,9 +744,22 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
   },
   actionBtn: {
     minHeight: 42,
+    flex: 1,
+  },
+  inlineDelete: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.4)',
   },
   addMoreBtn: {
     marginTop: 12,

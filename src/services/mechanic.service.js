@@ -155,6 +155,18 @@ export const updateMechanicAddress = async (addressId, payload) => {
   return response.data;
 };
 
+export const deleteMechanicAddress = async (addressId) => {
+  const safeAddressId = toId(addressId, 'addressId');
+  const response = await api.delete(ENDPOINTS.me.mechanic.addressDelete(safeAddressId));
+  return response.data;
+};
+
+export const setPrimaryMechanicAddress = async (addressId) => {
+  const safeAddressId = toId(addressId, 'addressId');
+  const response = await api.post(ENDPOINTS.me.mechanic.addressSetPrimary(safeAddressId), {});
+  return response.data;
+};
+
 export const addMechanicBank = async ({ account_name, account_number, bank_code, bank_name }) => {
   const response = await api.post(ENDPOINTS.me.mechanic.bankAdd, {
     account_name: String(account_name || '').trim(),
@@ -190,6 +202,13 @@ export const getMechanicBankList = async () => {
   return response.data;
 };
 
+export const setMechanicOnlineStatus = async (isOnline) => {
+  const response = await api.post(ENDPOINTS.me.mechanic.onlineStatus, {
+    is_online: Boolean(isOnline),
+  });
+  return response.data;
+};
+
 export default {
   ISSUE_TYPES,
   addMechanicService,
@@ -199,9 +218,12 @@ export default {
   getMechanicAddresses,
   addMechanicAddress,
   updateMechanicAddress,
+  deleteMechanicAddress,
+  setPrimaryMechanicAddress,
   addMechanicBank,
   verifyMechanicBank,
   deleteMechanicBank,
   setPrimaryMechanicBank,
   getMechanicBankList,
+  setMechanicOnlineStatus,
 };
