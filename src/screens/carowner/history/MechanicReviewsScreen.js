@@ -1,12 +1,14 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { StarIcon } from '@hugeicons/core-free-icons';
-import { AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
+import { useAuth } from '../../../context';
 import { getCarOwnerJob, getMechanicJobStats } from '../../../services/jobs.service';
-import { getMechanicReviews } from '../../../services/mechanic-reviews.service';
+import { getMechanicReviews, getReviewReplies, replyToMechanicReview } from '../../../services/mechanic-reviews.service';
 import { darkTheme } from '../../../theme';
+import { ROLES } from '../../../utils';
 
 const FALLBACK_AVATAR = 'https://i.pravatar.cc/160?img=47';
 const FALLBACK_NAME = 'Toluwalase Daniel';
@@ -80,6 +82,8 @@ const toMechanicId = (job, route) =>
 
 const normalizeReview = (item, fallbackAvatar) => {
   return {
+    id: String(item?.id || item?._id || '').trim(),
+    rating: toNumber(item?.rating || item?.stars, 0),
     author:
       String(item?.author_name || item?.name || item?.user?.name || FALLBACK_REVIEW.author).trim() ||
       FALLBACK_REVIEW.author,
@@ -90,10 +94,12 @@ const normalizeReview = (item, fallbackAvatar) => {
     avatar:
       String(item?.author_avatar || item?.user?.avatar || fallbackAvatar || FALLBACK_AVATAR).trim() ||
       FALLBACK_AVATAR,
+    repliesCount: toNumber(item?.replies_count || item?.repliesCount || item?.reply_count || 0),
   };
 };
 
 const MechanicReviewsScreen = ({ route }) => {
+  const { role } = useAuth();
   const jobId = String(route?.params?.jobId || '').trim();
   const preview = route?.params?.preview || {};
   const [job, setJob] = useState(null);
@@ -101,6 +107,10 @@ const MechanicReviewsScreen = ({ route }) => {
   const [statsPayload, setStatsPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedReplies, setExpandedReplies] = useState({});
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replyLoading, setReplyLoading] = useState({});
+  const [replyError, setReplyError] = useState({});
 
   const loadDetails = useCallback(async () => {
     if (!jobId) {
@@ -201,6 +211,66 @@ const MechanicReviewsScreen = ({ route }) => {
     };
   }, [job, preview, reviewsPayload, statsPayload]);
 
+  const handleToggleReplies = async (reviewId) => {
+    if (!reviewId) {
+      return;
+    }
+
+    setExpandedReplies((prev) => ({
+      ...prev,
+      [reviewId]: prev[reviewId] ? null : { loading: true, list: [] },
+    }));
+
+    try {
+      const response = await getReviewReplies(reviewId);
+      const payload = response?.data || response || {};
+      const list = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.replies)
+          ? payload.replies
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : [];
+      setExpandedReplies((prev) => ({
+        ...prev,
+        [reviewId]: { loading: false, list },
+      }));
+    } catch (loadError) {
+      setExpandedReplies((prev) => ({
+        ...prev,
+        [reviewId]: { loading: false, list: [] },
+      }));
+      setReplyError((prev) => ({
+        ...prev,
+        [reviewId]: loadError?.message || 'Could not load replies.',
+      }));
+    }
+  };
+
+  const handleSubmitReply = async (reviewId) => {
+    const draft = String(replyDrafts[reviewId] || '').trim();
+    if (!reviewId || !draft) {
+      setReplyError((prev) => ({ ...prev, [reviewId]: 'Reply cannot be empty.' }));
+      return;
+    }
+
+    setReplyLoading((prev) => ({ ...prev, [reviewId]: true }));
+    setReplyError((prev) => ({ ...prev, [reviewId]: '' }));
+
+    try {
+      await replyToMechanicReview(reviewId, { body: draft });
+      setReplyDrafts((prev) => ({ ...prev, [reviewId]: '' }));
+      await handleToggleReplies(reviewId);
+    } catch (submitError) {
+      setReplyError((prev) => ({
+        ...prev,
+        [reviewId]: submitError?.message || 'Could not submit reply.',
+      }));
+    } finally {
+      setReplyLoading((prev) => ({ ...prev, [reviewId]: false }));
+    }
+  };
+
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -233,7 +303,11 @@ const MechanicReviewsScreen = ({ route }) => {
             </View>
 
             <View style={styles.reviewsWrap}>
-              {viewModel.reviews.map((review, index) => (
+              {viewModel.reviews.map((review, index) => {
+                const repliesState = expandedReplies[review.id];
+                const replies = repliesState?.list || [];
+                const isExpanded = Boolean(repliesState);
+                return (
                 <View key={`${review.author}-${review.date}-${index}`} style={styles.reviewItem}>
                   <View style={styles.reviewHead}>
                     <Image source={{ uri: review.avatar }} style={styles.reviewAvatar} />
@@ -243,8 +317,63 @@ const MechanicReviewsScreen = ({ route }) => {
                     </View>
                   </View>
                   <AppText style={styles.reviewText}>{review.text}</AppText>
+                  <View style={styles.reviewActions}>
+                    <TouchableOpacity
+                      style={styles.replyToggle}
+                      onPress={() => handleToggleReplies(review.id)}
+                      activeOpacity={0.85}
+                    >
+                      <AppText style={styles.replyToggleText}>
+                        {isExpanded ? 'Hide replies' : `View replies (${review.repliesCount || replies.length || 0})`}
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+
+                  {isExpanded ? (
+                    <View style={styles.repliesWrap}>
+                      {repliesState?.loading ? (
+                        <ActivityIndicator size="small" color="#D2ED24" />
+                      ) : replies.length ? (
+                        replies.map((reply, replyIndex) => (
+                          <View key={`${review.id}-${replyIndex}`} style={styles.replyItem}>
+                            <AppText style={styles.replyAuthor}>
+                              {String(reply?.author_name || reply?.user?.name || 'User')}
+                            </AppText>
+                            <AppText style={styles.replyText}>
+                              {String(reply?.body || reply?.comment || '').trim()}
+                            </AppText>
+                          </View>
+                        ))
+                      ) : (
+                        <AppText style={styles.replyEmpty}>No replies yet.</AppText>
+                      )}
+                    </View>
+                  ) : null}
+
+                  {role === ROLES.MECH ? (
+                    <View style={styles.replyBox}>
+                      <LiftableTextInput
+                        value={replyDrafts[review.id] || ''}
+                        onChangeText={(value) =>
+                          setReplyDrafts((prev) => ({ ...prev, [review.id]: value }))
+                        }
+                        placeholder="Write a reply..."
+                        placeholderTextColor="rgba(255,255,255,0.36)"
+                        style={styles.replyInput}
+                      />
+                      {replyError[review.id] ? (
+                        <AppText style={styles.replyError}>{replyError[review.id]}</AppText>
+                      ) : null}
+                      <AppButton
+                        label={replyLoading[review.id] ? 'Replying...' : 'Reply'}
+                        onPress={() => handleSubmitReply(review.id)}
+                        disabled={replyLoading[review.id]}
+                        style={styles.replyButton}
+                      />
+                    </View>
+                  ) : null}
                 </View>
-              ))}
+              )})}
             </View>
           </View>
         ) : null}
@@ -325,6 +454,9 @@ const styles = StyleSheet.create({
   },
   reviewItem: {
     rowGap: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    padding: 14,
   },
   reviewHead: {
     flexDirection: 'row',
@@ -355,6 +487,62 @@ const styles = StyleSheet.create({
     color: '#C6CAE8',
     fontSize: 15,
     lineHeight: 20,
+  },
+  reviewActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyToggle: {
+    paddingVertical: 4,
+  },
+  replyToggleText: {
+    color: '#E6C714',
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  repliesWrap: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 10,
+    rowGap: 8,
+  },
+  replyItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingBottom: 6,
+  },
+  replyAuthor: {
+    color: '#F5F5F5',
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  replyText: {
+    color: 'rgba(245,245,245,0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  replyEmpty: {
+    color: 'rgba(245,245,245,0.6)',
+    fontSize: 12,
+  },
+  replyBox: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    padding: 10,
+  },
+  replyInput: {
+    minHeight: 60,
+    color: '#FFFFFF',
+  },
+  replyButton: {
+    marginTop: 8,
+  },
+  replyError: {
+    color: '#F87171',
+    fontSize: 11,
+    marginTop: 6,
   },
 });
 

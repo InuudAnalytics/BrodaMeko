@@ -40,7 +40,46 @@ export const getMechanicReviews = async (mechanicId) => {
   return response.data;
 };
 
+export const replyToMechanicReview = async (reviewId, { body } = {}) => {
+  const safeReviewId = String(reviewId || '').trim();
+  const safeBody = String(body || '').trim();
+
+  if (!safeReviewId) {
+    const error = new Error('reviewId is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  if (!safeBody) {
+    const error = new Error('reply body is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.post(ENDPOINTS.mechanicReviews.reply(safeReviewId), {
+    body: safeBody,
+  });
+  return response.data;
+};
+
+export const getReviewReplies = async (reviewId) => {
+  const safeReviewId = String(reviewId || '').trim();
+  if (!safeReviewId) {
+    const error = new Error('reviewId is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.get(ENDPOINTS.mechanicReviews.replies(safeReviewId));
+  return response.data;
+};
+
 export default {
   leaveMechanicReview,
   getMechanicReviews,
+  replyToMechanicReview,
+  getReviewReplies,
 };
