@@ -33,6 +33,13 @@ import SupportScreen from '../screens/shared/SupportScreen';
 import SupportChatMockScreen from '../screens/shared/SupportChatMockScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
+import MarketplaceScreen from '../screens/carowner/marketplace/MarketplaceScreen';
+import ProductDetailsScreen from '../screens/carowner/marketplace/ProductDetailsScreen';
+import CartScreen from '../screens/carowner/marketplace/CartScreen';
+import CheckoutScreen from '../screens/carowner/marketplace/CheckoutScreen';
+import MarketplacePaymentSuccessScreen from '../screens/carowner/marketplace/PaymentSuccessScreen';
+import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
+import OrderTrackingScreen from '../screens/carowner/marketplace/OrderTrackingScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -65,9 +72,23 @@ const CarOwnerStack = () => {
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_MARKETPLACE}
-        component={PlaceholderScreen}
+        component={MarketplaceScreen}
         options={{ headerShown: false }}
-        initialParams={{ title: 'Market' }}
+      />
+      <Stack.Screen name="Favorites" component={FavoritesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="PaymentSuccessScreen"
+        component={MarketplacePaymentSuccessScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="SparePartsOrderTrackingScreen"
+        component={OrderTrackingScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REWARDS}
