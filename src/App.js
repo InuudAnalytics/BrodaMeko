@@ -1,6 +1,8 @@
 import { StatusBar } from 'react-native';
 import {
   AuthProvider,
+  CartProvider,
+  FavoritesProvider,
   ChatProvider,
   JobsProvider,
   MechanicProfileProvider,
@@ -21,10 +23,14 @@ export default function App() {
             <MechanicProfileProvider>
               <SparePartsProfileProvider>
                 <SellerStoreProvider>
-                  <MechanicServicesProvider>
-                    <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
-                    <RootNavigator />
-                  </MechanicServicesProvider>
+                  <FavoritesProvider>
+                    <CartProvider>
+                      <MechanicServicesProvider>
+                        <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
+                        <RootNavigator />
+                      </MechanicServicesProvider>
+                    </CartProvider>
+                  </FavoritesProvider>
                 </SellerStoreProvider>
               </SparePartsProfileProvider>
             </MechanicProfileProvider>
