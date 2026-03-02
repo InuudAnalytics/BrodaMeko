@@ -28,6 +28,15 @@ import { useAuth, useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
+import MarketplaceScreen from '../screens/mech/marketplace/MarketplaceScreen';
+import ProductDetailsScreen from '../screens/mech/marketplace/ProductDetailsScreen';
+import CartScreen from '../screens/mech/marketplace/CartScreen';
+import CheckoutScreen from '../screens/mech/marketplace/CheckoutScreen';
+import MarketplacePaymentSuccessScreen from '../screens/mech/marketplace/PaymentSuccessScreen';
+import OrderTrackingScreen from '../screens/mech/marketplace/OrderTrackingScreen';
+import RateProductScreen from '../screens/mech/marketplace/RateProductScreen';
+import OrderDeliveredSuccessScreen from '../screens/mech/marketplace/OrderDeliveredSuccessScreen';
+import ProductFeedbackSuccessScreen from '../screens/mech/marketplace/ProductFeedbackSuccessScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -108,6 +117,32 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MechanicMarketplace" component={MarketplaceScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="PaymentSuccessScreen"
+        component={MarketplacePaymentSuccessScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="SparePartsOrderTrackingScreen"
+        component={OrderTrackingScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen name="RateProduct" component={RateProductScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="OrderDeliveredSuccess"
+        component={OrderDeliveredSuccessScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ProductFeedbackSuccess"
+        component={ProductFeedbackSuccessScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name={ROUTES.CHANGE_PASSWORD}
         component={ChangePasswordScreen}

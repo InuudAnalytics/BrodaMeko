@@ -41,6 +41,8 @@ import MarketplacePaymentSuccessScreen from '../screens/carowner/marketplace/Pay
 import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
 import OrderTrackingScreen from '../screens/carowner/marketplace/OrderTrackingScreen';
 import RateProductScreen from '../screens/carowner/marketplace/RateProductScreen';
+import OrderDeliveredSuccessScreen from '../screens/carowner/marketplace/OrderDeliveredSuccessScreen';
+import ProductFeedbackSuccessScreen from '../screens/carowner/marketplace/ProductFeedbackSuccessScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -92,6 +94,16 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="RateProduct" component={RateProductScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="OrderDeliveredSuccess"
+        component={OrderDeliveredSuccessScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ProductFeedbackSuccess"
+        component={ProductFeedbackSuccessScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REWARDS}
         component={CarOwnerRewardsScreen}

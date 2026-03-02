@@ -6,6 +6,7 @@ import MechanicTabBar from '../components/navigation/MechanicTabBar';
 import MechanicDashboardScreen from '../screens/mech/home/MechanicDashboardScreen';
 import MechanicJobsScreen from '../screens/mech/jobs/MechanicJobsScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
+import MechanicMarketplaceScreen from '../screens/mech/marketplace/MarketplaceScreen';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 
@@ -41,6 +42,10 @@ const MechanicDashboardTabs = ({ navigation, route }) => {
 
     if (activeTab === 'wallet') {
       return <MechanicWalletScreen navigation={navigation} onTabPress={setActiveTab} showTabBar={false} />;
+    }
+
+    if (activeTab === 'marketplace') {
+      return <MechanicMarketplaceScreen navigation={navigation} />;
     }
 
     return null;
