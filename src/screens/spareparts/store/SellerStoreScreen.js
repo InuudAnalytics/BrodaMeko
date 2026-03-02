@@ -14,6 +14,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useSellerStore } from '../../../context';
+import { deleteSellerPart, deleteSellerPartImage, updateSellerPart } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -29,7 +30,7 @@ const normalizeCategory = (value) => {
 };
 
 const SellerStoreScreen = ({ navigation, onBack }) => {
-  const { products, isHydrated } = useSellerStore();
+  const { products, isHydrated, loading, error, removeProduct, updateProduct } = useSellerStore();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState(CATEGORY_FILTERS[0]);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -51,6 +52,38 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
   const openEditModal = (product) => {
     setSelectedProduct(product);
     setShowEditModal(true);
+  };
+
+  const resolveImages = (product) => {
+    const raw = product?.images || product?.image_urls || product?.image || [];
+    if (typeof raw === 'string') {
+      return [{ uri: raw }];
+    }
+    if (Array.isArray(raw)) {
+      return raw.map((item) => {
+        if (typeof item === 'string') {
+          return { uri: item };
+        }
+        return {
+          uri: item?.url || item?.uri || item?.secure_url || '',
+          publicId: item?.public_id || item?.publicId || item?.id || '',
+        };
+      });
+    }
+    return [];
+  };
+
+  const handleRemoveImage = async (image) => {
+    if (!selectedProduct?.id || !image?.publicId) {
+      return;
+    }
+
+    await deleteSellerPartImage(selectedProduct.id, image.publicId);
+    const nextImages = resolveImages(selectedProduct).filter(
+      (item) => item.publicId !== image.publicId
+    );
+    updateProduct(selectedProduct.id, { images: nextImages.map((item) => item.uri) });
+    setSelectedProduct((prev) => (prev ? { ...prev, images: nextImages.map((item) => item.uri) } : prev));
   };
 
   const closeEditModal = () => {
@@ -112,13 +145,13 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
           })}
         </ScrollView>
 
-        {!isHydrated ? (
+        {loading ? (
           <View style={styles.emptyState}>
             <AppText style={styles.emptyTitle}>Loading store...</AppText>
           </View>
         ) : null}
 
-        {isHydrated && products.length === 0 ? (
+        {!loading && isHydrated && products.length === 0 ? (
           <View style={styles.emptyState}>
             <AppText style={styles.emptyTitle}>No products yet</AppText>
             <AppText variant="muted" style={styles.emptySubtitle}>
@@ -128,10 +161,10 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
           </View>
         ) : null}
 
-        {isHydrated && products.length > 0 ? (
+        {!loading && isHydrated && products.length > 0 ? (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
             {filteredProducts.map((product) => {
-              const quantity = Number(product?.quantity || 0);
+              const quantity = Number(product?.quantity ?? product?.stock_quantity ?? 0);
               const outOfStock = quantity <= 0;
               const category = normalizeCategory(product?.category || product?.type);
               const imageUri = product?.images?.[0] || '';
@@ -179,7 +212,56 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
             <AppText variant="muted" style={styles.modalSubtitle}>
               Editing is coming soon for {selectedProduct?.name || 'this product'}.
             </AppText>
-            <AppButton label="Close" onPress={closeEditModal} style={styles.modalButton} />
+
+            {selectedProduct ? (
+              <View style={styles.modalImages}>
+                <AppText style={styles.modalSectionTitle}>Product images</AppText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalImageRow}>
+                  {resolveImages(selectedProduct).map((image, index) => (
+                    <View key={`${image.uri}-${index}`} style={styles.modalImageTile}>
+                      {image.uri ? (
+                        <Image source={{ uri: image.uri }} style={styles.modalImage} />
+                      ) : (
+                        <View style={styles.modalImageFallback} />
+                      )}
+                      {image.publicId ? (
+                        <TouchableOpacity
+                          style={styles.modalRemove}
+                          activeOpacity={0.85}
+                          onPress={() => handleRemoveImage(image)}
+                        >
+                          <AppText style={styles.modalRemoveText}>Remove</AppText>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <AppButton
+                label="Deactivate"
+                onPress={async () => {
+                  if (!selectedProduct?.id) return;
+                  await updateSellerPart(selectedProduct.id, { is_available: false });
+                  updateProduct(selectedProduct.id, { is_available: false });
+                  closeEditModal();
+                }}
+                style={styles.modalButton}
+              />
+              <AppButton
+                label="Delete"
+                onPress={async () => {
+                  if (!selectedProduct?.id) return;
+                  await deleteSellerPart(selectedProduct.id);
+                  removeProduct(selectedProduct.id);
+                  closeEditModal();
+                }}
+                style={styles.modalDeleteButton}
+                textStyle={styles.modalDeleteText}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -396,6 +478,58 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     marginTop: 16,
+  },
+  modalActions: {
+    width: '100%',
+    rowGap: 10,
+    marginTop: 16,
+  },
+  modalImages: {
+    marginTop: 14,
+  },
+  modalSectionTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 13,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    marginBottom: 8,
+  },
+  modalImageRow: {
+    columnGap: 10,
+    paddingBottom: 4,
+  },
+  modalImageTile: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  modalImageFallback: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  modalRemove: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  modalRemoveText: {
+    color: '#F87171',
+    fontSize: 10,
+  },
+  modalDeleteButton: {
+    backgroundColor: '#F87171',
+  },
+  modalDeleteText: {
+    color: '#1A1A1A',
   },
 });
 

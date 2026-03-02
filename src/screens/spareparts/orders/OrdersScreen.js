@@ -1,17 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, ScreenContainer, ScrollableTabs } from '../../../components';
+import { confirmMarketplaceOrderItem } from '../../../services/marketplace.service';
+import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
-
-const TABS = [
-  { key: 'all', label: 'All (4)' },
-  { key: 'new', label: 'New' },
-  { key: 'preparing', label: 'Preparing' },
-  { key: 'in_transit', label: 'In transit' },
-  { key: 'completed', label: 'Completed' },
-];
 
 const ORDERS = [
   {
@@ -61,15 +55,109 @@ const statusConfig = {
   completed: { label: 'Completed', color: '#22C55E', textColor: '#0B2B15' },
 };
 
+const normalizeOrderList = (payload) => {
+  if (!payload) return [];
+  const root = payload?.data || payload;
+  if (Array.isArray(root)) return root;
+  if (Array.isArray(root?.orders)) return root.orders;
+  if (Array.isArray(root?.items)) return root.items;
+  if (Array.isArray(root?.results)) return root.results;
+  return [];
+};
+
+const toStatusKey = (value) => {
+  const status = String(value || '').toLowerCase();
+  if (['new', 'pending', 'confirmed'].includes(status)) return 'new';
+  if (['preparing', 'processing'].includes(status)) return 'preparing';
+  if (['shipped', 'in_transit', 'out_for_delivery'].includes(status)) return 'in_transit';
+  if (['completed', 'delivered', 'received'].includes(status)) return 'completed';
+  return 'new';
+};
+
 const OrdersScreen = () => {
   const [activeTab, setActiveTab] = useState('all');
+  const [orders, setOrders] = useState(ORDERS);
+  const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState('');
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setErrorText('');
+    try {
+      // TODO: Confirm seller orders payload shape.
+      const response = await getSellerOrders();
+      const list = normalizeOrderList(response);
+      const mapped = list.flatMap((order) => {
+        const items = order?.items || order?.order_items || order?.products || [order];
+        return items.map((item) => ({
+          id: String(item?.id || item?._id || order?.id || order?._id || Math.random()),
+          orderId: String(order?.id || order?._id || item?.order_id || item?.orderId || ''),
+          itemId: String(item?.id || item?._id || ''),
+          status: toStatusKey(item?.status || order?.status),
+          name: item?.name || item?.part?.name || order?.name || 'Product',
+          qty: Number(item?.quantity || item?.qty || order?.quantity || 1),
+          total: Number(item?.total || item?.amount || order?.total || order?.amount || 0),
+          orderedAt: item?.created_at || order?.created_at || 'Recently',
+          image:
+            item?.image ||
+            item?.part?.images?.[0] ||
+            item?.part?.image ||
+            order?.image ||
+            'https://picsum.photos/120?random=90',
+        }));
+      });
+      setOrders(mapped.length ? mapped : []);
+    } catch (error) {
+      setErrorText(error?.message || 'Unable to load orders right now.');
+      setOrders(ORDERS);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const visibleOrders = useMemo(() => {
     if (activeTab === 'all') {
-      return ORDERS;
+      return orders;
     }
-    return ORDERS.filter((order) => order.status === activeTab);
-  }, [activeTab]);
+    return orders.filter((order) => order.status === activeTab);
+  }, [activeTab, orders]);
+
+  const tabsWithCounts = useMemo(() => {
+    const counts = orders.reduce(
+      (acc, order) => {
+        acc.all += 1;
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      },
+      { all: 0, new: 0, preparing: 0, in_transit: 0, completed: 0 }
+    );
+
+    return [
+      { key: 'all', label: `All (${counts.all})` },
+      { key: 'new', label: `New (${counts.new})` },
+      { key: 'preparing', label: `Preparing (${counts.preparing})` },
+      { key: 'in_transit', label: `In transit (${counts.in_transit})` },
+      { key: 'completed', label: `Completed (${counts.completed})` },
+    ];
+  }, [orders]);
+
+  const handleConfirmItem = async (order) => {
+    if (!order?.orderId || !order?.itemId) {
+      Alert.alert('Missing order info', 'Unable to update this order right now.');
+      return;
+    }
+
+    try {
+      await confirmMarketplaceOrderItem(order.orderId, order.itemId);
+      fetchOrders();
+    } catch (error) {
+      Alert.alert('Could not update order', error?.message || 'Please try again.');
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -87,10 +175,20 @@ const OrdersScreen = () => {
         </View>
 
         <View style={styles.tabsWrap}>
-          <ScrollableTabs tabs={TABS} activeKey={activeTab} onChange={setActiveTab} />
+          <ScrollableTabs tabs={tabsWithCounts} activeKey={activeTab} onChange={setActiveTab} />
         </View>
 
         <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            </View>
+          ) : null}
+
+          {errorText ? (
+            <AppText style={styles.errorText}>{errorText}</AppText>
+          ) : null}
+
           {visibleOrders.map((order) => {
             const status = statusConfig[order.status] || statusConfig.new;
             return (
@@ -120,14 +218,22 @@ const OrdersScreen = () => {
                 </View>
 
                 {order.status === 'new' ? (
-                  <TouchableOpacity style={styles.primaryButton} activeOpacity={0.85}>
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    activeOpacity={0.85}
+                    onPress={() => handleConfirmItem(order)}
+                  >
                     <AppText style={styles.primaryButtonText}>Prepare package</AppText>
                   </TouchableOpacity>
                 ) : null}
 
                 {order.status === 'preparing' ? (
                   <View style={styles.prepRow}>
-                    <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.85}>
+                    <TouchableOpacity
+                      style={styles.secondaryButton}
+                      activeOpacity={0.85}
+                      onPress={() => handleConfirmItem(order)}
+                    >
                       <AppText style={styles.secondaryButtonText}>Mark as ready</AppText>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.iconButton} activeOpacity={0.85}>
@@ -212,6 +318,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 24,
     rowGap: 12,
+  },
+  loadingRow: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#F87171',
+    fontSize: 12,
+    marginBottom: 8,
   },
   card: {
     backgroundColor: '#1A1A4A',

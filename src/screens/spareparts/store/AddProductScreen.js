@@ -14,6 +14,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, CancelCircleIcon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useSellerStore } from '../../../context/SellerStoreContext';
+import { addSellerPartImages, createSellerPart } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
 
@@ -80,32 +81,38 @@ const AddProductScreen = ({ navigation }) => {
     setImages((prev) => prev.filter((item) => item.id !== imageId));
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     if (!canPublish || isPublishing) {
       return;
     }
 
     setIsPublishing(true);
+    try {
+      const response = await createSellerPart({
+        name: name.trim(),
+        description: description.trim(),
+        price: Number(price || 0),
+        stock_quantity: Number(quantity || 0),
+        condition,
+      });
 
-    const product = {
-      id: `${Date.now()}`,
-      name: name.trim(),
-      quantity: Number(quantity || 0),
-      price: Number(price || 0),
-      condition,
-      location: location.trim(),
-      description: description.trim(),
-      images: images.map((image) => image.uri),
-      createdAt: new Date().toISOString(),
-    };
+      const payload = response?.data || response || {};
+      const saved = payload?.part || payload?.data || payload;
+      const savedId = String(saved?.id || saved?._id || '').trim();
+      if (savedId && images.length) {
+        await addSellerPartImages(savedId, images);
+      }
+      if (saved) {
+        addProduct(saved);
+      }
 
-    addProduct(product);
-
-    setTimeout(() => {
-      setIsPublishing(false);
       Alert.alert('Product published', 'Your product is now visible in your store.');
       navigation.navigate(ROUTES.SPARE_PARTS_TABS, { tab: 'store' });
-    }, 150);
+    } catch (error) {
+      Alert.alert('Publish failed', error?.message || 'Could not publish product.');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -123,34 +130,44 @@ const AddProductScreen = ({ navigation }) => {
             <View style={styles.imageHeader}>
               <AppText style={styles.sectionLabel}>Product images</AppText>
               <AppText variant="muted" style={styles.imageHint}>
-                Up to {MAX_IMAGES} images
+                {images.length}/{MAX_IMAGES} selected
               </AppText>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
+            <View style={styles.uploadBox}>
+              <View style={styles.uploadRow}>
+                <HugeiconsIcon icon={ImageUploadIcon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
+                <AppText style={styles.uploadTitle}>Add product images</AppText>
+              </View>
+              <AppText variant="muted" style={styles.uploadSubtitle}>
+                Upload up to {MAX_IMAGES} images to showcase your product.
+              </AppText>
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={handleAddImage}
                 disabled={isPicking}
-                style={[styles.addImageCard, isPicking ? styles.addImageCardDisabled : null]}
+                style={[styles.uploadButton, isPicking ? styles.addImageCardDisabled : null]}
               >
-                <HugeiconsIcon icon={ImageUploadIcon} size={22} color={darkTheme.colors.accent} strokeWidth={2} />
-                <AppText style={styles.addImageText}>{isPicking ? '...' : 'Add image'}</AppText>
+                <AppText style={styles.uploadButtonText}>{isPicking ? 'Picking...' : 'Add image'}</AppText>
               </TouchableOpacity>
+            </View>
 
-              {images.map((image) => (
-                <View key={image.id} style={styles.thumbnail}>
-                  <Image source={{ uri: image.uri }} style={styles.thumbnailImage} />
-                  <TouchableOpacity
-                    style={styles.removeThumb}
-                    activeOpacity={0.85}
-                    onPress={() => handleRemoveImage(image.id)}
-                  >
-                    <HugeiconsIcon icon={CancelCircleIcon} size={16} color={darkTheme.colors.background} strokeWidth={2.2} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
+            {images.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>
+                {images.map((image) => (
+                  <View key={image.id} style={styles.thumbnail}>
+                    <Image source={{ uri: image.uri }} style={styles.thumbnailImage} />
+                    <TouchableOpacity
+                      style={styles.removeThumb}
+                      activeOpacity={0.85}
+                      onPress={() => handleRemoveImage(image.id)}
+                    >
+                      <HugeiconsIcon icon={CancelCircleIcon} size={16} color={darkTheme.colors.background} strokeWidth={2.2} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : null}
 
             <AppInput
               label="Product name"
@@ -291,25 +308,45 @@ const styles = StyleSheet.create({
   imageRow: {
     paddingBottom: 6,
     columnGap: 10,
-  },
-  addImageCard: {
-    width: 92,
-    height: 92,
-    borderRadius: 12,
-    borderWidth: 1.2,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.6),
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginTop: 10,
   },
   addImageCardDisabled: {
     opacity: 0.6,
   },
-  addImageText: {
+  uploadBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: withAlpha(darkTheme.colors.accent, 0.4),
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    padding: 12,
+  },
+  uploadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  uploadTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 13,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  uploadSubtitle: {
     marginTop: 6,
+    fontSize: 12,
+    color: darkTheme.colors.muted,
+  },
+  uploadButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.15),
+  },
+  uploadButtonText: {
     color: darkTheme.colors.accent,
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   thumbnail: {
     width: 92,

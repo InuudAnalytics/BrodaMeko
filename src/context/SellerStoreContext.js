@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { getSellerParts } from '../services/spareParts.service';
 
 const STORAGE_KEY_BASE = '@brodameko/seller_store';
 
@@ -15,6 +16,8 @@ export const SellerStoreProvider = ({ children }) => {
   const { user, role } = useAuth();
   const [products, setProducts] = useState([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const ownerKey = useMemo(() => {
     const raw =
@@ -38,18 +41,47 @@ export const SellerStoreProvider = ({ children }) => {
   useEffect(() => {
     const restore = async () => {
       setIsHydrated(false);
+      setLoading(true);
+      setError('');
       try {
-        const raw = await AsyncStorage.getItem(storageKey);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setProducts(sanitizeProducts(parsed));
+        const response = await getSellerParts();
+        const payload = response?.data || response || {};
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.parts)
+            ? payload.parts
+            : Array.isArray(payload?.items)
+              ? payload.items
+              : Array.isArray(payload?.data)
+                ? payload.data
+                : [];
+        if (list.length) {
+          setProducts(sanitizeProducts(list));
         } else {
+          const raw = await AsyncStorage.getItem(storageKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            setProducts(sanitizeProducts(parsed));
+          } else {
+            setProducts([]);
+          }
+        }
+      } catch (err) {
+        try {
+          const raw = await AsyncStorage.getItem(storageKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            setProducts(sanitizeProducts(parsed));
+          } else {
+            setProducts([]);
+          }
+        } catch {
           setProducts([]);
         }
-      } catch {
-        setProducts([]);
+        setError(err?.message || 'Could not load store items.');
       } finally {
         setIsHydrated(true);
+        setLoading(false);
       }
     };
 
@@ -68,6 +100,19 @@ export const SellerStoreProvider = ({ children }) => {
     setProducts((prev) => [product, ...prev]);
   }, []);
 
+  const updateProduct = useCallback((productId, updates) => {
+    const safeId = String(productId || '').trim();
+    if (!safeId) return;
+    setProducts((prev) =>
+      prev.map((item) => (String(item?.id || item?._id || '') === safeId ? { ...item, ...updates } : item))
+    );
+  }, []);
+
+  const removeProduct = useCallback((productId) => {
+    const safeId = String(productId || '').trim();
+    setProducts((prev) => prev.filter((item) => String(item?.id || item?._id || '') !== safeId));
+  }, []);
+
   const resetStore = useCallback(() => {
     setProducts([]);
   }, []);
@@ -76,10 +121,14 @@ export const SellerStoreProvider = ({ children }) => {
     () => ({
       products,
       isHydrated,
+      loading,
+      error,
       addProduct,
+      updateProduct,
+      removeProduct,
       resetStore,
     }),
-    [addProduct, isHydrated, products, resetStore]
+    [addProduct, isHydrated, products, resetStore, loading, error, updateProduct, removeProduct]
   );
 
   return <SellerStoreContext.Provider value={value}>{children}</SellerStoreContext.Provider>;
