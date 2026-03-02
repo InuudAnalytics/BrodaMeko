@@ -1,0 +1,96 @@
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { CheckmarkCircle01Icon } from '@hugeicons/core-free-icons';
+import { AppText, ScreenContainer } from '../../../components';
+import { ROUTES } from '../../../utils';
+
+const PaymentSuccessScreen = ({ navigation }) => {
+  const handleBackToMarketplace = () => {
+    navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+  };
+  return (
+    <ScreenContainer padded={false}>
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <HugeiconsIcon icon={CheckmarkCircle01Icon} size={72} color="#22C55E" strokeWidth={2} />
+          <AppText style={styles.title}>Payment successful</AppText>
+          <AppText style={styles.subtitle}>
+            Your order is being processed and will be delivered soon.
+          </AppText>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('OrderTracking')}>
+              <AppText style={styles.primaryText}>Track order</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleBackToMarketplace}>
+              <AppText style={styles.secondaryText}>Go to marketplace</AppText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </ScreenContainer>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#1A1A4A',
+    borderRadius: 18,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  actions: {
+    marginTop: 24,
+    width: '100%',
+  },
+  primaryButton: {
+    backgroundColor: '#E6C714',
+    borderRadius: 14,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryText: {
+    color: '#000033',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    marginTop: 12,
+    borderRadius: 14,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E6C714',
+  },
+  secondaryText: {
+    color: '#E6C714',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
+export default PaymentSuccessScreen;
