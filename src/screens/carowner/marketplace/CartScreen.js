@@ -34,9 +34,9 @@ const CartScreen = ({ navigation }) => {
 
         <View style={styles.emptyWrap}>
           <View style={styles.emptyIcon}>
-            <HugeiconsIcon icon={ShoppingCart01Icon} size={40} color="#E6C714" strokeWidth={2} />
+            <Image source={require('../../../../assets/Empty cart.png')} style={styles.emptyImage} />
           </View>
-          <AppText style={styles.emptyTitle}>Your cart is empty</AppText>
+          <AppText style={styles.emptyTitle} numberOfLines={1}>Your cart is empty</AppText>
           <AppText style={styles.emptySubtitle}>
             Looks like you haven't added any spare parts to your cart
           </AppText>
@@ -181,13 +181,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIcon: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(230,199,20,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
+  },
+  emptyImage: {
+    width: 150,
+    height: 120,
+    resizeMode: 'contain',
   },
   emptyTitle: {
     color: '#FFFFFF',

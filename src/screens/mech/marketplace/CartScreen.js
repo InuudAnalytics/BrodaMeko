@@ -1,13 +1,25 @@
 import React from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Delete02Icon, MinusSignIcon, PlusSignIcon, ShoppingCart01Icon } from '@hugeicons/core-free-icons';
+import {
+  ArrowLeft01Icon,
+  Delete02Icon,
+  MinusSignIcon,
+  PlusSignIcon,
+  ShoppingCart01Icon,
+} from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { ROUTES } from '../../../utils';
 import { useCart } from '../../../context';
 
-const formatNaira = (value) => `₦${Number(value || 0).toLocaleString('en-NG')}`;
+const formatNaira = value => `₦${Number(value || 0).toLocaleString('en-NG')}`;
 
 const CartScreen = ({ navigation }) => {
   const { items, removeFromCart, updateQuantity, calculateTotal } = useCart();
@@ -17,7 +29,7 @@ const CartScreen = ({ navigation }) => {
   const serviceFee = subtotal > 0 ? 500 : 0;
   const total = subtotal + deliveryFee + serviceFee;
 
-  const handleTabPress = (tabKey) => {
+  const handleTabPress = tabKey => {
     if (tabKey === 'profile') {
       navigation.navigate(ROUTES.USER_PROFILE);
       return;
@@ -29,118 +41,180 @@ const CartScreen = ({ navigation }) => {
   if (!items.length) {
     return (
       <View style={styles.root}>
-        <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={22} color="#E6C714" strokeWidth={2} />
-          </TouchableOpacity>
-          <AppText style={styles.headerTitle}>Cart</AppText>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        <View style={styles.emptyWrap}>
-          <View style={styles.emptyIcon}>
-            <HugeiconsIcon icon={ShoppingCart01Icon} size={40} color="#E6C714" strokeWidth={2} />
+        <ScreenContainer
+          padded={false}
+          edges={['top', 'left', 'right']}
+          style={styles.screen}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.85}
+            >
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                size={22}
+                color="#E6C714"
+                strokeWidth={2}
+              />
+            </TouchableOpacity>
+            <AppText style={styles.headerTitle}>Cart</AppText>
+            <View style={styles.headerSpacer} />
           </View>
-          <AppText style={styles.emptyTitle}>Your cart is empty</AppText>
-          <AppText style={styles.emptySubtitle}>
-            Looks like you haven't added any spare parts to your cart
-          </AppText>
-        </View>
-      </ScreenContainer>
-      <MechanicTabBar activeTab="marketplace" onTabPress={handleTabPress} />
-    </View>
+
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIcon}>
+              <Image
+                source={require('../../../../assets/Empty cart.png')}
+                style={styles.emptyImage}
+              />
+            </View>
+          <AppText style={styles.emptyTitle} numberOfLines={1}>Your cart is empty</AppText>
+            <AppText style={styles.emptySubtitle}>
+              Looks like you haven't added any spare parts to your cart
+            </AppText>
+          </View>
+        </ScreenContainer>
+        <MechanicTabBar activeTab="marketplace" onTabPress={handleTabPress} />
+      </View>
     );
   }
 
   return (
     <View style={styles.root}>
-      <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={22} color="#E6C714" strokeWidth={2} />
-        </TouchableOpacity>
-        <AppText style={styles.headerTitle}>Cart</AppText>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {items.map((item) => {
-          const product = item.product || {};
-          const image = product?.images?.[0];
-          return (
-            <View key={item.productId} style={styles.itemCard}>
-              <View style={styles.itemRow}>
-                {image ? (
-                  <Image source={{ uri: image }} style={styles.itemImage} />
-                ) : (
-                  <View style={styles.itemImagePlaceholder} />
-                )}
-                <View style={styles.itemInfo}>
-                  <AppText style={styles.itemName} numberOfLines={1}>
-                    {product?.name || 'Product'}
-                  </AppText>
-                  <AppText style={styles.itemShop} numberOfLines={1}>
-                    {product?.shop || 'Seller'}
-                  </AppText>
-                  <AppText style={styles.itemPrice}>{formatNaira(product?.price || 0)}</AppText>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => removeFromCart(item.productId)}
-                  activeOpacity={0.85}
-                >
-                  <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.qtyRow}>
-                <TouchableOpacity
-                  style={styles.qtyButton}
-                  onPress={() => updateQuantity(item.productId, item.quantity - 1)}
-                  activeOpacity={0.85}
-                >
-                  <HugeiconsIcon icon={MinusSignIcon} size={14} color="#E6C714" strokeWidth={2} />
-                </TouchableOpacity>
-                <AppText style={styles.qtyValue}>{item.quantity}</AppText>
-                <TouchableOpacity
-                  style={styles.qtyButton}
-                  onPress={() => updateQuantity(item.productId, item.quantity + 1)}
-                  activeOpacity={0.85}
-                >
-                  <HugeiconsIcon icon={PlusSignIcon} size={14} color="#E6C714" strokeWidth={2} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-
-        <View style={styles.summaryCard}>
-          <AppText style={styles.summaryTitle}>Order Summary</AppText>
-          <View style={styles.summaryRow}>
-            <AppText style={styles.summaryLabel}>Subtotal</AppText>
-            <AppText style={styles.summaryValue}>{formatNaira(subtotal)}</AppText>
-          </View>
-          <View style={styles.summaryRow}>
-            <AppText style={styles.summaryLabel}>Delivery fee</AppText>
-            <AppText style={styles.summaryValue}>{formatNaira(deliveryFee)}</AppText>
-          </View>
-          <View style={styles.summaryRow}>
-            <AppText style={styles.summaryLabel}>Service fee</AppText>
-            <AppText style={styles.summaryValue}>{formatNaira(serviceFee)}</AppText>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
-            <AppText style={styles.totalLabel}>Total</AppText>
-            <AppText style={styles.totalValue}>{formatNaira(total)}</AppText>
-          </View>
+      <ScreenContainer
+        padded={false}
+        edges={['top', 'left', 'right']}
+        style={styles.screen}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
+            <HugeiconsIcon
+              icon={ArrowLeft01Icon}
+              size={22}
+              color="#E6C714"
+              strokeWidth={2}
+            />
+          </TouchableOpacity>
+          <AppText style={styles.headerTitle}>Cart</AppText>
+          <View style={styles.headerSpacer} />
         </View>
-      </ScrollView>
 
-      <View style={styles.bottomButton}>
-        <AppButton label="Proceed to checkout" onPress={() => navigation.navigate('Checkout')} />
-      </View>
-    </ScreenContainer>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {items.map(item => {
+            const product = item.product || {};
+            const image = product?.images?.[0];
+            return (
+              <View key={item.productId} style={styles.itemCard}>
+                <View style={styles.itemRow}>
+                  {image ? (
+                    <Image source={{ uri: image }} style={styles.itemImage} />
+                  ) : (
+                    <View style={styles.itemImagePlaceholder} />
+                  )}
+                  <View style={styles.itemInfo}>
+                    <AppText style={styles.itemName} numberOfLines={1}>
+                      {product?.name || 'Product'}
+                    </AppText>
+                    <AppText style={styles.itemShop} numberOfLines={1}>
+                      {product?.shop || 'Seller'}
+                    </AppText>
+                    <AppText style={styles.itemPrice}>
+                      {formatNaira(product?.price || 0)}
+                    </AppText>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => removeFromCart(item.productId)}
+                    activeOpacity={0.85}
+                  >
+                    <HugeiconsIcon
+                      icon={Delete02Icon}
+                      size={18}
+                      color="#F87171"
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.qtyRow}>
+                  <TouchableOpacity
+                    style={styles.qtyButton}
+                    onPress={() =>
+                      updateQuantity(item.productId, item.quantity - 1)
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <HugeiconsIcon
+                      icon={MinusSignIcon}
+                      size={14}
+                      color="#E6C714"
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+                  <AppText style={styles.qtyValue}>{item.quantity}</AppText>
+                  <TouchableOpacity
+                    style={styles.qtyButton}
+                    onPress={() =>
+                      updateQuantity(item.productId, item.quantity + 1)
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <HugeiconsIcon
+                      icon={PlusSignIcon}
+                      size={14}
+                      color="#E6C714"
+                      strokeWidth={2}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+
+          <View style={styles.summaryCard}>
+            <AppText style={styles.summaryTitle}>Order Summary</AppText>
+            <View style={styles.summaryRow}>
+              <AppText style={styles.summaryLabel}>Subtotal</AppText>
+              <AppText style={styles.summaryValue}>
+                {formatNaira(subtotal)}
+              </AppText>
+            </View>
+            <View style={styles.summaryRow}>
+              <AppText style={styles.summaryLabel}>Delivery fee</AppText>
+              <AppText style={styles.summaryValue}>
+                {formatNaira(deliveryFee)}
+              </AppText>
+            </View>
+            <View style={styles.summaryRow}>
+              <AppText style={styles.summaryLabel}>Service fee</AppText>
+              <AppText style={styles.summaryValue}>
+                {formatNaira(serviceFee)}
+              </AppText>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <AppText style={styles.totalLabel}>Total</AppText>
+              <AppText style={styles.totalValue}>{formatNaira(total)}</AppText>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.bottomButton}>
+          <AppButton
+            label="Proceed to checkout"
+            onPress={() => navigation.navigate('Checkout')}
+          />
+        </View>
+      </ScreenContainer>
       <MechanicTabBar activeTab="marketplace" onTabPress={handleTabPress} />
     </View>
   );
@@ -184,16 +258,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
   },
   emptyIcon: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(230,199,20,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
+    marginBottom: 16,
+  },
+  emptyImage: {
+    width: 150,
+    height: 120,
+    resizeMode: 'contain',
   },
   emptyTitle: {
     color: '#FFFFFF',

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -11,50 +12,60 @@ import {
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
 import ProductCard from '../../../components/marketplace/ProductCard';
 import { useCart } from '../../../context';
+import { getMarketplaceParts } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
-const products = [
-  {
-    id: '1',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/300'],
-  },
-  {
-    id: '2',
-    name: '12V power battery',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/301'],
-  },
-  {
-    id: '3',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/302'],
-  },
-  {
-    id: '4',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/303'],
-  },
-];
+const normalizeParts = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.parts)) return payload.parts;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+const mapPartToProduct = (part) => ({
+  id: String(part?.id || part?._id || ''),
+  name: String(part?.name || part?.title || 'Spare part'),
+  price: Number(part?.price || 0),
+  shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+  rating: Number(part?.rating || 4.9),
+  reviews: Number(part?.reviews || part?.review_count || 0),
+  images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+});
 
 const MarketplaceScreen = ({ navigation }) => {
   const { addToCart } = useCart();
+  const [search, setSearch] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchParts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getMarketplaceParts({ title_search: search || undefined });
+      const payload = response?.data || response || {};
+      const list = normalizeParts(payload);
+      setProducts(list.map(mapPartToProduct));
+    } catch {
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchParts();
+    }, [fetchParts])
+  );
+
+  const visibleProducts = useMemo(() => {
+    if (!search) return products;
+    const q = search.trim().toLowerCase();
+    return products.filter((item) => item.name.toLowerCase().includes(q));
+  }, [products, search]);
 
   const handleOpenProduct = (product) => {
     navigation.navigate('ProductDetails', { productId: product.id });
@@ -89,6 +100,8 @@ const MarketplaceScreen = ({ navigation }) => {
               placeholder="Search for products"
               placeholderTextColor="#9CA3AF"
               style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
             />
             <HugeiconsIcon icon={FilterHorizontalIcon} size={18} color="#9CA3AF" strokeWidth={2} />
           </View>
@@ -98,7 +111,7 @@ const MarketplaceScreen = ({ navigation }) => {
         </View>
 
         <FlatList
-          data={products}
+          data={visibleProducts}
           keyExtractor={(item) => item.id}
           numColumns={2}
           columnWrapperStyle={styles.columnWrap}

@@ -6,8 +6,9 @@ import { AppText, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
 import { ROUTES } from '../../../utils';
 
-const PaymentSuccessScreen = ({ navigation }) => {
+const PaymentSuccessScreen = ({ navigation, route }) => {
   const { role } = useAuth();
+  const orderId = route?.params?.orderId;
 
   const handleBackToMarketplace = () => {
     if (String(role || '').toLowerCase() === 'mech') {
@@ -27,7 +28,10 @@ const PaymentSuccessScreen = ({ navigation }) => {
             Your order is being processed and will be delivered soon.
           </AppText>
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('OrderTracking')}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => navigation.navigate('OrderTracking', { orderId })}
+            >
               <AppText style={styles.primaryText}>Track order</AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={handleBackToMarketplace}>

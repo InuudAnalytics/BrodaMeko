@@ -5,19 +5,25 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { useAuth, useCart } from '../../../context';
+import { checkoutMarketplaceOrder } from '../../../services/marketplace.service';
 
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
 const CheckoutScreen = ({ navigation, route }) => {
+  const { user } = useAuth();
+  const { items, calculateTotal, clearCart, addToCart } = useCart();
   const [deliveryType, setDeliveryType] = useState('delivery');
   const [paymentMethod, setPaymentMethod] = useState('transfer');
 
-  const product = route?.params?.directProduct || {
+  const directProduct = route?.params?.directProduct || null;
+  const product = directProduct || items?.[0]?.product || {
     id: '1',
     name: 'LED headlights',
     price: 2500,
@@ -26,14 +32,48 @@ const CheckoutScreen = ({ navigation, route }) => {
   };
 
   const image = product?.images?.[0];
-  const quantity = Number(product?.quantity || 1);
-  const subtotal = useMemo(
-    () => Number(product?.price || 0) * quantity,
-    [product?.price, quantity],
-  );
+  const quantity = Number(product?.quantity || items?.[0]?.quantity || 1);
+  const subtotal = useMemo(() => {
+    if (directProduct) {
+      return Number(product?.price || 0) * quantity;
+    }
+    return calculateTotal();
+  }, [calculateTotal, directProduct, product?.price, quantity]);
   const deliveryFee = deliveryType === 'delivery' ? 2500 : 0;
   const serviceFee = 500;
   const total = subtotal + deliveryFee + serviceFee;
+  const handleCheckout = async () => {
+    try {
+      if (directProduct) {
+        await addToCart(directProduct, quantity);
+      }
+
+      const payload = {
+        payment_method: paymentMethod === 'card' ? 'paystack' : 'paystack',
+        fulfillment_type: deliveryType === 'pickup' ? 'pickup' : 'delivery',
+        delivery_street: 'No 1, Onireke street, Agbabiaka',
+        delivery_city: 'Lagos',
+        delivery_state: 'Lagos',
+        delivery_country: 'Nigeria',
+        contact_phone: String(user?.phone_number || user?.phone || '+2348012345678'),
+        email: String(user?.email || 'buyer@example.com'),
+      };
+
+      const checkoutResponse = await checkoutMarketplaceOrder(payload);
+      await clearCart();
+      const responsePayload = checkoutResponse?.data || checkoutResponse || {};
+      const createdOrderId =
+        responsePayload?.order_id ||
+        responsePayload?.orderId ||
+        responsePayload?.id ||
+        responsePayload?.data?.order_id ||
+        responsePayload?.data?.id;
+      navigation.navigate('PaymentSuccessScreen', { orderId: createdOrderId });
+    } catch (error) {
+      Alert.alert('Checkout failed', error?.message || 'Could not process checkout.');
+    }
+  };
+
 
   return (
     <ScreenContainer padded={false}>
@@ -210,7 +250,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       <View style={styles.bottomAction}>
         <AppButton
           label="Confirm and pay"
-          onPress={() => navigation.navigate('PaymentSuccessScreen')}
+          onPress={handleCheckout}
         />
       </View>
     </ScreenContainer>

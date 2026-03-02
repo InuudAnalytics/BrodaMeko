@@ -12,7 +12,6 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
-  CheckmarkCircle01Icon,
   Message02Icon,
 } from '@hugeicons/core-free-icons';
 import {
@@ -21,6 +20,10 @@ import {
   OpenStreetMapView,
   ScreenContainer,
 } from '../../../components';
+import {
+  getMarketplaceOrder,
+  receivedMarketplaceOrderItem,
+} from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 
 const PANEL_MAX_DOWN = 360;
@@ -54,18 +57,63 @@ const fallbackAddress = 'No 1, Onireke street, Agbabiaka';
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
+const normalizeOrderPayload = (payload) => {
+  if (!payload) return null;
+  if (payload?.data) return payload.data;
+  return payload;
+};
+
+const extractTimeline = (statusValue) => {
+  const status = String(statusValue || '').toLowerCase();
+  const steps = [
+    { id: 'confirmed', label: 'Order confirmed' },
+    { id: 'preparing', label: 'Seller preparing package' },
+    { id: 'out_for_delivery', label: 'Out for delivery' },
+    { id: 'delivered', label: 'Delivered' },
+  ];
+
+  const statusMap = {
+    confirmed: 0,
+    pending: 0,
+    new: 0,
+    preparing: 1,
+    processing: 1,
+    shipped: 2,
+    in_transit: 2,
+    out_for_delivery: 2,
+    delivered: 3,
+    completed: 3,
+    received: 3,
+  };
+
+  const currentIndex = statusMap[status] ?? 0;
+  return steps.map((step, index) => ({
+    ...step,
+    completed: index <= currentIndex,
+    eta: '',
+  }));
+};
+
 const OrderTrackingScreen = ({ navigation, route }) => {
   const panelY = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
 
   const [mapReady] = useState(true);
-  const product = route?.params?.product || fallbackProduct;
-  const seller = route?.params?.seller || fallbackSeller;
-  const deliveryAddress = route?.params?.deliveryAddress || fallbackAddress;
-  const statusTimeline = Array.isArray(route?.params?.statusTimeline)
-    ? route.params.statusTimeline
-    : fallbackTimeline;
+  const [orderState, setOrderState] = useState({
+    product: route?.params?.product || fallbackProduct,
+    seller: route?.params?.seller || fallbackSeller,
+    deliveryAddress: route?.params?.deliveryAddress || fallbackAddress,
+    statusTimeline: Array.isArray(route?.params?.statusTimeline)
+      ? route.params.statusTimeline
+      : fallbackTimeline,
+    orderId: route?.params?.orderId || route?.params?.order_id || '',
+    itemId: route?.params?.itemId || '',
+  });
+  const [loadingOrder, setLoadingOrder] = useState(false);
+  const [orderError, setOrderError] = useState('');
+
+  const { product, seller, deliveryAddress, statusTimeline, orderId, itemId } = orderState;
 
   const mapCenter = useMemo(() => {
     const lat = Number(route?.params?.latitude || 6.5244);
@@ -118,18 +166,81 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     Alert.alert('Coming soon', 'Seller chat is not available yet.');
   };
 
-  const handleConfirmDelivery = () => {
-    navigation.navigate('OrderDeliveredSuccess', {
-      productName: product?.name,
-      productImage: product?.images?.[0],
-      sellerName: seller?.name,
-      orderId: route?.params?.orderId || route?.params?.order_id,
-    });
+  const handleConfirmDelivery = async () => {
+    if (!orderId || !itemId) {
+      Alert.alert('Missing order info', 'Could not confirm delivery for this order.');
+      return;
+    }
+
+    try {
+      await receivedMarketplaceOrderItem(orderId, itemId);
+      navigation.navigate('OrderDeliveredSuccess', {
+        productName: product?.name,
+        productImage: product?.images?.[0],
+        sellerName: seller?.name,
+        orderId,
+      });
+    } catch (error) {
+      Alert.alert('Could not confirm delivery', error?.message || 'Please try again.');
+    }
   };
 
   const handleReportIssue = () => {
     Alert.alert('Report issue', 'Issue reporting will be wired soon.');
   };
+
+  useEffect(() => {
+    const fetchOrder = async () => {
+      if (!orderId) {
+        return;
+      }
+
+      setLoadingOrder(true);
+      setOrderError('');
+      try {
+        const response = await getMarketplaceOrder(orderId);
+        const data = normalizeOrderPayload(response);
+        const items = data?.items || data?.order_items || data?.products || [];
+        const item = items?.[0] || {};
+        const part = item?.part || item?.product || item?.spare_part || {};
+        const store = part?.store || data?.store || data?.seller || {};
+
+        const resolvedProduct = {
+          name: part?.name || item?.name || fallbackProduct.name,
+          price: part?.price || item?.price || fallbackProduct.price,
+          shop: store?.store_name || store?.name || fallbackProduct.shop,
+          images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
+        };
+
+        const resolvedSeller = {
+          name: store?.store_name || store?.name || fallbackSeller.name,
+          avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
+          isActive: Boolean(store?.is_active ?? true),
+        };
+
+        const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
+        const resolvedAddress =
+          addressPayload?.street
+            ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
+            : data?.delivery_address_text || fallbackAddress;
+
+        setOrderState((prev) => ({
+          ...prev,
+          product: resolvedProduct,
+          seller: resolvedSeller,
+          deliveryAddress: resolvedAddress,
+          statusTimeline: extractTimeline(item?.status || data?.status),
+          itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
+        }));
+      } catch (error) {
+        setOrderError(error?.message || 'Could not load order details.');
+      } finally {
+        setLoadingOrder(false);
+      }
+    };
+
+    fetchOrder();
+  }, [orderId]);
 
   return (
     <View style={styles.root}>
@@ -183,15 +294,46 @@ const OrderTrackingScreen = ({ navigation, route }) => {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.timelineBlock}>
-              {statusTimeline.map(step => (
+              {orderError ? (
+                <AppText style={styles.errorText}>{orderError}</AppText>
+              ) : null}
+              {statusTimeline.map((step, index) => {
+                const isCompleted =
+                  typeof step?.completed === 'boolean'
+                    ? step.completed
+                    : index < statusTimeline.length - 1;
+                return (
                 <View key={step.id} style={styles.timelineRow}>
-                  <View style={styles.timelineIconWrap}>
-                    <HugeiconsIcon
-                      icon={CheckmarkCircle01Icon}
-                      size={18}
-                      color="#E6C714"
-                      strokeWidth={2}
-                    />
+                  <View style={styles.timelineMarker}>
+                    <View
+                      style={[
+                        styles.timelineCircle,
+                        isCompleted
+                          ? styles.timelineCircleActive
+                          : styles.timelineCircleInactive,
+                      ]}
+                    >
+                      <AppText
+                        style={[
+                          styles.timelineCheck,
+                          isCompleted
+                            ? styles.timelineCheckActive
+                            : styles.timelineCheckInactive,
+                        ]}
+                      >
+                        {'\u2713'}
+                      </AppText>
+                    </View>
+                    {index < statusTimeline.length - 1 ? (
+                      <View
+                        style={[
+                          styles.timelineLine,
+                          isCompleted
+                            ? styles.timelineLineActive
+                            : styles.timelineLineInactive,
+                        ]}
+                      />
+                    ) : null}
                   </View>
                   <View style={styles.timelineContent}>
                     <AppText style={styles.timelineTitle}>{step.label}</AppText>
@@ -200,7 +342,8 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                     </AppText>
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
 
             <View style={styles.productCard}>
@@ -263,6 +406,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <AppButton
                 label="Confirm delivery"
                 onPress={handleConfirmDelivery}
+                disabled={loadingOrder}
               />
               <TouchableOpacity
                 style={styles.secondaryAction}
@@ -372,19 +516,54 @@ const styles = StyleSheet.create({
   timelineBlock: {
     marginBottom: darkTheme.spacing.lg,
   },
+  errorText: {
+    color: '#F87171',
+    fontSize: 12,
+    marginBottom: 8,
+  },
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     columnGap: 12,
     marginBottom: 14,
   },
-  timelineIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(230,199,20,0.15)',
+  timelineMarker: {
+    width: 46,
+    alignItems: 'center',
+  },
+  timelineCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  timelineCircleActive: {
+    backgroundColor: '#E6C714',
+  },
+  timelineCircleInactive: {
+    backgroundColor: '#3A3A52',
+  },
+  timelineCheck: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  timelineCheckActive: {
+    color: '#0B0B0B',
+  },
+  timelineCheckInactive: {
+    color: '#FFFFFF',
+  },
+  timelineLine: {
+    width: 2,
+    height: 28,
+    marginTop: 6,
+  },
+  timelineLineActive: {
+    backgroundColor: '#E6C714',
+  },
+  timelineLineInactive: {
+    backgroundColor: '#3A3A52',
   },
   timelineContent: {
     flex: 1,

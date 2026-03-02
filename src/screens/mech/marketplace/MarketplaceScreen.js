@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -8,54 +9,58 @@ import {
   ShoppingCart02Icon,
 } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../../components';
-import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { ROUTES } from '../../../utils';
 import ProductCard from '../../../components/marketplace/ProductCard';
 import { useCart } from '../../../context';
+import { getMarketplaceParts } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 
-const products = [
-  {
-    id: '1',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/300'],
-  },
-  {
-    id: '2',
-    name: '12V power battery',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/301'],
-  },
-  {
-    id: '3',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/302'],
-  },
-  {
-    id: '4',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    images: ['https://picsum.photos/303'],
-  },
-];
+const normalizeParts = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.parts)) return payload.parts;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+const mapPartToProduct = (part) => ({
+  id: String(part?.id || part?._id || ''),
+  name: String(part?.name || part?.title || 'Spare part'),
+  price: Number(part?.price || 0),
+  shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+  rating: Number(part?.rating || 4.9),
+  reviews: Number(part?.reviews || part?.review_count || 0),
+  images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+});
 
 const MechanicMarketplaceScreen = ({ navigation }) => {
   const { addToCart } = useCart();
+  const [search, setSearch] = useState('');
+  const [products, setProducts] = useState([]);
 
+  const fetchParts = useCallback(async () => {
+    try {
+      const response = await getMarketplaceParts({ title_search: search || undefined });
+      const payload = response?.data || response || {};
+      const list = normalizeParts(payload);
+      setProducts(list.map(mapPartToProduct));
+    } catch {
+      setProducts([]);
+    }
+  }, [search]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchParts();
+    }, [fetchParts])
+  );
+
+  const visibleProducts = useMemo(() => {
+    if (!search) return products;
+    const q = search.trim().toLowerCase();
+    return products.filter((item) => item.name.toLowerCase().includes(q));
+  }, [products, search]);
   const handleTabPress = tabKey => {
     if (tabKey === 'profile') {
       navigation.navigate(ROUTES.USER_PROFILE);
@@ -77,79 +82,80 @@ const MechanicMarketplaceScreen = ({ navigation }) => {
     <View style={styles.root}>
       <ScreenContainer
         padded={false}
-        edges={['top', 'left', 'right']}
+        edges={['left', 'right']}
         style={styles.screen}
       >
         <View style={styles.content}>
-        <View style={styles.header}>
-          <Pressable
-            style={styles.headerIconBtn}
-            onPress={() => navigation.goBack()}
-          >
-            <HugeiconsIcon
-              icon={ArrowLeft01Icon}
-              size={20}
-              color="#FFFFFF"
-              strokeWidth={2}
-            />
-          </Pressable>
-          <AppText style={styles.headerTitle}>Marketplace</AppText>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        <View style={styles.searchRow}>
-          <View style={styles.searchWrap}>
-            <HugeiconsIcon
-              icon={Search01Icon}
-              size={18}
-              color="#9CA3AF"
-              strokeWidth={2}
-            />
-            <TextInput
-              placeholder="Search for products"
-              placeholderTextColor="#9CA3AF"
-              style={styles.searchInput}
-            />
-            <HugeiconsIcon
-              icon={FilterHorizontalIcon}
-              size={18}
-              color="#9CA3AF"
-              strokeWidth={2}
-            />
+          <View style={styles.header}>
+            <Pressable
+              style={styles.headerIconBtn}
+              onPress={() => navigation.goBack()}
+            >
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                size={20}
+                color="#FFFFFF"
+                strokeWidth={2}
+              />
+            </Pressable>
+            <AppText style={styles.headerTitle}>Marketplace</AppText>
+            <View style={styles.headerSpacer} />
           </View>
-          <Pressable
-            style={styles.cartButton}
-            onPress={() => navigation.navigate('Cart')}
-          >
-            <HugeiconsIcon
-              icon={ShoppingCart02Icon}
-              size={18}
-              color="#000033"
-              strokeWidth={2}
-            />
-          </Pressable>
-        </View>
 
-        <FlatList
-          data={products}
-          keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrap}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <View style={styles.cardWrap}>
-              <ProductCard
-                product={item}
-                onPress={() => handleOpenProduct(item)}
-                onAddToCart={() => handleAddToCart(item)}
+          <View style={styles.searchRow}>
+            <View style={styles.searchWrap}>
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={18}
+                color="#9CA3AF"
+                strokeWidth={2}
+              />
+              <TextInput
+                placeholder="Search for products"
+                placeholderTextColor="#9CA3AF"
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+              />
+              <HugeiconsIcon
+                icon={FilterHorizontalIcon}
+                size={18}
+                color="#9CA3AF"
+                strokeWidth={2}
               />
             </View>
-          )}
-        />
+            <Pressable
+              style={styles.cartButton}
+              onPress={() => navigation.navigate('Cart')}
+            >
+              <HugeiconsIcon
+                icon={ShoppingCart02Icon}
+                size={18}
+                color="#000033"
+                strokeWidth={2}
+              />
+            </Pressable>
+          </View>
+
+          <FlatList
+            data={visibleProducts}
+            keyExtractor={item => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrap}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <View style={styles.cardWrap}>
+                <ProductCard
+                  product={item}
+                  onPress={() => handleOpenProduct(item)}
+                  onAddToCart={() => handleAddToCart(item)}
+                />
+              </View>
+            )}
+          />
         </View>
       </ScreenContainer>
-      <MechanicTabBar activeTab="marketplace" onTabPress={handleTabPress} />
     </View>
   );
 };

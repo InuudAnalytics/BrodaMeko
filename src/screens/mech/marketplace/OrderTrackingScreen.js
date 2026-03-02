@@ -12,7 +12,6 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
-  CheckmarkCircle01Icon,
   Message02Icon,
 } from '@hugeicons/core-free-icons';
 import {
@@ -183,15 +182,43 @@ const OrderTrackingScreen = ({ navigation, route }) => {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.timelineBlock}>
-              {statusTimeline.map(step => (
+              {statusTimeline.map((step, index) => {
+                const isCompleted =
+                  typeof step?.completed === 'boolean'
+                    ? step.completed
+                    : index < statusTimeline.length - 1;
+                return (
                 <View key={step.id} style={styles.timelineRow}>
-                  <View style={styles.timelineIconWrap}>
-                    <HugeiconsIcon
-                      icon={CheckmarkCircle01Icon}
-                      size={18}
-                      color="#E6C714"
-                      strokeWidth={2}
-                    />
+                  <View style={styles.timelineMarker}>
+                    <View
+                      style={[
+                        styles.timelineCircle,
+                        isCompleted
+                          ? styles.timelineCircleActive
+                          : styles.timelineCircleInactive,
+                      ]}
+                    >
+                      <AppText
+                        style={[
+                          styles.timelineCheck,
+                          isCompleted
+                            ? styles.timelineCheckActive
+                            : styles.timelineCheckInactive,
+                        ]}
+                      >
+                        {'\u2713'}
+                      </AppText>
+                    </View>
+                    {index < statusTimeline.length - 1 ? (
+                      <View
+                        style={[
+                          styles.timelineLine,
+                          isCompleted
+                            ? styles.timelineLineActive
+                            : styles.timelineLineInactive,
+                        ]}
+                      />
+                    ) : null}
                   </View>
                   <View style={styles.timelineContent}>
                     <AppText style={styles.timelineTitle}>{step.label}</AppText>
@@ -200,7 +227,8 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                     </AppText>
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
 
             <View style={styles.productCard}>
@@ -378,13 +406,43 @@ const styles = StyleSheet.create({
     columnGap: 12,
     marginBottom: 14,
   },
-  timelineIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(230,199,20,0.15)',
+  timelineMarker: {
+    width: 46,
+    alignItems: 'center',
+  },
+  timelineCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  timelineCircleActive: {
+    backgroundColor: '#E6C714',
+  },
+  timelineCircleInactive: {
+    backgroundColor: '#3A3A52',
+  },
+  timelineCheck: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  timelineCheckActive: {
+    color: '#0B0B0B',
+  },
+  timelineCheckInactive: {
+    color: '#FFFFFF',
+  },
+  timelineLine: {
+    width: 2,
+    height: 28,
+    marginTop: 6,
+  },
+  timelineLineActive: {
+    backgroundColor: '#E6C714',
+  },
+  timelineLineInactive: {
+    backgroundColor: '#3A3A52',
   },
   timelineContent: {
     flex: 1,

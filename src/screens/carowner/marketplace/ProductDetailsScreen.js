@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -17,6 +17,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useCart } from '../../../context';
+import { getMarketplacePart } from '../../../services/marketplace.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -49,12 +50,51 @@ const ProductDetailsScreen = ({ navigation, route }) => {
   const listRef = useRef(null);
   const { addToCart } = useCart();
 
-  const product = useMemo(() => {
+  const [product, setProduct] = useState(() => {
     if (route?.params?.product) {
       return route.params.product;
     }
     const id = route?.params?.productId;
     return MOCK_PRODUCTS.find(item => item.id === id) || MOCK_PRODUCTS[0];
+  });
+
+  useEffect(() => {
+    const id = route?.params?.productId;
+    if (!id || route?.params?.product) {
+      return;
+    }
+
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await getMarketplacePart(id);
+        const payload = response?.data || response || {};
+        const part = payload?.part || payload?.data || payload;
+        if (active && part) {
+          setProduct({
+            id: String(part?.id || part?._id || id),
+            name: String(part?.name || part?.title || 'Spare part'),
+            price: Number(part?.price || 0),
+            shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+            rating: Number(part?.rating || 4.9),
+            reviews: Number(part?.reviews || part?.review_count || 0),
+            stock: Number(part?.stock_quantity || part?.stock || 0),
+            location: String(part?.location || part?.city || 'Lagos, Nigeria'),
+            compatibility: String(part?.compatibility || 'Compatible'),
+            delivery: String(part?.delivery || 'Delivery date'),
+            description: String(part?.description || ''),
+            images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+          });
+        }
+      } catch {
+        // keep fallback
+      }
+    };
+
+    load();
+    return () => {
+      active = false;
+    };
   }, [route?.params?.product, route?.params?.productId]);
 
   const images = product?.images?.length
