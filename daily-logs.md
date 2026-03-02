@@ -88,3 +88,42 @@
 
 8. **chore(app): wrap app with favorites provider** (`61a4aee`)
    - Added FavoritesProvider to app root.
+
+9. **chore(logs): update daily logs for Mar 2** (`f0809cf`)
+   - Logged marketplace and navigation updates for March 2.
+
+10. **feat(spareparts): add orders screen ui** (`ca2c97f`)
+    - Added spare parts orders UI with tabs and status states.
+
+11. **chore(api): expand endpoint registry** (`1acab89`)
+    - Added additional auth, wallet, marketplace, and seller endpoints.
+
+12. **feat(spareparts): expand seller service helpers** (`9164c16`)
+    - Added seller services for bank, parts, images, and orders.
+
+13. **feat(profile): add personal info alert and shared bank details** (`4de3841`)
+    - Added profile completion alert and shared bank details screen for all roles.
+
+14. **feat(mech): refresh dashboard tabs and online toggle** (`a33e495`)
+    - Updated mechanic dashboard tabs, styling, and online toggle.
+
+15. **feat(mech): align jobs screen header and tabs** (`91ca792`)
+    - Updated mechanic jobs screen header and scrollable tabs.
+
+16. **feat(mech): add address management UI and actions** (`b974c82`)
+    - Added address empty state, delete, and primary selection in mechanic profile.
+
+17. **feat(wallet): add withdraw modal and withdrawals feed** (`ec5e9bf`)
+    - Added withdraw modal and merged withdrawals into wallet history.
+
+18. **feat(reviews): wire mechanic reviews to API** (`be74400`)
+    - Wired mechanic reviews list, submit, and replies to backend.
+
+19. **feat(marketplace): wire products, cart, and order tracking** (`831a23f`)
+    - Wired marketplace product list/detail, cart, checkout, and tracking.
+
+20. **feat(spareparts): wire store products, images, and orders** (`5cda3d1`)
+    - Wired seller products, images, and orders to backend endpoints.
+
+21. **docs: update endpoint integration audit** (`234fe0c`)
+    - Updated endpoint integration audit to reflect new wiring.
