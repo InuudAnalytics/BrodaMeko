@@ -50,19 +50,41 @@
    - Profile tab now opens shared profile screen.
    - Back buttons on spare parts tabs return to Home.
 
-### Uncommitted updates (post-commit)
-- **Seller store setup screen** (`src/screens/spareparts/profile/SparePartsAddressScreen.js`)
-  - Store setup payload fields + banner upload UI.
-  - Time picker modal (00:00–23:59).
-  - Section headers with arrow styling.
-- **Marketplace endpoints + services**
-  - Added seller store endpoints in `src/config/endpoints.js`.
-  - Added seller store service functions in `src/services/spareParts.service.js`.
-- **Spare parts profile state**
-  - `SparePartsProfileContext` updated to use `storeDetails` instead of addresses.
-- **Delete account endpoint switch**
-  - `deleteAccount` now uses DELETE method in `src/services/auth.service.js`.
-- **Global 401 sign-out handler**
-  - Unauthorized responses trigger forced sign-out (`src/services/api.js`, `src/context/AuthContext.js`).
-- **Seller onboarding routing**
-  - Setup flow routes to seller tabs instead of placeholder.
+3. **feat(spareparts): store setup flow and session handling** (`9a7f4e3`)
+   - Seller store setup screen + banner upload + time picker.
+   - Marketplace seller store endpoints/services wired.
+   - Spare parts profile state updated to store details.
+   - Global 401 auto sign-out.
+   - Updated endpoint audit + daily logs.
+
+## March 2, 2026
+
+### Commits
+
+1. **feat(marketplace): add spare parts order tracking screen with timeline + actions** (`3371d18`)
+   - Added marketplace order tracking screen with map + timeline.
+   - Wired order tracking route for car owner flow.
+
+2. **feat(marketplace): add rate product screen reusing ratings UI with product-focused tags** (`4ef6561`)
+   - Added product rating screen based on mechanic ratings UI.
+   - Wired rate product route in car owner marketplace flow.
+
+3. **feat(marketplace): add cart + favorites contexts and product card** (`f6bbac6`)
+   - Added CartContext + FavoritesContext with persistence.
+   - Added marketplace ProductCard with cart + favorite actions.
+
+4. **feat(marketplace): add car owner marketplace core screens** (`c84294b`)
+   - Added marketplace list, product details, cart, and checkout screens for car owner.
+
+5. **feat(marketplace): add car owner favorites, tracking, and feedback flows** (`899812b`)
+   - Added favorites, order tracking, delivered success, feedback success flows.
+   - Updated rate product flow to use feedback success screen.
+
+6. **feat(marketplace): add mechanic marketplace screens** (`934401e`)
+   - Added dedicated mechanic marketplace screens mirroring car owner flow.
+
+7. **feat(navigation): wire marketplace routes and mechanic tab** (`9e03427`)
+   - Added mechanic marketplace tab and routes in navigation stacks.
+
+8. **chore(app): wrap app with favorites provider** (`61a4aee`)
+   - Added FavoritesProvider to app root.
