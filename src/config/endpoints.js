@@ -14,6 +14,7 @@ export const ENDPOINTS = {
     updatePassword: '/api/v1/auth/update-password',
     deleteUser: '/api/v1/auth/users/delete',
     uploadAvatar: '/api/v1/auth/upload-avatar',
+    contactStatus: '/api/v1/auth/users/contact-status',
     verifyAddContact: '/api/v1/auth/verify/add-contact',
     verifyConfirmContact: '/api/v1/auth/verify/confirm-contact',
     devices: {
@@ -35,11 +36,22 @@ export const ENDPOINTS = {
       addressAdd: '/api/v1/me/mechanic/address',
       addressUpdate: (addressId) =>
         `/api/v1/me/mechanic/address/${encodeURIComponent(String(addressId || ''))}`,
+      addressDelete: (addressId) =>
+        `/api/v1/me/mechanic/address/${encodeURIComponent(String(addressId || ''))}`,
+      addressSetPrimary: (addressId) =>
+        `/api/v1/me/mechanic/address/${encodeURIComponent(String(addressId || ''))}/primary`,
       bankAdd: '/api/v1/me/mechanic/bank',
       bankVerify: '/api/v1/me/mechanic/bank/verify',
       bankDelete: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
       bankSetPrimary: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
       bankList: '/api/v1/me/mechanic/bank/list',
+      onlineStatus: '/api/v1/me/mechanic/online-status',
+    },
+    carOwner: {
+      bankAdd: '/api/v1/me/car-owner/bank',
+      bankVerify: '/api/v1/me/car-owner/bank/verify',
+      bankDelete: (bankId) => `/api/v1/me/car-owner/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
+      bankSetPrimary: (bankId) => `/api/v1/me/car-owner/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
     },
     spareParts: {
       // TODO: Confirm spare parts address endpoints with backend.
@@ -51,6 +63,10 @@ export const ENDPOINTS = {
       addressAddLegacy: '/api/v1/me/spare-parts/address',
       addressUpdateLegacy: (addressId) =>
         `/api/v1/me/spare-parts/address/${encodeURIComponent(String(addressId || ''))}`,
+      bankAdd: '/api/v1/seller/me/bank',
+      bankVerify: '/api/v1/seller/me/bank/verify',
+      bankDelete: (bankId) => `/api/v1/seller/me/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
+      bankSetPrimary: (bankId) => `/api/v1/seller/me/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
     },
   },
   jobs: {
@@ -84,6 +100,8 @@ export const ENDPOINTS = {
     balance: '/api/v1/wallet/balance',
     topUp: '/api/v1/wallets/top-up',
     verifyPayment: '/api/v1/wallets/verify/payment',
+    withdrawRequest: '/api/v1/wallets/request',
+    withdrawals: '/api/v1/wallets/withdrawals',
   },
   chat: {
     jobPaymentInitiate: (jobId) => `/api/v1/chat/jobs/${encodeURIComponent(String(jobId || ''))}/payment/initiate`,
@@ -105,6 +123,10 @@ export const ENDPOINTS = {
       `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/review`,
     list: (mechanicId) =>
       `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/review`,
+    reply: (reviewId) =>
+      `/api/v1/mechanic-reviews/${encodeURIComponent(String(reviewId || ''))}/reply`,
+    replies: (reviewId) =>
+      `/api/v1/mechanic-reviews/${encodeURIComponent(String(reviewId || ''))}/replies`,
   },
   transactions: {
     list: '/api/v1/transactions/list',
@@ -125,10 +147,37 @@ export const ENDPOINTS = {
     jobs: '/api/v1/admin/jobs',
   },
   marketplace: {
+    // TODO: Confirm marketplace order endpoints with backend (buyer vs seller + payload shapes).
     sellerStore: '/api/v1/marketplace/seller/store',
     sellerStoreMe: '/api/v1/marketplace/seller/store/me',
     sellerStoreLogo: '/api/v1/marketplace/seller/store/logo',
     sellerStoreBanner: '/api/v1/marketplace/seller/store/banner',
+    // TODO: Confirm seller orders response shape.
+    sellerOrders: '/api/v1/marketplace/seller/orders',
+    partsList: '/api/v1/marketplace/parts',
+    partDetails: (partId) => `/api/v1/marketplace/parts/${encodeURIComponent(String(partId || ''))}`,
+    cart: '/api/v1/marketplace/cart',
+    cartItems: '/api/v1/marketplace/cart/items',
+    cartItem: (itemId) => `/api/v1/marketplace/cart/items/${encodeURIComponent(String(itemId || ''))}`,
+    cartClear: '/api/v1/marketplace/cart/clear',
+    // TODO: Confirm order endpoints (buyer vs seller + payload shapes).
+    orders: '/api/v1/marketplace/orders',
+    orderDetails: (orderId) => `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}`,
+    orderCancel: (orderId) => `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/cancel`,
+    orderConfirmItem: (orderId, itemId) =>
+      `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/items/${encodeURIComponent(
+        String(itemId || '')
+      )}/confirm`,
+    orderReceivedItem: (orderId, itemId) =>
+      `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/items/${encodeURIComponent(
+        String(itemId || '')
+      )}/received`,
+    checkout: '/api/v1/marketplace/orders/checkout',
+    sellerParts: '/api/v1/marketplace/seller/parts',
+    sellerPartsMe: '/api/v1/marketplace/seller/parts/me',
+    sellerPartDetails: (partId) => `/api/v1/marketplace/seller/parts/${encodeURIComponent(String(partId || ''))}`,
+    sellerPartImages: (partId) =>
+      `/api/v1/marketplace/seller/parts/${encodeURIComponent(String(partId || ''))}/images`,
   },
   ws: {
     chat: CHAT_WS_URL,
