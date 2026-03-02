@@ -1,21 +1,21 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { FilterHorizontalIcon, Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText } from '../../../components';
+import { Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
+import { AppButton, AppText, PersonalInfoAlert, ScrollableTabs } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
 import { getAvailableJobs } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
+import { setMechanicOnlineStatus } from '../../../services/mechanic.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme, withAlpha } from '../../../theme';
 
 const FILTERS = [
-  { key: 'all', label: 'All jobs' },
-  { key: 'urgent', label: 'Urgent' },
-  { key: 'high_paying', label: 'High paying' },
-  { key: 'filters', label: 'Filters', icon: FilterHorizontalIcon },
+  { key: 'available', label: 'Available jobs' },
+  { key: 'active', label: 'Active' },
+  { key: 'completed', label: 'Completed' },
 ];
 
 const initialsFromName = (name) =>
@@ -28,7 +28,7 @@ const initialsFromName = (name) =>
 
 const formatCurrency = (amount) => {
   const value = Number(amount || 0);
-  return `₦${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `\u20A6${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const normalizeJob = (job) => {
@@ -90,24 +90,35 @@ const readAvatarUri = (user) =>
 
 const MechanicDashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('available');
   const [walletBalance, setWalletBalance] = useState(0);
   const [jobs, setJobs] = useState([]);
   const [totalJobs, setTotalJobs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(Boolean(user?.is_online ?? user?.isOnline));
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
   const avatarUri = readAvatarUri(user);
 
-  const visibleJobs = useMemo(() => {
-    let filtered = jobs;
-    if (activeFilter === 'urgent') {
-      filtered = jobs.filter((job) => job.urgent);
+  const handleToggleOnline = useCallback(async (value) => {
+    setIsOnline(value);
+    try {
+      await setMechanicOnlineStatus(value);
+    } catch (error) {
+      setIsOnline((prev) => !prev);
     }
-    // High paying logic would go here if we had amounts
-    return filtered;
+  }, []);
+
+  const visibleJobs = useMemo(() => {
+    if (activeFilter === 'active') {
+      return jobs.filter((job) => job?.status === 'active');
+    }
+    if (activeFilter === 'completed') {
+      return jobs.filter((job) => job?.status === 'completed');
+    }
+    return jobs;
   }, [activeFilter, jobs]);
 
   useFocusEffect(
@@ -177,7 +188,9 @@ const MechanicDashboardScreen = ({ navigation }) => {
   );
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={styles.root}>
+      <PersonalInfoAlert />
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
@@ -203,8 +216,19 @@ const MechanicDashboardScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.earningsCard}>
-        <AppText style={styles.earningsLabel}>Todays earnings</AppText>
-        <AppText style={styles.earningsAmount}>₦25,000.00</AppText>
+        <View style={styles.earningsHeader}>
+          <AppText style={styles.earningsLabel}>Todays earnings</AppText>
+          <View style={styles.onlineToggle}>
+            <AppText style={styles.onlineLabel}>Online</AppText>
+            <Switch
+              value={isOnline}
+              onValueChange={handleToggleOnline}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: withAlpha(darkTheme.colors.accent, 0.55) }}
+              thumbColor={isOnline ? darkTheme.colors.accent : '#D9D9D9'}
+            />
+          </View>
+        </View>
+        <AppText style={styles.earningsAmount}>{'\u20A6'}25,000.00</AppText>
         <AppText style={styles.trendText}>1.5% increase in the past 5 days</AppText>
       </View>
 
@@ -226,30 +250,10 @@ const MechanicDashboardScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <AppText style={styles.sectionTitle}>Available jobs nearby</AppText>
+      <AppText style={styles.sectionTitle}>Nearby requests</AppText>
 
-      <View style={styles.chipsRow}>
-        {FILTERS.map((filter) => {
-          const isActive = activeFilter === filter.key;
-          return (
-            <TouchableOpacity
-              key={filter.key}
-              activeOpacity={0.85}
-              onPress={() => setActiveFilter(filter.key)}
-              style={[styles.chip, isActive && styles.chipActive]}
-            >
-              {filter.icon ? (
-                <HugeiconsIcon
-                  icon={filter.icon}
-                  size={14}
-                  color={isActive ? '#1A1A1A' : darkTheme.colors.text}
-                  strokeWidth={2}
-                />
-              ) : null}
-              <AppText style={[styles.chipText, isActive && styles.chipTextActive]}>{filter.label}</AppText>
-            </TouchableOpacity>
-          );
-        })}
+      <View style={styles.tabsWrap}>
+        <ScrollableTabs tabs={FILTERS} activeKey={activeFilter} onChange={setActiveFilter} />
       </View>
 
       <View style={styles.jobsList}>
@@ -290,21 +294,33 @@ const MechanicDashboardScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              <AppButton
-                label="Accept job"
-                onPress={() => console.log('Accept job:', job.id)}
-                style={styles.acceptBtn}
-                textStyle={styles.acceptBtnText}
-              />
+              <View style={styles.jobActions}>
+                <AppButton
+                  label="Accept job"
+                  onPress={() => console.log('Accept job:', job.id)}
+                  style={[styles.actionBtn, styles.acceptBtn]}
+                  textStyle={styles.acceptBtnText}
+                />
+                <AppButton
+                  label="Cancel"
+                  onPress={() => console.log('Cancel job:', job.id)}
+                  style={[styles.actionBtn, styles.cancelBtn]}
+                  textStyle={styles.cancelBtnText}
+                />
+              </View>
             </View>
           ))
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   screen: {
     flex: 1,
     backgroundColor: darkTheme.colors.background,
@@ -348,15 +364,15 @@ const styles = StyleSheet.create({
   },
   welcome: {
     color: darkTheme.colors.text,
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   partner: {
     marginTop: 2,
     color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
   },
   bellButton: {
     width: 40,
@@ -395,22 +411,37 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
   },
+  earningsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   earningsLabel: {
     color: darkTheme.colors.muted,
     fontSize: 12,
   },
+  onlineToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  onlineLabel: {
+    color: darkTheme.colors.muted,
+    fontSize: 11,
+    lineHeight: 14,
+  },
   earningsAmount: {
     marginTop: 4,
     color: darkTheme.colors.text,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   trendText: {
     marginTop: 6,
     color: darkTheme.colors.accent,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
   },
   statsRow: {
     marginTop: 12,
@@ -428,14 +459,14 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: darkTheme.colors.muted,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 13,
   },
   statValue: {
     marginTop: 4,
     color: darkTheme.colors.text,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   ratingRow: {
@@ -447,40 +478,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: 18,
     color: darkTheme.colors.text,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
-  chipsRow: {
+  tabsWrap: {
     marginTop: 10,
-    flexDirection: 'row',
-    columnGap: 8,
-    flexWrap: 'wrap',
-    rowGap: 8,
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 6,
-    backgroundColor: 'transparent',
-  },
-  chipActive: {
-    backgroundColor: darkTheme.colors.accent,
-    borderColor: darkTheme.colors.accent,
-  },
-  chipText: {
-    color: darkTheme.colors.text,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  chipTextActive: {
-    color: '#1A1A1A',
+    marginBottom: 4,
   },
   jobsList: {
     marginTop: 12,
@@ -535,28 +539,26 @@ const styles = StyleSheet.create({
   },
   jobName: {
     color: darkTheme.colors.text,
-    fontSize: 15,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 17,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   jobIssue: {
     marginTop: 2,
     color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
   },
   urgentPill: {
-    backgroundColor: withAlpha(darkTheme.colors.accent, 0.15),
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
+    backgroundColor: '#5A1B1B',
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 3,
   },
   urgentText: {
-    color: darkTheme.colors.accent,
-    fontSize: 11,
-    lineHeight: 14,
+    color: '#F5F5F5',
+    fontSize: 10,
+    lineHeight: 12,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   metaRow: {
@@ -572,17 +574,34 @@ const styles = StyleSheet.create({
   },
   metaText: {
     color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
   },
-  acceptBtn: {
+  jobActions: {
     marginTop: 10,
+    flexDirection: 'row',
+    columnGap: 10,
+  },
+  actionBtn: {
+    flex: 1,
     minHeight: 42,
     borderRadius: 10,
   },
+  acceptBtn: {
+    backgroundColor: darkTheme.colors.accent,
+  },
   acceptBtnText: {
     color: '#1A1A1A',
-    fontSize: 14,
+    fontSize: 13,
+  },
+  cancelBtn: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  cancelBtnText: {
+    color: darkTheme.colors.text,
+    fontSize: 13,
   },
 });
 
