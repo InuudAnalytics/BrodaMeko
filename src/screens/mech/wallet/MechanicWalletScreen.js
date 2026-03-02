@@ -7,6 +7,7 @@ import {
   Pressable,
   StatusBar,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -28,21 +29,21 @@ import {
 import { AppText, ScreenContainer } from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { getTransactions } from '../../../services/transactions.service';
-import { getWalletBalance } from '../../../services/wallet.service';
+import { getWalletBalance, getWithdrawals, requestWithdrawal } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 
-const toNaira = (value) => {
+const toNaira = value => {
   const amount = Number(value || 0);
   return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 };
 
-const toAmountWithSign = (amount) => {
+const toAmountWithSign = amount => {
   const numeric = Number(amount || 0);
   const sign = numeric >= 0 ? '+' : '-';
   return `${sign}${Math.abs(numeric).toLocaleString('en-NG')}`;
 };
 
-const readTransactions = (payload) => {
+const readTransactions = payload => {
   const root = payload?.data || payload || {};
 
   if (Array.isArray(root)) {
@@ -64,17 +65,25 @@ const readTransactions = (payload) => {
   return [];
 };
 
-const normalizeTransaction = (item, index) => {
+const normalizeTransaction = (item, index, source) => {
   const amount = Number(item?.amount || item?.value || 0);
-  const type = String(item?.type || item?.transaction_type || '').toLowerCase();
+  const inferredType =
+    item?.type ||
+    item?.transaction_type ||
+    (item?.bank_name || item?.account_name || item?.account_number
+      ? 'withdraw'
+      : '');
+  const type = String(inferredType || '').toLowerCase();
   const createdAtRaw = item?.created_at || item?.createdAt || item?.date || '';
   const parsedTime = Date.parse(String(createdAtRaw || ''));
   const createdAtMs = Number.isFinite(parsedTime) ? parsedTime : 0;
+  const baseTitle = item?.title || item?.narration || item?.description || '';
+  const resolvedTitle = baseTitle || (type.includes('withdraw') ? 'Withdrawal' : 'Transaction');
 
   return {
     id: String(item?.id || item?._id || item?.reference || `txn-${index}`),
     reference: String(item?.reference || item?.trxref || item?.id || '').trim(),
-    title: item?.title || item?.narration || item?.description || 'Transaction',
+    title: resolvedTitle,
     subtitle: item?.subtitle || item?.channel || item?.status || '',
     amountText: toAmountWithSign(amount),
     time: createdAtRaw,
@@ -84,7 +93,10 @@ const normalizeTransaction = (item, index) => {
     rawAmount: amount,
     rawType: type,
     rawStatus: String(item?.status || '').toLowerCase(),
-    rawTitle: String(item?.title || item?.narration || item?.description || '').toLowerCase(),
+    rawTitle: String(
+      item?.title || item?.narration || item?.description || '',
+    ).toLowerCase(),
+    rawSource: source || 'transactions',
   };
 };
 
@@ -104,8 +116,12 @@ const DATE_FILTER_OPTIONS = [
   { key: '30_days', label: 'Last 30 days', days: 30 },
 ];
 
+const QUICK_WITHDRAW_AMOUNTS = [1000, 5000, 10000];
+
 const matchesTypeFilter = (txn, filterKey) => {
-  const haystack = `${txn?.rawType || ''} ${txn?.rawStatus || ''} ${txn?.rawTitle || ''}`.toLowerCase();
+  const haystack = `${txn?.rawType || ''} ${txn?.rawStatus || ''} ${
+    txn?.rawTitle || ''
+  }`.toLowerCase();
   const amount = Number(txn?.rawAmount || 0);
 
   switch (filterKey) {
@@ -124,24 +140,18 @@ const matchesTypeFilter = (txn, filterKey) => {
         amount > 0
       );
     case 'withdraw':
-      return (
-        haystack.includes('withdraw') ||
-        haystack.includes('debit') ||
-        haystack.includes('cashout') ||
-        haystack.includes('transfer') ||
-        amount < 0
-      );
+      return txn?.rawSource === 'withdrawals';
     default:
       return true;
   }
 };
 
-const resolveDateRangeFromOption = (optionKey) => {
+const resolveDateRangeFromOption = optionKey => {
   if (!optionKey) {
     return { fromMs: 0, toMs: 0 };
   }
 
-  const option = DATE_FILTER_OPTIONS.find((entry) => entry.key === optionKey);
+  const option = DATE_FILTER_OPTIONS.find(entry => entry.key === optionKey);
   if (!option) {
     return { fromMs: 0, toMs: 0 };
   }
@@ -158,8 +168,17 @@ const resolveDateRangeFromOption = (optionKey) => {
 
 const ActionButton = ({ label, icon, onPress }) => {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.actionButton}>
-      <HugeiconsIcon icon={icon} size={18} color={darkTheme.colors.text} strokeWidth={2} />
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={styles.actionButton}
+    >
+      <HugeiconsIcon
+        icon={icon}
+        size={18}
+        color={darkTheme.colors.text}
+        strokeWidth={2}
+      />
       <AppText style={styles.actionText}>{label}</AppText>
     </TouchableOpacity>
   );
@@ -169,7 +188,12 @@ const TransactionItem = ({ item }) => {
   return (
     <View style={styles.txnRow}>
       <View style={styles.txnIconWrap}>
-        <HugeiconsIcon icon={item.icon || ArrowDownLeft01Icon} size={18} color={darkTheme.colors.background} strokeWidth={2} />
+        <HugeiconsIcon
+          icon={item.icon || ArrowDownLeft01Icon}
+          size={18}
+          color={darkTheme.colors.background}
+          strokeWidth={2}
+        />
       </View>
 
       <View style={styles.txnBody}>
@@ -180,7 +204,12 @@ const TransactionItem = ({ item }) => {
       </View>
 
       <View style={styles.txnMeta}>
-        <AppText style={[styles.txnAmount, item.positive ? styles.txnAmountPositive : styles.txnAmountNegative]}>
+        <AppText
+          style={[
+            styles.txnAmount,
+            item.positive ? styles.txnAmountPositive : styles.txnAmountNegative,
+          ]}
+        >
           {item.amountText}
         </AppText>
         <AppText variant="muted" style={styles.txnTime} numberOfLines={1}>
@@ -198,7 +227,14 @@ const FilterChip = ({ label, active, onPress }) => {
       activeOpacity={0.85}
       style={[styles.filterChip, active ? styles.filterChipActive : null]}
     >
-      <AppText style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}>{label}</AppText>
+      <AppText
+        style={[
+          styles.filterChipText,
+          active ? styles.filterChipTextActive : null,
+        ]}
+      >
+        {label}
+      </AppText>
     </TouchableOpacity>
   );
 };
@@ -207,7 +243,12 @@ const MetricCard = ({ icon, label, value }) => {
   return (
     <View style={styles.metricCard}>
       <View style={styles.metricLabelRow}>
-        <HugeiconsIcon icon={icon} size={16} color="rgba(255,255,255,0.65)" strokeWidth={2} />
+        <HugeiconsIcon
+          icon={icon}
+          size={16}
+          color="rgba(255,255,255,0.65)"
+          strokeWidth={2}
+        />
         <AppText style={styles.metricLabel}>{label}</AppText>
       </View>
       <AppText style={styles.metricValue}>{toNaira(value)}</AppText>
@@ -215,7 +256,11 @@ const MetricCard = ({ icon, label, value }) => {
   );
 };
 
-const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => {
+const MechanicWalletScreen = ({
+  navigation,
+  onTabPress,
+  showTabBar = true,
+}) => {
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -230,17 +275,34 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
   const [draftToDateOption, setDraftToDateOption] = useState('');
   const [datePickerTarget, setDatePickerTarget] = useState('');
   const sheetProgress = useRef(new Animated.Value(0)).current;
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
 
   const fetchWalletData = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const [walletResponse, transactionsResponse] = await Promise.all([getWalletBalance(), getTransactions()]);
+      const [walletResponse, transactionsResponse, withdrawalsResponse] = await Promise.all([
+        getWalletBalance(),
+        getTransactions(),
+        getWithdrawals(),
+      ]);
       const walletPayload = walletResponse?.data || walletResponse || {};
-      const transactionItems = readTransactions(transactionsResponse).map(normalizeTransaction);
+      const transactionItems = [
+        ...readTransactions(transactionsResponse).map((item, index) =>
+          normalizeTransaction(item, index, 'transactions'),
+        ),
+        ...readTransactions(withdrawalsResponse).map((item, index) =>
+          normalizeTransaction(item, index, 'withdrawals'),
+        ),
+      ];
 
-      setBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
+      setBalance(
+        Number(walletPayload?.balance || walletPayload?.available_balance || 0),
+      );
       setTransactions(transactionItems);
     } catch (requestError) {
       setError('Could not load transactions right now.');
@@ -253,7 +315,7 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
   useFocusEffect(
     useCallback(() => {
       fetchWalletData();
-    }, [fetchWalletData])
+    }, [fetchWalletData]),
   );
 
   const emptyText = useMemo(() => {
@@ -266,8 +328,14 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
     return 'No transactions yet.';
   }, [loading, error]);
 
-  const hasAppliedFilters = selectedTypes.length > 0 || Boolean(fromDateOption) || Boolean(toDateOption);
-  const hasDraftFilters = draftSelectedTypes.length > 0 || Boolean(draftFromDateOption) || Boolean(draftToDateOption);
+  const hasAppliedFilters =
+    selectedTypes.length > 0 ||
+    Boolean(fromDateOption) ||
+    Boolean(toDateOption);
+  const hasDraftFilters =
+    draftSelectedTypes.length > 0 ||
+    Boolean(draftFromDateOption) ||
+    Boolean(draftToDateOption);
 
   const openFilterSheet = () => {
     setDraftSelectedTypes(selectedTypes);
@@ -297,9 +365,59 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
     });
   };
 
-  const toggleDraftType = (typeKey) => {
-    setDraftSelectedTypes((prev) =>
-      prev.includes(typeKey) ? prev.filter((entry) => entry !== typeKey) : [...prev, typeKey]
+  const openWithdrawModal = () => {
+    setWithdrawError('');
+    setWithdrawAmount('');
+    setIsWithdrawModalOpen(true);
+  };
+
+  const closeWithdrawModal = () => {
+    if (withdrawSubmitting) {
+      return;
+    }
+    setIsWithdrawModalOpen(false);
+  };
+
+  const handleWithdrawAmountChange = value => {
+    const sanitized = String(value || '').replace(/[^\d]/g, '');
+    setWithdrawAmount(sanitized);
+    if (withdrawError) {
+      setWithdrawError('');
+    }
+  };
+
+  const handleSelectQuickAmount = amount => {
+    setWithdrawAmount(String(amount));
+    if (withdrawError) {
+      setWithdrawError('');
+    }
+  };
+
+  const handleSubmitWithdraw = async () => {
+    const parsedAmount = Number(withdrawAmount || 0);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setWithdrawError('Enter a valid amount to withdraw.');
+      return;
+    }
+
+    setWithdrawSubmitting(true);
+    setWithdrawError('');
+    try {
+      await requestWithdrawal(parsedAmount);
+      closeWithdrawModal();
+      fetchWalletData();
+    } catch (requestError) {
+      setWithdrawError('Unable to request withdrawal right now.');
+    } finally {
+      setWithdrawSubmitting(false);
+    }
+  };
+
+  const toggleDraftType = typeKey => {
+    setDraftSelectedTypes(prev =>
+      prev.includes(typeKey)
+        ? prev.filter(entry => entry !== typeKey)
+        : [...prev, typeKey],
     );
   };
 
@@ -327,7 +445,9 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
     let next = [...transactions];
 
     if (selectedTypes.length) {
-      next = next.filter((txn) => selectedTypes.some((filterKey) => matchesTypeFilter(txn, filterKey)));
+      next = next.filter(txn =>
+        selectedTypes.some(filterKey => matchesTypeFilter(txn, filterKey)),
+      );
     }
 
     const fromRange = resolveDateRangeFromOption(fromDateOption);
@@ -336,7 +456,7 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
     const toMs = toRange.toMs || 0;
 
     if (fromMs || toMs) {
-      next = next.filter((txn) => {
+      next = next.filter(txn => {
         const stamp = Number(txn?.createdAtMs || 0);
         if (!stamp) {
           return false;
@@ -378,7 +498,10 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
       const amount = Number(txn?.rawAmount || 0);
       const rawType = String(txn?.rawType || '');
       const rawTitle = String(txn?.rawTitle || '');
-      const looksWithdraw = rawType.includes('withdraw') || rawType.includes('debit') || rawTitle.includes('withdraw');
+      const looksWithdraw =
+        rawType.includes('withdraw') ||
+        rawType.includes('debit') ||
+        rawTitle.includes('withdraw');
       if (amount < 0 || looksWithdraw) {
         return sum + Math.abs(amount);
       }
@@ -395,7 +518,7 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
     outputRange: [420, 0],
   });
 
-  const handleTabPress = (tab) => {
+  const handleTabPress = tab => {
     if (typeof onTabPress === 'function') {
       onTabPress(tab);
     }
@@ -403,126 +526,189 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
 
   return (
     <View style={styles.root}>
-      <ScreenContainer padded={false} edges={['top', 'left', 'right']}>
+      <ScreenContainer padded={false} edges={['left', 'right']}>
         <View style={styles.content}>
-          <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
+          <StatusBar
+            barStyle="light-content"
+            backgroundColor={darkTheme.colors.background}
+          />
 
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-                return;
-              }
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                  return;
+                }
 
-              if (typeof onTabPress === 'function') {
-                onTabPress('home');
-              }
-            }}
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
-          </TouchableOpacity>
-          <AppText style={styles.headerTitle}>Wallet</AppText>
-        </View>
-
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceDecorTopLeft} />
-          <View style={styles.balanceDecorBottomRight} />
-          <View style={styles.balanceRow}>
-            <AppText variant="muted" style={styles.balanceLabel}>
-              Available balance
-            </AppText>
-            <TouchableOpacity onPress={() => setIsBalanceVisible((prev) => !prev)} activeOpacity={0.8}>
+                if (typeof onTabPress === 'function') {
+                  onTabPress('home');
+                }
+              }}
+            >
               <HugeiconsIcon
-                icon={isBalanceVisible ? ViewIcon : ViewOffIcon}
+                icon={ArrowLeft01Icon}
                 size={20}
                 color={darkTheme.colors.text}
+                strokeWidth={2.2}
+              />
+            </TouchableOpacity>
+            <AppText style={styles.headerTitle}>Wallet</AppText>
+          </View>
+
+          <View style={styles.balanceCard}>
+            <View style={styles.balanceDecorTopLeft} />
+            <View style={styles.balanceDecorBottomRight} />
+            <View style={styles.balanceRow}>
+              <AppText variant="muted" style={styles.balanceLabel}>
+                Available balance
+              </AppText>
+              <TouchableOpacity
+                onPress={() => setIsBalanceVisible(prev => !prev)}
+                activeOpacity={0.8}
+              >
+                <HugeiconsIcon
+                  icon={isBalanceVisible ? ViewIcon : ViewOffIcon}
+                  size={20}
+                  color={darkTheme.colors.text}
+                  strokeWidth={1.9}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <AppText style={styles.balanceAmount}>
+              {isBalanceVisible ? toNaira(balance) : '₦ *****'}
+            </AppText>
+
+            <AppText variant="muted" style={styles.balanceSubtext}>
+              You have transacted {transactions.length} times today
+            </AppText>
+          </View>
+
+          <View style={styles.actionsRow}>
+            <ActionButton
+              label="Withdraw"
+              icon={SentIcon}
+              onPress={openWithdrawModal}
+            />
+            <ActionButton
+              label="Fund wallet"
+              icon={WalletAdd02Icon}
+              onPress={() =>
+                navigation.navigate('Placeholder', { title: 'Fund wallet' })
+              }
+            />
+          </View>
+
+          <View style={styles.metricsRow}>
+            <MetricCard
+              icon={Calendar03Icon}
+              label="This month"
+              value={thisMonthTotal}
+            />
+            <MetricCard
+              icon={CreditCardIcon}
+              label="Total withdrawn"
+              value={totalWithdrawn}
+            />
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <AppText variant="muted" style={styles.sectionTitle}>
+              Recent transactions
+            </AppText>
+            <TouchableOpacity
+              onPress={openFilterSheet}
+              activeOpacity={0.85}
+              style={[
+                styles.filterIconButton,
+                hasAppliedFilters ? styles.filterIconButtonActive : null,
+              ]}
+            >
+              <HugeiconsIcon
+                icon={FilterHorizontalIcon}
+                size={18}
+                color={darkTheme.colors.muted}
                 strokeWidth={1.9}
               />
             </TouchableOpacity>
           </View>
 
-          <AppText style={styles.balanceAmount}>{isBalanceVisible ? toNaira(balance) : '₦ *****'}</AppText>
+          {loading ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            </View>
+          ) : null}
 
-          <AppText variant="muted" style={styles.balanceSubtext}>
-            You have transacted {transactions.length} times today
-          </AppText>
-        </View>
+          {!loading && filteredTransactions.length ? (
+            <View style={styles.txnList}>
+              {filteredTransactions.map(txn => (
+                <TransactionItem key={txn.id} item={txn} />
+              ))}
+            </View>
+          ) : null}
 
-        <View style={styles.actionsRow}>
-          <ActionButton label="Withdraw" icon={SentIcon} onPress={() => navigation.navigate('Placeholder', { title: 'Withdraw' })} />
-          <ActionButton
-            label="Fund wallet"
-            icon={WalletAdd02Icon}
-            onPress={() => navigation.navigate('Placeholder', { title: 'Fund wallet' })}
-          />
-        </View>
-
-        <View style={styles.metricsRow}>
-          <MetricCard icon={Calendar03Icon} label="This month" value={thisMonthTotal} />
-          <MetricCard icon={CreditCardIcon} label="Total withdrawn" value={totalWithdrawn} />
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <AppText variant="muted" style={styles.sectionTitle}>
-            Recent transactions
-          </AppText>
-          <TouchableOpacity
-            onPress={openFilterSheet}
-            activeOpacity={0.85}
-            style={[styles.filterIconButton, hasAppliedFilters ? styles.filterIconButtonActive : null]}
-          >
-            <HugeiconsIcon icon={FilterHorizontalIcon} size={18} color={darkTheme.colors.muted} strokeWidth={1.9} />
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator size="small" color={darkTheme.colors.accent} />
-          </View>
-        ) : null}
-
-        {!loading && filteredTransactions.length ? (
-          <View style={styles.txnList}>
-            {filteredTransactions.map((txn) => (
-              <TransactionItem key={txn.id} item={txn} />
-            ))}
-          </View>
-        ) : null}
-
-        {!loading && !filteredTransactions.length ? (
-          <View style={styles.centerState}>
-            <AppText style={styles.errorText}>
-              {hasAppliedFilters ? 'No transactions match your current filters.' : emptyText}
-            </AppText>
-          </View>
-        ) : null}
+          {!loading && !filteredTransactions.length ? (
+            <View style={styles.centerState}>
+              <AppText style={styles.errorText}>
+                {hasAppliedFilters
+                  ? 'No transactions match your current filters.'
+                  : emptyText}
+              </AppText>
+            </View>
+          ) : null}
         </View>
       </ScreenContainer>
 
-      <Modal visible={isFilterVisible} transparent animationType="none" onRequestClose={closeFilterSheet}>
+      <Modal
+        visible={isFilterVisible}
+        transparent
+        animationType="none"
+        onRequestClose={closeFilterSheet}
+      >
         <View style={styles.filterModalRoot}>
-          <Animated.View style={[styles.filterBackdrop, { opacity: backdropOpacity }]}>
-            <Pressable style={styles.filterBackdropTouch} onPress={closeFilterSheet} />
+          <Animated.View
+            style={[styles.filterBackdrop, { opacity: backdropOpacity }]}
+          >
+            <Pressable
+              style={styles.filterBackdropTouch}
+              onPress={closeFilterSheet}
+            />
           </Animated.View>
 
-          <Animated.View style={[styles.filterSheet, { transform: [{ translateY: sheetTranslateY }] }]}>
+          <Animated.View
+            style={[
+              styles.filterSheet,
+              { transform: [{ translateY: sheetTranslateY }] },
+            ]}
+          >
             <View style={styles.filterSheetHandle} />
             <View style={styles.filterTitleRow}>
               <View style={styles.filterHeadingWrap}>
                 <AppText style={styles.filterTitle}>Set filters</AppText>
-                <HugeiconsIcon icon={FilterHorizontalIcon} size={16} color={darkTheme.colors.muted} strokeWidth={1.9} />
+                <HugeiconsIcon
+                  icon={FilterHorizontalIcon}
+                  size={16}
+                  color={darkTheme.colors.muted}
+                  strokeWidth={1.9}
+                />
               </View>
-              <TouchableOpacity onPress={clearDraftFilters} style={styles.clearFilterButton} activeOpacity={0.85}>
-                <AppText style={styles.clearFilterButtonText}>x Clear filters</AppText>
+              <TouchableOpacity
+                onPress={clearDraftFilters}
+                style={styles.clearFilterButton}
+                activeOpacity={0.85}
+              >
+                <AppText style={styles.clearFilterButtonText}>
+                  x Clear filters
+                </AppText>
               </TouchableOpacity>
             </View>
 
             <AppText style={styles.filterSectionLabel}>Type</AppText>
             <View style={styles.filterTypeWrap}>
-              {FILTER_TYPE_OPTIONS.map((typeOption) => (
+              {FILTER_TYPE_OPTIONS.map(typeOption => (
                 <FilterChip
                   key={typeOption.key}
                   label={typeOption.label}
@@ -540,12 +726,23 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
                   datePickerTarget === 'from' ? styles.dateDropdownOpen : null,
                   draftFromDateOption ? styles.dateDropdownSelected : null,
                 ]}
-                onPress={() => setDatePickerTarget((prev) => (prev === 'from' ? '' : 'from'))}
+                onPress={() =>
+                  setDatePickerTarget(prev => (prev === 'from' ? '' : 'from'))
+                }
                 activeOpacity={0.85}
               >
-                <AppText style={[styles.dateDropdownText, draftFromDateOption ? styles.dateDropdownTextSelected : null]}>
+                <AppText
+                  style={[
+                    styles.dateDropdownText,
+                    draftFromDateOption
+                      ? styles.dateDropdownTextSelected
+                      : null,
+                  ]}
+                >
                   {draftFromDateOption
-                    ? DATE_FILTER_OPTIONS.find((entry) => entry.key === draftFromDateOption)?.label || 'From'
+                    ? DATE_FILTER_OPTIONS.find(
+                        entry => entry.key === draftFromDateOption,
+                      )?.label || 'From'
                     : 'From'}
                 </AppText>
                 <AppText style={styles.dateDropdownChevron}>v</AppText>
@@ -557,12 +754,21 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
                   datePickerTarget === 'to' ? styles.dateDropdownOpen : null,
                   draftToDateOption ? styles.dateDropdownSelected : null,
                 ]}
-                onPress={() => setDatePickerTarget((prev) => (prev === 'to' ? '' : 'to'))}
+                onPress={() =>
+                  setDatePickerTarget(prev => (prev === 'to' ? '' : 'to'))
+                }
                 activeOpacity={0.85}
               >
-                <AppText style={[styles.dateDropdownText, draftToDateOption ? styles.dateDropdownTextSelected : null]}>
+                <AppText
+                  style={[
+                    styles.dateDropdownText,
+                    draftToDateOption ? styles.dateDropdownTextSelected : null,
+                  ]}
+                >
                   {draftToDateOption
-                    ? DATE_FILTER_OPTIONS.find((entry) => entry.key === draftToDateOption)?.label || 'To'
+                    ? DATE_FILTER_OPTIONS.find(
+                        entry => entry.key === draftToDateOption,
+                      )?.label || 'To'
                     : 'To'}
                 </AppText>
                 <AppText style={styles.dateDropdownChevron}>v</AppText>
@@ -571,9 +777,11 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
 
             {datePickerTarget ? (
               <View style={styles.dateOptionWrap}>
-                {DATE_FILTER_OPTIONS.map((option) => {
+                {DATE_FILTER_OPTIONS.map(option => {
                   const activeForTarget =
-                    datePickerTarget === 'from' ? draftFromDateOption === option.key : draftToDateOption === option.key;
+                    datePickerTarget === 'from'
+                      ? draftFromDateOption === option.key
+                      : draftToDateOption === option.key;
                   return (
                     <FilterChip
                       key={`${datePickerTarget}-${option.key}`}
@@ -594,7 +802,10 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
             ) : null}
 
             <TouchableOpacity
-              style={[styles.applyFiltersButton, !hasDraftFilters ? styles.applyFiltersButtonDisabled : null]}
+              style={[
+                styles.applyFiltersButton,
+                !hasDraftFilters ? styles.applyFiltersButtonDisabled : null,
+              ]}
               disabled={!hasDraftFilters}
               onPress={applyDraftFilters}
               activeOpacity={0.9}
@@ -602,7 +813,9 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
               <AppText
                 style={[
                   styles.applyFiltersButtonText,
-                  !hasDraftFilters ? styles.applyFiltersButtonTextDisabled : null,
+                  !hasDraftFilters
+                    ? styles.applyFiltersButtonTextDisabled
+                    : null,
                 ]}
               >
                 Show transactions
@@ -612,7 +825,95 @@ const MechanicWalletScreen = ({ navigation, onTabPress, showTabBar = true }) => 
         </View>
       </Modal>
 
-      {showTabBar ? <MechanicTabBar activeTab="wallet" onTabPress={handleTabPress} /> : null}
+      <Modal
+        visible={isWithdrawModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeWithdrawModal}
+      >
+        <View style={styles.withdrawModalRoot}>
+          <Pressable
+            style={styles.withdrawBackdrop}
+            onPress={closeWithdrawModal}
+          />
+          <View style={styles.withdrawCard}>
+            <AppText style={styles.withdrawTitle}>Withdraw</AppText>
+            <AppText variant="muted" style={styles.withdrawSubtitle}>
+              Select an amount or enter a custom value
+            </AppText>
+
+            <View style={styles.withdrawQuickRow}>
+              {QUICK_WITHDRAW_AMOUNTS.map((amount, index) => {
+                const isActive = Number(withdrawAmount) === amount;
+                return (
+                  <TouchableOpacity
+                    key={amount}
+                    activeOpacity={0.85}
+                    onPress={() => handleSelectQuickAmount(amount)}
+                    style={[
+                      styles.quickAmountChip,
+                      index === QUICK_WITHDRAW_AMOUNTS.length - 1
+                        ? styles.quickAmountChipLast
+                        : null,
+                      isActive ? styles.quickAmountChipActive : null,
+                    ]}
+                  >
+                    <AppText
+                      style={[
+                        styles.quickAmountText,
+                        isActive ? styles.quickAmountTextActive : null,
+                      ]}
+                    >
+                      {toNaira(amount)}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.withdrawInputWrap}>
+              <AppText style={styles.withdrawInputLabel}>Custom amount</AppText>
+              <TextInput
+                placeholder="Enter amount"
+                placeholderTextColor="rgba(255,255,255,0.45)"
+                keyboardType="number-pad"
+                value={withdrawAmount}
+                onChangeText={handleWithdrawAmountChange}
+                style={styles.withdrawInput}
+              />
+            </View>
+
+            {withdrawError ? (
+              <AppText style={styles.withdrawError}>{withdrawError}</AppText>
+            ) : null}
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleSubmitWithdraw}
+              disabled={withdrawSubmitting}
+              style={[
+                styles.withdrawSubmit,
+                withdrawSubmitting ? styles.withdrawSubmitDisabled : null,
+              ]}
+            >
+              {withdrawSubmitting ? (
+                <ActivityIndicator
+                  size="small"
+                  color={darkTheme.colors.background}
+                />
+              ) : (
+                <AppText style={styles.withdrawSubmitText}>
+                  Request withdrawal
+                </AppText>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {showTabBar ? (
+        <MechanicTabBar activeTab="wallet" onTabPress={handleTabPress} />
+      ) : null}
     </View>
   );
 };
@@ -626,7 +927,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     paddingHorizontal: darkTheme.spacing.xl,
-    paddingTop: 4,
   },
   header: {
     minHeight: 44,
@@ -853,6 +1153,97 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 22,
     minHeight: 350,
+  },
+  withdrawModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  withdrawBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(6, 7, 24, 0.7)',
+  },
+  withdrawCard: {
+    width: '86%',
+    backgroundColor: '#1A1A4A',
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+  },
+  withdrawTitle: {
+    fontSize: 18,
+    fontFamily: darkTheme.fonts?.heading,
+    color: darkTheme.colors.text,
+  },
+  withdrawSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+  },
+  withdrawQuickRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+  },
+  quickAmountChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  quickAmountChipLast: {
+    marginRight: 0,
+  },
+  quickAmountChipActive: {
+    borderColor: darkTheme.colors.accent,
+    backgroundColor: 'rgba(230,199,20,0.12)',
+  },
+  quickAmountText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  quickAmountTextActive: {
+    color: darkTheme.colors.accent,
+    fontFamily: darkTheme.fonts?.heading,
+  },
+  withdrawInputWrap: {
+    marginTop: 18,
+  },
+  withdrawInputLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 6,
+  },
+  withdrawInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: darkTheme.colors.text,
+    fontSize: 14,
+  },
+  withdrawError: {
+    marginTop: 10,
+    color: '#F87171',
+    fontSize: 12,
+  },
+  withdrawSubmit: {
+    marginTop: 16,
+    backgroundColor: darkTheme.colors.accent,
+    borderRadius: 14,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  withdrawSubmitDisabled: {
+    opacity: 0.7,
+  },
+  withdrawSubmitText: {
+    color: '#000',
+    fontSize: 14,
+    fontFamily: darkTheme.fonts?.heading,
   },
   filterSheetHandle: {
     alignSelf: 'center',

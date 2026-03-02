@@ -7,6 +7,7 @@ import {
   Pressable,
   StatusBar,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -25,7 +26,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
 import { getTransactions } from '../../../services/transactions.service';
-import { getWalletBalance } from '../../../services/wallet.service';
+import { getWalletBalance, getWithdrawals, requestWithdrawal } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -62,17 +63,23 @@ const readTransactions = (payload) => {
   return [];
 };
 
-const normalizeTransaction = (item, index) => {
+const normalizeTransaction = (item, index, source) => {
   const amount = Number(item?.amount || item?.value || 0);
-  const type = String(item?.type || item?.transaction_type || '').toLowerCase();
+  const inferredType =
+    item?.type ||
+    item?.transaction_type ||
+    (item?.bank_name || item?.account_name || item?.account_number ? 'withdraw' : '');
+  const type = String(inferredType || '').toLowerCase();
   const createdAtRaw = item?.created_at || item?.createdAt || item?.date || '';
   const parsedTime = Date.parse(String(createdAtRaw || ''));
   const createdAtMs = Number.isFinite(parsedTime) ? parsedTime : 0;
+  const baseTitle = item?.title || item?.narration || item?.description || '';
+  const resolvedTitle = baseTitle || (type.includes('withdraw') ? 'Withdrawal' : 'Transaction');
 
   return {
     id: String(item?.id || item?._id || item?.reference || `txn-${index}`),
     reference: String(item?.reference || item?.trxref || item?.id || '').trim(),
-    title: item?.title || item?.narration || item?.description || 'Transaction',
+    title: resolvedTitle,
     subtitle: item?.subtitle || item?.channel || item?.status || '',
     amountText: toAmountWithSign(amount),
     time: createdAtRaw,
@@ -83,6 +90,7 @@ const normalizeTransaction = (item, index) => {
     rawType: type,
     rawStatus: String(item?.status || '').toLowerCase(),
     rawTitle: String(item?.title || item?.narration || item?.description || '').toLowerCase(),
+    rawSource: source || 'transactions',
   };
 };
 
@@ -101,6 +109,8 @@ const DATE_FILTER_OPTIONS = [
   { key: '7_days', label: 'Last 7 days', days: 7 },
   { key: '30_days', label: 'Last 30 days', days: 30 },
 ];
+
+const QUICK_WITHDRAW_AMOUNTS = [1000, 5000, 10000];
 
 const matchesTypeFilter = (txn, filterKey) => {
   const haystack = `${txn?.rawType || ''} ${txn?.rawStatus || ''} ${txn?.rawTitle || ''}`.toLowerCase();
@@ -122,13 +132,7 @@ const matchesTypeFilter = (txn, filterKey) => {
         amount > 0
       );
     case 'withdraw':
-      return (
-        haystack.includes('withdraw') ||
-        haystack.includes('debit') ||
-        haystack.includes('cashout') ||
-        haystack.includes('transfer') ||
-        amount < 0
-      );
+      return txn?.rawSource === 'withdrawals';
     default:
       return true;
   }
@@ -221,19 +225,31 @@ const WalletScreen = ({ navigation }) => {
   const [draftToDateOption, setDraftToDateOption] = useState('');
   const [datePickerTarget, setDatePickerTarget] = useState('');
   const sheetProgress = useRef(new Animated.Value(0)).current;
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
 
   const fetchWalletData = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      const [walletResponse, transactionsResponse] = await Promise.all([
+      const [walletResponse, transactionsResponse, withdrawalsResponse] = await Promise.all([
         getWalletBalance(),
         getTransactions(),
+        getWithdrawals(),
       ]);
 
       const walletPayload = walletResponse?.data || walletResponse || {};
-      const transactionItems = readTransactions(transactionsResponse).map(normalizeTransaction);
+      const transactionItems = [
+        ...readTransactions(transactionsResponse).map((item, index) =>
+          normalizeTransaction(item, index, 'transactions')
+        ),
+        ...readTransactions(withdrawalsResponse).map((item, index) =>
+          normalizeTransaction(item, index, 'withdrawals')
+        ),
+      ];
 
       setBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
       setTransactions(transactionItems);
@@ -291,6 +307,54 @@ const WalletScreen = ({ navigation }) => {
         setIsFilterVisible(false);
       }
     });
+  };
+
+  const openWithdrawModal = () => {
+    setWithdrawError('');
+    setWithdrawAmount('');
+    setIsWithdrawModalOpen(true);
+  };
+
+  const closeWithdrawModal = () => {
+    if (withdrawSubmitting) {
+      return;
+    }
+    setIsWithdrawModalOpen(false);
+  };
+
+  const handleWithdrawAmountChange = (value) => {
+    const sanitized = String(value || '').replace(/[^\d]/g, '');
+    setWithdrawAmount(sanitized);
+    if (withdrawError) {
+      setWithdrawError('');
+    }
+  };
+
+  const handleSelectQuickAmount = (amount) => {
+    setWithdrawAmount(String(amount));
+    if (withdrawError) {
+      setWithdrawError('');
+    }
+  };
+
+  const handleSubmitWithdraw = async () => {
+    const parsedAmount = Number(withdrawAmount || 0);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setWithdrawError('Enter a valid amount to withdraw.');
+      return;
+    }
+
+    setWithdrawSubmitting(true);
+    setWithdrawError('');
+    try {
+      await requestWithdrawal(parsedAmount);
+      closeWithdrawModal();
+      fetchWalletData();
+    } catch (requestError) {
+      setWithdrawError('Unable to request withdrawal right now.');
+    } finally {
+      setWithdrawSubmitting(false);
+    }
   };
 
   const toggleDraftType = (typeKey) => {
@@ -412,7 +476,7 @@ const WalletScreen = ({ navigation }) => {
           <ActionButton
             label="Withdraw"
             icon={SentIcon}
-            onPress={() => navigation.navigate(ROUTES.CAR_OWNER_WITHDRAW)}
+            onPress={openWithdrawModal}
           />
           <ActionButton
             label="Fund wallet"
@@ -578,6 +642,67 @@ const WalletScreen = ({ navigation }) => {
               </AppText>
             </TouchableOpacity>
           </Animated.View>
+        </View>
+      </Modal>
+
+      <Modal visible={isWithdrawModalOpen} transparent animationType="fade" onRequestClose={closeWithdrawModal}>
+        <View style={styles.withdrawModalRoot}>
+          <Pressable style={styles.withdrawBackdrop} onPress={closeWithdrawModal} />
+          <View style={styles.withdrawCard}>
+            <AppText style={styles.withdrawTitle}>Withdraw</AppText>
+            <AppText variant="muted" style={styles.withdrawSubtitle}>
+              Select an amount or enter a custom value
+            </AppText>
+
+            <View style={styles.withdrawQuickRow}>
+              {QUICK_WITHDRAW_AMOUNTS.map((amount, index) => {
+                const isActive = Number(withdrawAmount) === amount;
+                return (
+                  <TouchableOpacity
+                    key={amount}
+                    activeOpacity={0.85}
+                    onPress={() => handleSelectQuickAmount(amount)}
+                    style={[
+                      styles.quickAmountChip,
+                      index === QUICK_WITHDRAW_AMOUNTS.length - 1 ? styles.quickAmountChipLast : null,
+                      isActive ? styles.quickAmountChipActive : null,
+                    ]}
+                  >
+                    <AppText style={[styles.quickAmountText, isActive ? styles.quickAmountTextActive : null]}>
+                      {toNaira(amount)}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.withdrawInputWrap}>
+              <AppText style={styles.withdrawInputLabel}>Custom amount</AppText>
+              <TextInput
+                placeholder="Enter amount"
+                placeholderTextColor="rgba(255,255,255,0.45)"
+                keyboardType="number-pad"
+                value={withdrawAmount}
+                onChangeText={handleWithdrawAmountChange}
+                style={styles.withdrawInput}
+              />
+            </View>
+
+            {withdrawError ? <AppText style={styles.withdrawError}>{withdrawError}</AppText> : null}
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleSubmitWithdraw}
+              disabled={withdrawSubmitting}
+              style={[styles.withdrawSubmit, withdrawSubmitting ? styles.withdrawSubmitDisabled : null]}
+            >
+              {withdrawSubmitting ? (
+                <ActivityIndicator size="small" color={darkTheme.colors.background} />
+              ) : (
+                <AppText style={styles.withdrawSubmitText}>Request withdrawal</AppText>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -940,6 +1065,97 @@ const styles = StyleSheet.create({
   bottomNav: {
     borderTopWidth: 0,
     paddingTop: darkTheme.spacing.xs,
+  },
+  withdrawModalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  withdrawBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(6, 7, 24, 0.7)',
+  },
+  withdrawCard: {
+    width: '86%',
+    backgroundColor: '#1A1A4A',
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+  },
+  withdrawTitle: {
+    fontSize: 18,
+    fontFamily: darkTheme.fonts?.heading,
+    color: darkTheme.colors.text,
+  },
+  withdrawSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+  },
+  withdrawQuickRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+  },
+  quickAmountChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  quickAmountChipLast: {
+    marginRight: 0,
+  },
+  quickAmountChipActive: {
+    borderColor: darkTheme.colors.accent,
+    backgroundColor: 'rgba(230,199,20,0.12)',
+  },
+  quickAmountText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  quickAmountTextActive: {
+    color: darkTheme.colors.accent,
+    fontFamily: darkTheme.fonts?.heading,
+  },
+  withdrawInputWrap: {
+    marginTop: 18,
+  },
+  withdrawInputLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 6,
+  },
+  withdrawInput: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: darkTheme.colors.text,
+    fontSize: 14,
+  },
+  withdrawError: {
+    marginTop: 10,
+    color: '#F87171',
+    fontSize: 12,
+  },
+  withdrawSubmit: {
+    marginTop: 16,
+    backgroundColor: darkTheme.colors.accent,
+    borderRadius: 14,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  withdrawSubmitDisabled: {
+    opacity: 0.7,
+  },
+  withdrawSubmitText: {
+    color: '#000',
+    fontSize: 14,
+    fontFamily: darkTheme.fonts?.heading,
   },
 });
 

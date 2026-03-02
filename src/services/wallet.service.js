@@ -60,9 +60,22 @@ export const getWalletBalance = async () => {
   return response.data;
 };
 
+export const requestWithdrawal = async (amount) => {
+  const validAmount = validateTopUpAmount(amount);
+  const response = await api.post(ENDPOINTS.wallet.withdrawRequest, { amount: validAmount });
+  return response.data;
+};
+
+export const getWithdrawals = async () => {
+  const response = await api.get(ENDPOINTS.wallet.withdrawals);
+  return response.data;
+};
+
 export default {
   topUpWallet,
   verifyWalletPayment,
   validateTopUpAmount,
   getWalletBalance,
+  requestWithdrawal,
+  getWithdrawals,
 };
