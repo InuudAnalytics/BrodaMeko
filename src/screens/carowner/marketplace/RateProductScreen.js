@@ -64,7 +64,7 @@ const RateProductScreen = ({ navigation, route }) => {
     setSubmitting(true);
     try {
       // TODO: Hook into product rating endpoint when available.
-      Alert.alert('Rating submitted', 'Thanks for your feedback.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      navigation.navigate('ProductFeedbackSuccess');
     } catch (submitError) {
       Alert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
     } finally {
@@ -155,8 +155,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 84,
-    paddingBottom: 28,
+    paddingTop: 56,
+    paddingBottom: 24,
   },
   profileCard: {
     backgroundColor: 'rgba(245,245,245,0.18)',
@@ -170,11 +170,11 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatarCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#F28C28',
-    borderWidth: 4,
+    borderWidth: 0.5,
     borderColor: '#E6C714',
     alignItems: 'center',
     justifyContent: 'center',
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: '#111133',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: darkTheme.typography.fontWeights.bold,
   },
   profileInfo: {
@@ -194,53 +194,53 @@ const styles = StyleSheet.create({
   },
   profileName: {
     color: '#F5F5F5',
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   profileIssue: {
     marginTop: 2,
     color: 'rgba(245,245,245,0.72)',
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },
   profileId: {
     marginTop: 2,
     color: 'rgba(245,245,245,0.45)',
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },
   section: {
-    marginTop: 22,
+    marginTop: 18,
   },
   sectionTitle: {
     color: '#F5F5F5',
-    fontSize: 30,
-    lineHeight: 34,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   starRow: {
-    marginTop: 12,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: 304,
+    width: 260,
     maxWidth: '100%',
   },
   tagsWrap: {
-    marginTop: 10,
+    marginTop: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   tag: {
-    minHeight: 40,
-    borderRadius: 11,
+    minHeight: 32,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: 'rgba(245,245,245,0.35)',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
@@ -251,32 +251,32 @@ const styles = StyleSheet.create({
   },
   tagText: {
     color: 'rgba(245,245,245,0.9)',
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },
   tagTextSelected: {
     color: '#111133',
   },
   feedbackWrap: {
-    marginTop: 10,
+    marginTop: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(245,245,245,0.24)',
-    minHeight: 186,
+    minHeight: 150,
     paddingHorizontal: 12,
     paddingTop: 10,
   },
   feedbackInput: {
-    minHeight: 160,
+    minHeight: 130,
     color: '#F5F5F5',
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },
   ctaWrap: {
     marginTop: 'auto',
-    paddingTop: 24,
-    paddingHorizontal: 32,
+    paddingTop: 18,
+    paddingHorizontal: 28,
   },
 });
 

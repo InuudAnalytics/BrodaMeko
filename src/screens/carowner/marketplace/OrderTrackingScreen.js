@@ -10,15 +10,28 @@ import {
   View,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, CheckmarkCircle01Icon, Message02Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
+import {
+  ArrowLeft01Icon,
+  CheckmarkCircle01Icon,
+  Message02Icon,
+} from '@hugeicons/core-free-icons';
+import {
+  AppButton,
+  AppText,
+  OpenStreetMapView,
+  ScreenContainer,
+} from '../../../components';
 import { darkTheme } from '../../../theme';
 
 const PANEL_MAX_DOWN = 360;
 
 const fallbackTimeline = [
   { id: 'confirmed', label: 'Order confirmed', eta: 'Today • 10:15 AM' },
-  { id: 'preparing', label: 'Seller preparing package', eta: 'Today • 11:30 AM' },
+  {
+    id: 'preparing',
+    label: 'Seller preparing package',
+    eta: 'Today • 11:30 AM',
+  },
   { id: 'out_for_delivery', label: 'Out for delivery', eta: 'Today • 1:20 PM' },
   { id: 'delivered', label: 'Delivered', eta: 'Today • 3:30 PM' },
 ];
@@ -38,7 +51,8 @@ const fallbackSeller = {
 
 const fallbackAddress = 'No 1, Onireke street, Agbabiaka';
 
-const formatNaira = (value) => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
+const formatNaira = value =>
+  `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
 const OrderTrackingScreen = ({ navigation, route }) => {
   const panelY = useRef(new Animated.Value(0)).current;
@@ -61,7 +75,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
 
   const imageUri = product?.images?.[0] || '';
 
-  const animatePanelTo = (toValue) => {
+  const animatePanelTo = toValue => {
     Animated.spring(panelY, {
       toValue,
       useNativeDriver: true,
@@ -78,7 +92,10 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           dragStartRef.current = panelYRef.current;
         },
         onPanResponderMove: (_, gesture) => {
-          const next = Math.max(0, Math.min(PANEL_MAX_DOWN, dragStartRef.current + gesture.dy));
+          const next = Math.max(
+            0,
+            Math.min(PANEL_MAX_DOWN, dragStartRef.current + gesture.dy),
+          );
           panelY.setValue(next);
         },
         onPanResponderRelease: (_, gesture) => {
@@ -90,7 +107,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           }
         },
       }),
-    [panelY]
+    [panelY],
   );
 
   panelY.addListener(({ value }) => {
@@ -102,7 +119,12 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   };
 
   const handleConfirmDelivery = () => {
-    Alert.alert('Confirm delivery', 'Delivery confirmation will be wired soon.');
+    navigation.navigate('OrderDeliveredSuccess', {
+      productName: product?.name,
+      productImage: product?.images?.[0],
+      sellerName: seller?.name,
+      orderId: route?.params?.orderId || route?.params?.order_id,
+    });
   };
 
   const handleReportIssue = () => {
@@ -111,47 +133,82 @@ const OrderTrackingScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.root}>
-      <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
+      <ScreenContainer
+        padded={false}
+        edges={['top', 'left', 'right']}
+        style={styles.screen}
+      >
         <View style={styles.mapBackdrop}>
           {mapReady ? (
             <>
-              <OpenStreetMapView latitude={mapCenter.latitude} longitude={mapCenter.longitude} />
+              <OpenStreetMapView
+                latitude={mapCenter.latitude}
+                longitude={mapCenter.longitude}
+              />
               <View style={styles.mockRouteLine} />
               <View style={styles.mockPin} />
             </>
           ) : (
             <View style={styles.mapFallback}>
-              <AppText style={styles.mapFallbackText}>Map preview unavailable</AppText>
+              <AppText style={styles.mapFallbackText}>
+                Map preview unavailable
+              </AppText>
             </View>
           )}
           <View style={styles.topBar}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
-              <HugeiconsIcon icon={ArrowLeft01Icon} size={22} color={darkTheme.colors.accent} strokeWidth={2} />
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.85}
+            >
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                size={22}
+                color={darkTheme.colors.accent}
+                strokeWidth={2}
+              />
             </TouchableOpacity>
             <AppText style={styles.topTitle}>Order tracking</AppText>
             <View style={styles.topSpacer} />
           </View>
         </View>
 
-        <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]} {...panResponder.panHandlers}>
+        <Animated.View
+          style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]}
+          {...panResponder.panHandlers}
+        >
           <View style={styles.handle} />
-          <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.sheetContent}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.timelineBlock}>
-              {statusTimeline.map((step) => (
+              {statusTimeline.map(step => (
                 <View key={step.id} style={styles.timelineRow}>
                   <View style={styles.timelineIconWrap}>
-                    <HugeiconsIcon icon={CheckmarkCircle01Icon} size={18} color="#E6C714" strokeWidth={2} />
+                    <HugeiconsIcon
+                      icon={CheckmarkCircle01Icon}
+                      size={18}
+                      color="#E6C714"
+                      strokeWidth={2}
+                    />
                   </View>
                   <View style={styles.timelineContent}>
                     <AppText style={styles.timelineTitle}>{step.label}</AppText>
-                    <AppText style={styles.timelineEta}>{step.eta || 'ETA coming soon'}</AppText>
+                    <AppText style={styles.timelineEta}>
+                      {step.eta || 'ETA coming soon'}
+                    </AppText>
                   </View>
                 </View>
               ))}
             </View>
 
             <View style={styles.productCard}>
-              {imageUri ? <Image source={{ uri: imageUri }} style={styles.productImage} /> : <View style={styles.imagePlaceholder} />}
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.productImage} />
+              ) : (
+                <View style={styles.imagePlaceholder} />
+              )}
               <View style={styles.productInfo}>
                 <AppText style={styles.productName} numberOfLines={1}>
                   {product?.name || 'Product'}
@@ -159,7 +216,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                 <AppText style={styles.productShop} numberOfLines={1}>
                   {product?.shop || 'Seller'}
                 </AppText>
-                <AppText style={styles.productPrice}>{formatNaira(product?.price || 0)}</AppText>
+                <AppText style={styles.productPrice}>
+                  {formatNaira(product?.price || 0)}
+                </AppText>
               </View>
             </View>
             <View style={styles.addressRow}>
@@ -170,26 +229,49 @@ const OrderTrackingScreen = ({ navigation, route }) => {
             <View style={styles.sellerCard}>
               <View style={styles.sellerAvatarWrap}>
                 {seller?.avatar ? (
-                  <Image source={{ uri: seller.avatar }} style={styles.sellerAvatar} />
+                  <Image
+                    source={{ uri: seller.avatar }}
+                    style={styles.sellerAvatar}
+                  />
                 ) : (
                   <View style={styles.sellerAvatarPlaceholder} />
                 )}
                 {seller?.isActive ? <View style={styles.activeDot} /> : null}
               </View>
               <View style={styles.sellerInfo}>
-                <AppText style={styles.sellerName}>{seller?.name || 'Seller'}</AppText>
+                <AppText style={styles.sellerName}>
+                  {seller?.name || 'Seller'}
+                </AppText>
                 <AppText style={styles.sellerStatus}>Active now</AppText>
               </View>
-              <TouchableOpacity style={styles.messageBtn} onPress={handleMessageSeller} activeOpacity={0.85}>
-                <HugeiconsIcon icon={Message02Icon} size={18} color="#E6C714" strokeWidth={2} />
+              <TouchableOpacity
+                style={styles.messageBtn}
+                onPress={handleMessageSeller}
+                activeOpacity={0.85}
+              >
+                <HugeiconsIcon
+                  icon={Message02Icon}
+                  size={18}
+                  color="#E6C714"
+                  strokeWidth={2}
+                />
                 <AppText style={styles.messageText}>Message seller</AppText>
               </TouchableOpacity>
             </View>
 
             <View style={styles.actionsRow}>
-              <AppButton label="Confirm delivery" onPress={handleConfirmDelivery} />
-              <TouchableOpacity style={styles.secondaryAction} onPress={handleReportIssue} activeOpacity={0.85}>
-                <AppText style={styles.secondaryActionText}>Report an issue</AppText>
+              <AppButton
+                label="Confirm delivery"
+                onPress={handleConfirmDelivery}
+              />
+              <TouchableOpacity
+                style={styles.secondaryAction}
+                onPress={handleReportIssue}
+                activeOpacity={0.85}
+              >
+                <AppText style={styles.secondaryActionText}>
+                  Report an issue
+                </AppText>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -285,7 +367,7 @@ const styles = StyleSheet.create({
   },
   sheetContent: {
     paddingHorizontal: darkTheme.spacing.lg,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   timelineBlock: {
     marginBottom: darkTheme.spacing.lg,
@@ -446,4 +528,3 @@ const styles = StyleSheet.create({
 });
 
 export default OrderTrackingScreen;
-
