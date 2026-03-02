@@ -1,4 +1,6 @@
 export { AuthProvider, useAuth } from './AuthContext';
+export { CartProvider, useCart } from './CartContext';
+export { FavoritesProvider, useFavorites } from './FavoritesContext';
 export { ChatProvider, useChat } from './ChatContext';
 export { JobsProvider, useJobs } from './JobsContext';
 export { MechanicProfileProvider, useMechanicProfile } from './MechanicProfileContext';
