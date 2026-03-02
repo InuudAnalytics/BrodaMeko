@@ -5,6 +5,7 @@ import SparePartsTabBar from '../components/navigation/SparePartsTabBar';
 import SellerDashboardScreen from '../screens/spareparts/home/SellerDashboardScreen';
 import MechanicWalletScreen from '../screens/mech/wallet/MechanicWalletScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
+import OrdersScreen from '../screens/spareparts/orders/OrdersScreen';
 import SellerStoreScreen from '../screens/spareparts/store/SellerStoreScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import { ROUTES } from '../utils';
@@ -33,13 +34,7 @@ const SparePartsTabs = ({ navigation, route }) => {
     }
 
     if (activeTab === 'orders') {
-      return (
-        <PlaceholderScreen
-          navigation={navigation}
-          route={{ params: { title: 'Orders' } }}
-          onBack={() => setActiveTab('home')}
-        />
-      );
+      return <OrdersScreen navigation={navigation} onBack={() => setActiveTab('home')} />;
     }
 
     if (activeTab === 'store') {
