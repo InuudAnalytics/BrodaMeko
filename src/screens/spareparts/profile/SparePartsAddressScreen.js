@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ArrowRight01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
+import { openSettings } from 'react-native-permissions';
 import {
   AppButton,
   AppInput,
@@ -19,6 +20,7 @@ import {
   ScreenContainer,
 } from '../../../components';
 import { useSparePartsProfile } from '../../../context';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import {
   createSellerStore,
   getSellerStore,
@@ -32,6 +34,7 @@ import {
   ROUTES,
   SPARE_PARTS_ONBOARDING_STEPS,
 } from '../../../utils';
+import { fetchPlaceDetails, fetchPlaceSuggestions, parseAddressComponents, reverseGeocode } from '../../../utils/places';
 
 const DAYS = [
   'Monday',
@@ -118,6 +121,12 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
   );
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [timeTarget, setTimeTarget] = useState('opening');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [fetchingSuggestions, setFetchingSuggestions] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const autocompleteTimer = useRef(null);
+  const { permissionStatus, requestPermission, refreshOnce, error: locationError } = useUserLocation();
 
   const [storeExists, setStoreExists] = useState(false);
 
@@ -159,6 +168,7 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
       String(store?.delivery_scope || store?.deliveryScope || 'state'),
     );
     setBannerUri(String(store?.banner_url || store?.bannerUrl || ''));
+    setSearchQuery(String(store?.street || ''));
   }, []);
 
   useEffect(() => {
@@ -206,6 +216,101 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
   const openTimePicker = target => {
     setTimeTarget(target);
     setShowTimePicker(true);
+  };
+
+  const handleSearchChange = value => {
+    setSearchQuery(value);
+
+    if (autocompleteTimer.current) {
+      clearTimeout(autocompleteTimer.current);
+    }
+
+    if (!value || value.trim().length < 3) {
+      setSuggestions([]);
+      setFetchingSuggestions(false);
+      return;
+    }
+
+    autocompleteTimer.current = setTimeout(async () => {
+      setFetchingSuggestions(true);
+      try {
+        const items = await fetchPlaceSuggestions(value.trim());
+        setSuggestions(items);
+      } catch (error) {
+        setSuggestions([]);
+        setErrorText(error?.message || 'Unable to search addresses.');
+      } finally {
+        setFetchingSuggestions(false);
+      }
+    }, 400);
+  };
+
+  const handleSuggestionSelect = async suggestion => {
+    if (!suggestion?.placeId) {
+      return;
+    }
+
+    setFetchingSuggestions(true);
+    try {
+      const details = await fetchPlaceDetails(suggestion.placeId);
+      const parsed = parseAddressComponents(details.components);
+      setSearchQuery(details.formattedAddress || suggestion.description || searchQuery);
+      setStreet(parsed.street || street);
+      setCity(parsed.city || city);
+      setStateName(parsed.state || stateName);
+      setCountry(parsed.country || country);
+      if (details.latitude !== null) {
+        setLatitude(String(details.latitude));
+      }
+      if (details.longitude !== null) {
+        setLongitude(String(details.longitude));
+      }
+      setSuggestions([]);
+    } catch (error) {
+      setErrorText(error?.message || 'Unable to fetch address details.');
+    } finally {
+      setFetchingSuggestions(false);
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocationLoading(true);
+    setErrorText('');
+
+    try {
+      const status = permissionStatus === 'granted' ? permissionStatus : await requestPermission();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location permission needed',
+          'Enable location permission to auto-fill your store address.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open settings', onPress: openSettings },
+          ]
+        );
+        return;
+      }
+
+      const location = await refreshOnce();
+      if (!location) {
+        setErrorText(locationError || 'Unable to read your location.');
+        return;
+      }
+
+      const result = await reverseGeocode(location);
+      const parsed = parseAddressComponents(result.components);
+      setSearchQuery(result.formattedAddress || searchQuery);
+      setStreet(parsed.street || street);
+      setCity(parsed.city || city);
+      setStateName(parsed.state || stateName);
+      setCountry(parsed.country || country);
+      setLatitude(String(location.latitude));
+      setLongitude(String(location.longitude));
+    } catch (error) {
+      setErrorText(error?.message || 'Unable to use current location.');
+    } finally {
+      setLocationLoading(false);
+    }
   };
 
   const pickBanner = async () => {
@@ -415,6 +520,41 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
             <AppText style={styles.sectionTitle}>Location</AppText>
             <HugeiconsIcon icon={ArrowRight01Icon} size={16} color="rgba(255,255,255,0.5)" strokeWidth={2} />
           </View>
+          <AppInput
+            label="Search address"
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            placeholder="Search for a place"
+          />
+          {suggestions.length ? (
+            <View style={styles.suggestionList}>
+              {suggestions.map(item => (
+                <TouchableOpacity
+                  key={item.placeId}
+                  style={styles.suggestionItem}
+                  activeOpacity={0.85}
+                  onPress={() => handleSuggestionSelect(item)}
+                >
+                  <AppText style={styles.suggestionText}>{item.description}</AppText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+          {fetchingSuggestions ? (
+            <View style={styles.suggestionLoading}>
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            </View>
+          ) : null}
+          <TouchableOpacity
+            style={styles.locationBtn}
+            activeOpacity={0.85}
+            onPress={handleUseCurrentLocation}
+            disabled={locationLoading}
+          >
+            <AppText style={styles.locationBtnText}>
+              {locationLoading ? 'Locating...' : 'Use current location'}
+            </AppText>
+          </TouchableOpacity>
           <AppInput
             label="Street"
             value={street}
@@ -711,6 +851,41 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
     marginBottom: 6,
+  },
+  suggestionList: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  suggestionText: {
+    color: darkTheme.colors.text,
+    fontSize: 12,
+  },
+  suggestionLoading: {
+    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  locationBtn: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  locationBtnText: {
+    color: darkTheme.colors.accent,
+    fontSize: 12,
   },
   rowInputs: {
     flexDirection: 'row',

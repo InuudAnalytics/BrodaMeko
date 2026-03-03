@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Delete02Icon, Location01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, Delete02Icon, Edit02Icon, Location01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
+import { openSettings } from 'react-native-permissions';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import {
   addMechanicAddress,
   deleteMechanicAddress,
@@ -13,6 +15,7 @@ import {
 } from '../../../services/mechanic.service';
 import { darkTheme } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
+import { fetchPlaceDetails, fetchPlaceSuggestions, parseAddressComponents, reverseGeocode } from '../../../utils/places';
 
 const buildEmptyAddress = () => ({
   id: `new-${Date.now()}-${Math.random()}`,
@@ -24,6 +27,7 @@ const buildEmptyAddress = () => ({
   country: '',
   latitude: '',
   longitude: '',
+  searchQuery: '',
   isPrimary: false,
   isExisting: false,
   isEditing: true,
@@ -73,6 +77,13 @@ const MechanicAddressScreen = ({ navigation, route }) => {
   const [actionId, setActionId] = useState('');
   const [globalError, setGlobalError] = useState('');
   const [showForm, setShowForm] = useState(isOnboarding);
+  const [activeFormId, setActiveFormId] = useState('');
+  const [activeSearchId, setActiveSearchId] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [fetchingSuggestions, setFetchingSuggestions] = useState(false);
+  const [locationRowId, setLocationRowId] = useState('');
+  const autocompleteTimer = useRef(null);
+  const { permissionStatus, requestPermission, refreshOnce, error: locationError } = useUserLocation();
 
   useEffect(() => {
     if (!isOnboarding) {
@@ -114,11 +125,17 @@ const MechanicAddressScreen = ({ navigation, route }) => {
         setRows(isOnboarding ? [buildEmptyAddress()] : []);
       }
       setShowForm(isOnboarding);
+      if (isOnboarding && mapped.length) {
+        setActiveFormId(mapped[0].id);
+      }
       setAddresses(mapped);
     } catch (error) {
       setGlobalError(error?.message || 'Unable to fetch addresses.');
       setRows(isOnboarding ? [buildEmptyAddress()] : []);
       setShowForm(isOnboarding);
+      if (isOnboarding) {
+        setActiveFormId((prev) => prev || buildEmptyAddress().id);
+      }
     } finally {
       setLoading(false);
     }
@@ -132,6 +149,108 @@ const MechanicAddressScreen = ({ navigation, route }) => {
     setRows((prev) =>
       prev.map((row) => (row.id === rowId ? { ...row, ...patch, error: patch.error ?? '' } : row))
     );
+  };
+
+  const handleSearchChange = (rowId, value) => {
+    updateRow(rowId, { searchQuery: value });
+    setActiveSearchId(rowId);
+
+    if (autocompleteTimer.current) {
+      clearTimeout(autocompleteTimer.current);
+    }
+
+    if (!value || value.trim().length < 3) {
+      setSuggestions([]);
+      setFetchingSuggestions(false);
+      return;
+    }
+
+    autocompleteTimer.current = setTimeout(async () => {
+      setFetchingSuggestions(true);
+      try {
+        const items = await fetchPlaceSuggestions(value.trim());
+        setSuggestions(items);
+      } catch (error) {
+        setSuggestions([]);
+        setGlobalError(error?.message || 'Unable to search addresses.');
+      } finally {
+        setFetchingSuggestions(false);
+      }
+    }, 400);
+  };
+
+  const applySuggestion = async (row, suggestion) => {
+    if (!row?.id || !suggestion?.placeId) {
+      return;
+    }
+
+    setFetchingSuggestions(true);
+    setActiveSearchId(row.id);
+    try {
+      const details = await fetchPlaceDetails(suggestion.placeId);
+      const parsed = parseAddressComponents(details.components);
+      updateRow(row.id, {
+        searchQuery: details.formattedAddress || suggestion.description || row.searchQuery,
+        street: parsed.street || row.street,
+        city: parsed.city || row.city,
+        state: parsed.state || row.state,
+        country: parsed.country || row.country,
+        latitude: details.latitude !== null ? String(details.latitude) : row.latitude,
+        longitude: details.longitude !== null ? String(details.longitude) : row.longitude,
+      });
+      setSuggestions([]);
+    } catch (error) {
+      setGlobalError(error?.message || 'Unable to fetch address details.');
+    } finally {
+      setFetchingSuggestions(false);
+    }
+  };
+
+  const handleUseCurrentLocation = async (row) => {
+    if (!row?.id) {
+      return;
+    }
+
+    setLocationRowId(row.id);
+    setGlobalError('');
+
+    try {
+      const status = permissionStatus === 'granted' ? permissionStatus : await requestPermission();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location permission needed',
+          'Enable location permission to auto-fill your address.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open settings', onPress: openSettings },
+          ]
+        );
+        return;
+      }
+
+      const location = await refreshOnce();
+      if (!location) {
+        setGlobalError(locationError || 'Unable to read your location.');
+        return;
+      }
+
+      const result = await reverseGeocode(location);
+      const parsed = parseAddressComponents(result.components);
+
+      updateRow(row.id, {
+        searchQuery: result.formattedAddress || row.searchQuery,
+        street: parsed.street || row.street,
+        city: parsed.city || row.city,
+        state: parsed.state || row.state,
+        country: parsed.country || row.country,
+        latitude: String(location.latitude),
+        longitude: String(location.longitude),
+      });
+    } catch (error) {
+      setGlobalError(error?.message || 'Unable to use current location.');
+    } finally {
+      setLocationRowId('');
+    }
   };
 
   const togglePrimary = (rowId) => {
@@ -205,6 +324,7 @@ const MechanicAddressScreen = ({ navigation, route }) => {
         if (!isOnboarding) {
           setShowForm(false);
         }
+        setActiveFormId('');
         return true;
       }
 
@@ -220,6 +340,7 @@ const MechanicAddressScreen = ({ navigation, route }) => {
       if (!isOnboarding) {
         setShowForm(false);
       }
+      setActiveFormId('');
       return true;
     } catch (error) {
       updateRow(row.id, { error: error?.message || 'Unable to save address.' });
@@ -230,13 +351,17 @@ const MechanicAddressScreen = ({ navigation, route }) => {
   };
 
   const handleAddAnother = () => {
-    setRows((prev) => [...prev, buildEmptyAddress()]);
+    const next = buildEmptyAddress();
+    setRows((prev) => [...prev, next]);
     setShowForm(true);
+    setActiveFormId(next.id);
   };
 
   const handleAddFirst = () => {
     if (rows.length === 0) {
-      setRows([buildEmptyAddress()]);
+      const next = buildEmptyAddress();
+      setRows([next]);
+      setActiveFormId(next.id);
     }
     setShowForm(true);
   };
@@ -244,6 +369,9 @@ const MechanicAddressScreen = ({ navigation, route }) => {
   const handleDeleteRow = (row) => {
     if (!row?.isExisting) {
       setRows((prev) => prev.filter((item) => item.id !== row.id));
+      if (activeFormId === row.id) {
+        setActiveFormId('');
+      }
       return;
     }
 
@@ -258,6 +386,9 @@ const MechanicAddressScreen = ({ navigation, route }) => {
           try {
             await deleteMechanicAddress(row.id);
             setRows((prev) => prev.filter((item) => item.id !== row.id));
+            if (activeFormId === row.id) {
+              setActiveFormId('');
+            }
           } catch (error) {
             setGlobalError(error?.message || 'Unable to delete address.');
           } finally {
@@ -327,7 +458,13 @@ const MechanicAddressScreen = ({ navigation, route }) => {
 
           {loading ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+              {[0, 1, 2].map((item) => (
+                <View key={`skeleton-${item}`} style={styles.skeletonCard}>
+                  <View style={styles.skeletonLineWide} />
+                  <View style={styles.skeletonLine} />
+                  <View style={styles.skeletonLineShort} />
+                </View>
+              ))}
             </View>
           ) : null}
 
@@ -351,14 +488,15 @@ const MechanicAddressScreen = ({ navigation, route }) => {
               {rows.map((row, index) => {
                 const readOnly = row.isExisting && !row.isEditing;
                 const isSaving = savingId === row.id;
-                const showFormCard = isOnboarding || showForm || row.isEditing || !row.isExisting;
+                const showFormCard =
+                  isOnboarding || row.id === activeFormId || row.isEditing || (!row.isExisting && showForm);
                 const isPrimary = Boolean(row.isPrimary);
 
                 if (!showFormCard && row.isExisting) {
                   return (
                     <View key={`${row.id}-${index}`} style={styles.summaryCard}>
                       <View style={styles.summaryHeader}>
-                        <View>
+                        <View style={styles.summaryBody}>
                           <AppText style={styles.summaryTitle}>
                             {row.label || 'Address'}
                           </AppText>
@@ -366,33 +504,48 @@ const MechanicAddressScreen = ({ navigation, route }) => {
                             {row.street}, {row.city}, {row.state}, {row.country}
                           </AppText>
                         </View>
-                        <TouchableOpacity
-                          onPress={() => handleDeleteRow(row)}
-                          activeOpacity={0.85}
-                          disabled={actionId === row.id}
-                          style={styles.deleteBtn}
-                        >
-                          <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
-                        </TouchableOpacity>
+                        <View style={styles.summaryActions}>
+                          <TouchableOpacity
+                            onPress={() => {
+                              updateRow(row.id, { isEditing: true });
+                              setActiveFormId(row.id);
+                              setShowForm(true);
+                            }}
+                            activeOpacity={0.85}
+                            style={styles.editBtn}
+                          >
+                            <HugeiconsIcon icon={Edit02Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteRow(row)}
+                            activeOpacity={0.85}
+                            disabled={actionId === row.id}
+                            style={styles.deleteBtn}
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
+                          </TouchableOpacity>
+                        </View>
                       </View>
 
-                      <View style={styles.summaryFooter}>
-                        <TouchableOpacity
-                          style={styles.primaryRow}
-                          activeOpacity={0.85}
-                          onPress={() => handleSetPrimary(row)}
-                          disabled={isPrimary || actionId === row.id}
-                        >
-                          <View style={[styles.primaryBox, isPrimary ? styles.primaryBoxActive : null]}>
-                            {isPrimary ? (
-                              <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
-                            ) : null}
-                          </View>
-                          <AppText style={styles.primaryText}>
-                            {isPrimary ? 'Primary address' : 'Set as primary'}
-                          </AppText>
-                        </TouchableOpacity>
-                      </View>
+                      {row.addressType !== 'home' ? (
+                        <View style={styles.summaryFooter}>
+                          <TouchableOpacity
+                            style={styles.primaryRow}
+                            activeOpacity={0.85}
+                            onPress={() => handleSetPrimary(row)}
+                            disabled={isPrimary || actionId === row.id}
+                          >
+                            <View style={[styles.primaryBox, isPrimary ? styles.primaryBoxActive : null]}>
+                              {isPrimary ? (
+                                <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                              ) : null}
+                            </View>
+                            <AppText style={styles.primaryText}>
+                              {isPrimary ? 'Primary address' : 'Set as primary'}
+                            </AppText>
+                          </TouchableOpacity>
+                        </View>
+                      ) : null}
                     </View>
                   );
                 }
@@ -426,6 +579,42 @@ const MechanicAddressScreen = ({ navigation, route }) => {
                       placeholder="Main workshop"
                       editable={!readOnly}
                     />
+                    <AppInput
+                      label="Search address"
+                      value={row.searchQuery}
+                      onChangeText={(value) => handleSearchChange(row.id, value)}
+                      placeholder="Search for a place"
+                      editable={!readOnly}
+                    />
+                    {activeSearchId === row.id && suggestions.length ? (
+                      <View style={styles.suggestionList}>
+                        {suggestions.map((item) => (
+                          <TouchableOpacity
+                            key={item.placeId}
+                            style={styles.suggestionItem}
+                            activeOpacity={0.85}
+                            onPress={() => applySuggestion(row, item)}
+                          >
+                            <AppText style={styles.suggestionText}>{item.description}</AppText>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : null}
+                    {activeSearchId === row.id && fetchingSuggestions ? (
+                      <View style={styles.suggestionLoading}>
+                        <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+                      </View>
+                    ) : null}
+                    <TouchableOpacity
+                      style={styles.locationBtn}
+                      activeOpacity={0.85}
+                      onPress={() => handleUseCurrentLocation(row)}
+                      disabled={readOnly || locationRowId === row.id}
+                    >
+                      <AppText style={styles.locationBtnText}>
+                        {locationRowId === row.id ? 'Locating...' : 'Use current location'}
+                      </AppText>
+                    </TouchableOpacity>
                     <AppInput
                       label="Street"
                       value={row.street}
@@ -483,19 +672,21 @@ const MechanicAddressScreen = ({ navigation, route }) => {
                       </View>
                     </View>
 
-                    <TouchableOpacity
-                      style={styles.primaryRow}
-                      activeOpacity={0.85}
-                      onPress={() => togglePrimary(row.id)}
-                      disabled={readOnly}
-                    >
-                      <View style={[styles.primaryBox, row.isPrimary ? styles.primaryBoxActive : null]}>
-                        {row.isPrimary ? (
-                          <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
-                        ) : null}
-                      </View>
-                      <AppText style={styles.primaryText}>Set as primary address</AppText>
-                    </TouchableOpacity>
+                    {row.addressType !== 'home' ? (
+                      <TouchableOpacity
+                        style={styles.primaryRow}
+                        activeOpacity={0.85}
+                        onPress={() => togglePrimary(row.id)}
+                        disabled={readOnly}
+                      >
+                        <View style={[styles.primaryBox, row.isPrimary ? styles.primaryBoxActive : null]}>
+                          {row.isPrimary ? (
+                            <HugeiconsIcon icon={Tick04Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                          ) : null}
+                        </View>
+                        <AppText style={styles.primaryText}>Set as primary address</AppText>
+                      </TouchableOpacity>
+                    ) : null}
 
                     <View style={styles.actionRow}>
                       <AppButton
@@ -528,7 +719,7 @@ const MechanicAddressScreen = ({ navigation, route }) => {
             </View>
           ) : null}
 
-          {!isOnboarding ? (
+          {!isOnboarding && rows.length ? (
             <TouchableOpacity style={styles.addMoreBtn} activeOpacity={0.85} onPress={handleAddAnother}>
               <AppText style={styles.addMoreText}>Add address</AppText>
             </TouchableOpacity>
@@ -610,6 +801,34 @@ const styles = StyleSheet.create({
   },
   loadingRow: {
     marginBottom: 12,
+    rowGap: 12,
+  },
+  skeletonCard: {
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  skeletonLineWide: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    width: '70%',
+    marginBottom: 8,
+  },
+  skeletonLine: {
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: '90%',
+    marginBottom: 6,
+  },
+  skeletonLineShort: {
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: '45%',
   },
   list: {
     rowGap: 12,
@@ -661,6 +880,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     columnGap: 12,
   },
+  summaryBody: {
+    flex: 1,
+  },
+  summaryActions: {
+    flexDirection: 'row',
+    columnGap: 8,
+  },
   summaryTitle: {
     color: darkTheme.colors.text,
     fontSize: 14,
@@ -681,6 +907,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(248,113,113,0.12)',
+  },
+  editBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(230,199,20,0.12)',
   },
   sectionLabel: {
     color: 'rgba(255,255,255,0.6)',
@@ -719,6 +953,41 @@ const styles = StyleSheet.create({
   },
   rowInputItem: {
     flex: 1,
+  },
+  suggestionList: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  suggestionText: {
+    color: darkTheme.colors.text,
+    fontSize: 12,
+  },
+  suggestionLoading: {
+    marginBottom: 8,
+    alignItems: 'flex-start',
+  },
+  locationBtn: {
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  locationBtnText: {
+    color: darkTheme.colors.accent,
+    fontSize: 12,
   },
   primaryRow: {
     flexDirection: 'row',
