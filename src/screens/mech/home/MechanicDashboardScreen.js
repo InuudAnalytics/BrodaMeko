@@ -63,8 +63,14 @@ const readMechanicName = (user) => {
 };
 
 const readMechanicRating = (user) => {
-  const value = Number(user?.rating || user?.average_rating || 4.9);
-  return Number.isFinite(value) ? value : 4.9;
+  const value = Number(
+    user?.rating_summary?.avg_rating ??
+      user?.avg_rating ??
+      user?.average_rating ??
+      user?.rating ??
+      0
+  );
+  return Number.isFinite(value) ? value : 0;
 };
 
 const normalizeAvatarUri = (value) => {
