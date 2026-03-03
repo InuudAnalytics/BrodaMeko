@@ -8,6 +8,19 @@ import { useCart } from '../../../context';
 
 const formatNaira = (value) => `₦${Number(value || 0).toLocaleString('en-NG')}`;
 
+const resolveImageUri = (value) => {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object') {
+    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+  }
+  return '';
+};
+
 const CartScreen = ({ navigation }) => {
   const { items, removeFromCart, updateQuantity, calculateTotal } = useCart();
 
@@ -61,7 +74,7 @@ const CartScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {items.map((item) => {
           const product = item.product || {};
-          const image = product?.images?.[0];
+          const image = resolveImageUri(product?.images?.[0]);
           return (
             <View key={item.productId} style={styles.itemCard}>
               <View style={styles.itemRow}>

@@ -2,6 +2,7 @@ import React from 'react';
 import { DarkTheme as NavigationDarkTheme, NavigationContainer } from '@react-navigation/native';
 import { AppText, ScreenContainer } from '../components';
 import { useAuth } from '../context';
+import { navigationRef } from './navigationRef';
 import { darkTheme } from '../theme';
 import { ROLES } from '../utils';
 import AdminStack from './AdminStack';
@@ -64,7 +65,11 @@ const RootNavigator = () => {
     return <ScreenContainer padded={false} />;
   }
 
-  return <NavigationContainer theme={navTheme}>{token ? renderRoleStack() : <AuthStack />}</NavigationContainer>;
+  return (
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
+      {token ? renderRoleStack() : <AuthStack />}
+    </NavigationContainer>
+  );
 };
 
 export default RootNavigator;

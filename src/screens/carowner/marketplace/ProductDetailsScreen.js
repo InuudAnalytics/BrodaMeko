@@ -21,6 +21,26 @@ import { getMarketplacePart } from '../../../services/marketplace.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const resolveImageUri = (value) => {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object') {
+    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+  }
+  return '';
+};
+
+const normalizeImages = (list) => {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  return list.map(resolveImageUri).filter(Boolean);
+};
+
 const MOCK_PRODUCTS = [
   {
     id: '1',
@@ -97,9 +117,8 @@ const ProductDetailsScreen = ({ navigation, route }) => {
     };
   }, [route?.params?.product, route?.params?.productId]);
 
-  const images = product?.images?.length
-    ? product.images
-    : ['https://picsum.photos/600/600?random=10'];
+  const images = normalizeImages(product?.images?.length ? product.images : null);
+  const displayImages = images.length ? images : ['https://picsum.photos/600/600?random=10'];
   const isInStock = Number(product?.stock || 0) > 0;
 
   const handleScrollEnd = event => {
@@ -148,7 +167,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
         <View style={styles.carouselWrap}>
           <FlatList
             ref={listRef}
-            data={images}
+            data={displayImages}
             keyExtractor={(item, index) => `${item}-${index}`}
             horizontal
             pagingEnabled
@@ -163,7 +182,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             )}
           />
           <View style={styles.dotsRow}>
-            {images.map((_, index) => (
+            {displayImages.map((_, index) => (
               <View
                 key={`dot-${index}`}
                 style={[

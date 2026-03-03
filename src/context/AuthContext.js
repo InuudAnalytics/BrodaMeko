@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { NativeModules } from 'react-native';
 import { GOOGLE_CONFIG } from '../config/google';
-import { MOCK_FCM_TOKEN, getMockDeviceType } from '../config/mockDevice';
 import {
   forgotPassword as forgotPasswordService,
   getCurrentUser,
@@ -15,7 +14,6 @@ import {
   updatePassword as updatePasswordService,
   verifyOtp as verifyOtpService,
 } from '../services/auth.service';
-import { registerDevice as registerDeviceService } from '../services/device.service';
 import { TOKEN_STORAGE_KEY, setUnauthorizedHandler } from '../services/api';
 import { ROLES } from '../utils';
 
@@ -282,28 +280,6 @@ export const AuthProvider = ({ children }) => {
     return nextUser;
   };
 
-  const registerCurrentDevice = async () => {
-    const fcmToken = String(MOCK_FCM_TOKEN || '').trim();
-
-    if (!fcmToken) {
-      return;
-    }
-
-    try {
-      await registerDeviceService({
-        fcm_token: fcmToken,
-        device_type: getMockDeviceType(),
-      });
-    } catch (deviceError) {
-      if (__DEV__) {
-        // Non-blocking registration: auth flow should continue even when this fails.
-        console.log(
-          '[AuthContext] Device registration failed:',
-          deviceError?.message || deviceError,
-        );
-      }
-    }
-  };
 
   const bootstrapAuth = async () => {
     setIsLoading(true);
@@ -503,8 +479,6 @@ export const AuthProvider = ({ children }) => {
         nextRole,
       });
       await refreshUserProfile(authPayload.token).catch(() => {});
-      registerCurrentDevice();
-
       setPendingVerification(null);
       return true;
     } catch (verifyError) {
@@ -573,8 +547,6 @@ export const AuthProvider = ({ children }) => {
         nextRole,
       });
       await refreshUserProfile(authPayload.token).catch(() => {});
-      registerCurrentDevice();
-
       return true;
     } catch (signInError) {
       setError(signInError?.message || 'Invalid credentials.');
@@ -634,8 +606,6 @@ export const AuthProvider = ({ children }) => {
         nextRole: authPayload.role || normalizedSelectedRole,
       });
       await refreshUserProfile(authPayload.token).catch(() => {});
-      registerCurrentDevice();
-
       return true;
     } catch (googleError) {
       const statusCodes = getGoogleSigninClient()?.statusCodes || GOOGLE_STATUS;

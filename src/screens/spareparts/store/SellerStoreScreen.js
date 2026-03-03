@@ -54,6 +54,19 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
     setShowEditModal(true);
   };
 
+  const resolveImageUri = (value) => {
+    if (!value) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'object') {
+      return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    }
+    return '';
+  };
+
   const resolveImages = (product) => {
     const raw = product?.images || product?.image_urls || product?.image || [];
     if (typeof raw === 'string') {
@@ -65,7 +78,7 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
           return { uri: item };
         }
         return {
-          uri: item?.url || item?.uri || item?.secure_url || '',
+          uri: resolveImageUri(item),
           publicId: item?.public_id || item?.publicId || item?.id || '',
         };
       });
@@ -162,12 +175,16 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
         ) : null}
 
         {!loading && isHydrated && products.length > 0 ? (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={styles.listScroll}
+            contentContainerStyle={styles.list}
+          >
             {filteredProducts.map((product) => {
               const quantity = Number(product?.quantity ?? product?.stock_quantity ?? 0);
               const outOfStock = quantity <= 0;
               const category = normalizeCategory(product?.category || product?.type);
-              const imageUri = product?.images?.[0] || '';
+              const imageUri = resolveImageUri(product?.images?.[0]);
 
               return (
                 <View key={product.id} style={styles.card}>
@@ -345,6 +362,10 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
     rowGap: 14,
+    justifyContent: 'flex-start',
+  },
+  listScroll: {
+    flex: 1,
   },
   card: {
     flexDirection: 'row',

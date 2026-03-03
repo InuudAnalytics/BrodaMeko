@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { CallIcon, CancelCircleIcon, Location01Icon, Mail01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -58,6 +59,10 @@ const StatusStepper = ({ currentIndex }) => {
 };
 
 const MechanicLiveTrackingScreen = ({ navigation, route }) => {
+  const { location } = useUserLocation();
+  const [trackedLocation, setTrackedLocation] = useState(null);
+  const trackerAngleRef = useRef(0);
+
   const customer = route?.params?.customer || {
     id: route?.params?.carOwnerId || '',
     name: route?.params?.carOwnerName || 'Car Owner',
@@ -76,9 +81,44 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
   // status should be moved to `arrived` automatically from live GPS distance.
   const statusIndex = toStatusIndex(route?.params?.trackingStatus || route?.params?.progressStatus);
 
+  useEffect(() => {
+    if (!location) {
+      setTrackedLocation(null);
+      return undefined;
+    }
+
+    const radius = 0.002;
+    const centerLat = location.latitude;
+    const centerLng = location.longitude;
+    let mounted = true;
+
+    const tick = () => {
+      trackerAngleRef.current = (trackerAngleRef.current + 0.16) % (Math.PI * 2);
+      const nextLat = centerLat + radius * Math.cos(trackerAngleRef.current);
+      const nextLng = centerLng + radius * Math.sin(trackerAngleRef.current);
+      if (mounted) {
+        setTrackedLocation({ latitude: nextLat, longitude: nextLng });
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1500);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [location]);
+
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.mapArea}>
+        <OpenStreetMapView
+          latitude={location?.latitude}
+          longitude={location?.longitude}
+          otherLatitude={trackedLocation?.latitude}
+          otherLongitude={trackedLocation?.longitude}
+        />
         <TouchableOpacity
           style={styles.closeButton}
           activeOpacity={0.85}
@@ -86,12 +126,6 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
         >
           <HugeiconsIcon icon={CancelCircleIcon} size={22} color={darkTheme.colors.accent} strokeWidth={2} />
         </TouchableOpacity>
-        <View style={styles.mapRoadA} />
-        <View style={styles.mapRoadB} />
-        <View style={styles.mapRoadC} />
-        <View style={styles.routeLine} />
-        <View style={styles.selfPin} />
-        <View style={styles.targetPin} />
       </View>
 
       <View style={styles.sheet}>
@@ -171,64 +205,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
-  },
-  mapRoadA: {
-    position: 'absolute',
-    top: 60,
-    left: -40,
-    width: 380,
-    height: 6,
-    backgroundColor: '#57575E',
-    transform: [{ rotate: '-25deg' }],
-  },
-  mapRoadB: {
-    position: 'absolute',
-    top: 170,
-    left: 10,
-    width: 420,
-    height: 6,
-    backgroundColor: '#515158',
-    transform: [{ rotate: '8deg' }],
-  },
-  mapRoadC: {
-    position: 'absolute',
-    top: 260,
-    left: -30,
-    width: 360,
-    height: 6,
-    backgroundColor: '#505057',
-    transform: [{ rotate: '-12deg' }],
-  },
-  routeLine: {
-    position: 'absolute',
-    top: 140,
-    left: 60,
-    width: 14,
-    height: 170,
-    borderRadius: 7,
-    backgroundColor: '#2FAEFC',
-  },
-  selfPin: {
-    position: 'absolute',
-    top: 250,
-    left: 110,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: darkTheme.colors.accent,
-    borderWidth: 4,
-    borderColor: '#2B2B31',
-  },
-  targetPin: {
-    position: 'absolute',
-    top: 122,
-    left: 50,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#FF2D2D',
-    borderWidth: 4,
-    borderColor: '#2B2B31',
   },
   sheet: {
     backgroundColor: darkTheme.colors.background,

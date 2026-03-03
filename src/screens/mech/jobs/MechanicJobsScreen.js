@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { openSettings } from 'react-native-permissions';
 import {
   AppButton,
   AppText,
@@ -15,6 +16,8 @@ import {
   ScreenContainer,
   ScrollableTabs,
 } from '../../../components';
+import { LOCATION_ENABLED } from '../../../config/featureFlags';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import {
   getMechanicAssignedJobs,
   getMechanicPendingJobRequests,
@@ -168,6 +171,7 @@ const MechanicJobsScreen = ({ navigation, route }) => {
   const [completedJobs, setCompletedJobs] = useState([]);
   const [busyRequestId, setBusyRequestId] = useState('');
   const [busyAction, setBusyAction] = useState('');
+  const { permissionStatus, requestPermission } = useUserLocation();
 
   const requestedJobId = String(route?.params?.requestJobId || '').trim();
 
@@ -213,6 +217,21 @@ const MechanicJobsScreen = ({ navigation, route }) => {
     const safeJobId = String(item?.jobId || '').trim();
     if (!safeJobId || busyRequestId) {
       return;
+    }
+
+    if (action === 'accept' && LOCATION_ENABLED) {
+      const status =
+        permissionStatus === 'granted'
+          ? permissionStatus
+          : await requestPermission();
+
+      if (status !== 'granted') {
+        if (status === 'blocked') {
+          openSettings();
+        }
+        setError('Please enable location access before accepting a job.');
+        return;
+      }
     }
 
     setBusyRequestId(item.id);

@@ -35,6 +35,26 @@ const mapPartToProduct = (part) => ({
   images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
 });
 
+const SKELETON_ITEMS = Array.from({ length: 6 }).map((_, index) => ({
+  id: `skeleton-${index}`,
+  isSkeleton: true,
+}));
+
+const SkeletonCard = () => (
+  <View style={styles.skeletonCard}>
+    <View style={styles.skeletonImage} />
+    <View style={styles.skeletonContent}>
+      <View style={styles.skeletonLine} />
+      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+      <View style={styles.skeletonRating} />
+      <View style={styles.skeletonBottomRow}>
+        <View style={styles.skeletonPrice} />
+        <View style={styles.skeletonCircle} />
+      </View>
+    </View>
+  </View>
+);
+
 const MarketplaceScreen = ({ navigation }) => {
   const { addToCart } = useCart();
   const [search, setSearch] = useState('');
@@ -66,6 +86,7 @@ const MarketplaceScreen = ({ navigation }) => {
     const q = search.trim().toLowerCase();
     return products.filter((item) => item.name.toLowerCase().includes(q));
   }, [products, search]);
+  const listData = loading ? SKELETON_ITEMS : visibleProducts;
 
   const handleOpenProduct = (product) => {
     navigation.navigate('ProductDetails', { productId: product.id });
@@ -111,7 +132,7 @@ const MarketplaceScreen = ({ navigation }) => {
         </View>
 
         <FlatList
-          data={visibleProducts}
+          data={listData}
           keyExtractor={(item) => item.id}
           numColumns={2}
           columnWrapperStyle={styles.columnWrap}
@@ -119,11 +140,15 @@ const MarketplaceScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <View style={styles.cardWrap}>
-              <ProductCard
-                product={item}
-                onPress={() => handleOpenProduct(item)}
-                onAddToCart={() => handleAddToCart(item)}
-              />
+              {item.isSkeleton ? (
+                <SkeletonCard />
+              ) : (
+                <ProductCard
+                  product={item}
+                  onPress={() => handleOpenProduct(item)}
+                  onAddToCart={() => handleAddToCart(item)}
+                />
+              )}
             </View>
           )}
         />
@@ -216,6 +241,55 @@ const styles = StyleSheet.create({
   },
   cardWrap: {
     flex: 1,
+  },
+  skeletonCard: {
+    backgroundColor: '#1A1A4A',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  skeletonImage: {
+    height: 120,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  skeletonContent: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 12,
+    rowGap: 8,
+  },
+  skeletonLine: {
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  skeletonLineShort: {
+    width: '70%',
+  },
+  skeletonRating: {
+    width: '55%',
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  skeletonBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  skeletonPrice: {
+    width: '45%',
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(230,199,20,0.28)',
+  },
+  skeletonCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(230,199,20,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   floatingCart: {
     position: 'absolute',

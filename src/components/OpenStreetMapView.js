@@ -14,10 +14,16 @@ const toNumber = (value, fallback) => {
 const DEFAULT_LAT = 6.5244;
 const DEFAULT_LNG = 3.3792;
 
-const OpenStreetMapView = ({ latitude, longitude }) => {
+const OpenStreetMapView = ({ latitude, longitude, otherLatitude, otherLongitude }) => {
   const [hasError, setHasError] = useState(false);
   const safeLatitude = clamp(toNumber(latitude, DEFAULT_LAT), -90, 90);
   const safeLongitude = clamp(toNumber(longitude, DEFAULT_LNG), -180, 180);
+  const safeOtherLatitude = Number.isFinite(Number(otherLatitude))
+    ? clamp(Number(otherLatitude), -90, 90)
+    : null;
+  const safeOtherLongitude = Number.isFinite(Number(otherLongitude))
+    ? clamp(Number(otherLongitude), -180, 180)
+    : null;
 
   const region = useMemo(
     () => ({
@@ -48,6 +54,12 @@ const OpenStreetMapView = ({ latitude, longitude }) => {
           coordinate={{ latitude: safeLatitude, longitude: safeLongitude }}
           pinColor={darkTheme.colors.accent}
         />
+        {safeOtherLatitude !== null && safeOtherLongitude !== null ? (
+          <Marker
+            coordinate={{ latitude: safeOtherLatitude, longitude: safeOtherLongitude }}
+            pinColor="#FF2D2D"
+          />
+        ) : null}
       </MapView>
     </View>
   );

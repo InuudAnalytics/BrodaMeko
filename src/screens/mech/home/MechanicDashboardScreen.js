@@ -1,11 +1,14 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { openSettings } from 'react-native-permissions';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Mail01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, PersonalInfoAlert, ScrollableTabs } from '../../../components';
+import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
-import { useAuth } from '../../../context';
+import { useAuth, useNotifications } from '../../../context';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import { getAvailableJobs, getConversationByJobId } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
 import { setMechanicOnlineStatus } from '../../../services/mechanic.service';
@@ -95,6 +98,8 @@ const readAvatarUri = (user) =>
 
 const MechanicDashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
+  const { unreadTick } = useNotifications();
+  const { permissionStatus, requestPermission } = useUserLocation();
   const [activeFilter, setActiveFilter] = useState('available');
   const [walletBalance, setWalletBalance] = useState(0);
   const [jobs, setJobs] = useState([]);
@@ -112,11 +117,48 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const handleToggleOnline = useCallback(async (value) => {
     setIsOnline(value);
     try {
-      await setMechanicOnlineStatus(value);
+      const response = await setMechanicOnlineStatus(value);
+      const payload = response?.data || response || {};
+      if (typeof payload?.is_online === 'boolean') {
+        setIsOnline(payload.is_online);
+      }
     } catch (error) {
-      setIsOnline((prev) => !prev);
+      setError(error?.message || 'Could not update online status.');
     }
   }, []);
+
+  const ensureLocationPermission = useCallback(async () => {
+    if (!LOCATION_ENABLED) {
+      return true;
+    }
+
+    const status =
+      permissionStatus === 'granted'
+        ? permissionStatus
+        : await requestPermission();
+
+    if (status === 'granted') {
+      return true;
+    }
+
+    if (status === 'blocked') {
+      openSettings();
+    }
+
+    setError('Please enable location access before accepting a job.');
+    return false;
+  }, [permissionStatus, requestPermission]);
+
+  const handleAcceptJob = useCallback(
+    async (job) => {
+      const canProceed = await ensureLocationPermission();
+      if (!canProceed) {
+        return;
+      }
+      console.log('Accept job:', job?.id || job?.jobId);
+    },
+    [ensureLocationPermission],
+  );
 
   const visibleJobs = useMemo(() => {
     if (activeFilter === 'active') {
@@ -213,7 +255,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [unreadTick])
   );
 
   return (
@@ -247,8 +289,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
       <View style={styles.earningsCard}>
         <View style={styles.earningsHeader}>
           <AppText style={styles.earningsLabel}>Todays earnings</AppText>
-          <View style={styles.onlineToggle}>
-            <AppText style={styles.onlineLabel}>Online</AppText>
+            <View style={styles.onlineToggle}>
+              <AppText style={styles.onlineLabel}>{isOnline ? 'Online' : 'Offline'}</AppText>
             <Switch
               value={isOnline}
               onValueChange={handleToggleOnline}
@@ -389,12 +431,12 @@ const MechanicDashboardScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.jobActions}>
-                <AppButton
-                  label="Accept job"
-                  onPress={() => console.log('Accept job:', job.id)}
-                  style={[styles.actionBtn, styles.acceptBtn]}
-                  textStyle={styles.acceptBtnText}
-                />
+                  <AppButton
+                    label="Accept job"
+                    onPress={() => handleAcceptJob(job)}
+                    style={[styles.actionBtn, styles.acceptBtn]}
+                    textStyle={styles.acceptBtnText}
+                  />
                 <AppButton
                   label="Cancel"
                   onPress={() => console.log('Cancel job:', job.id)}

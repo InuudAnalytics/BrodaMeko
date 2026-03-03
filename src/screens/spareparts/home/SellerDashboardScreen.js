@@ -10,7 +10,7 @@ import {
   PlusSignIcon,
 } from '@hugeicons/core-free-icons';
 import { AppText, PersonalInfoAlert, ScreenContainer } from '../../../components';
-import { useAuth } from '../../../context';
+import { useAuth, useNotifications } from '../../../context';
 import { getNotifications } from '../../../services/notifications.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
@@ -30,6 +30,7 @@ const SCREEN_BG = '#000033';
 
 const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const { user } = useAuth();
+  const { unreadTick } = useNotifications();
   const [unreadCount, setUnreadCount] = useState(0);
   const firstName = getFirstName(user);
   const avatarUri =
@@ -79,7 +80,7 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [unreadTick])
   );
 
   const handleSeeMore = () => {

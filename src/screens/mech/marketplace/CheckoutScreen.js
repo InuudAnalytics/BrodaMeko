@@ -16,6 +16,19 @@ import { checkoutMarketplaceOrder } from '../../../services/marketplace.service'
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
+const resolveImageUri = (value) => {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object') {
+    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+  }
+  return '';
+};
+
 const CheckoutScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { items, calculateTotal, clearCart, addToCart } = useCart();
@@ -31,7 +44,7 @@ const CheckoutScreen = ({ navigation, route }) => {
     images: ['https://picsum.photos/300'],
   };
 
-  const image = product?.images?.[0];
+  const image = resolveImageUri(product?.images?.[0]);
   const quantity = Number(product?.quantity || items?.[0]?.quantity || 1);
   const subtotal = useMemo(() => {
     if (directProduct) {

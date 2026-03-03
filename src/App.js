@@ -7,6 +7,7 @@ import {
   JobsProvider,
   MechanicProfileProvider,
   MechanicServicesProvider,
+  NotificationsProvider,
   SellerStoreProvider,
   SparePartsProfileProvider,
   ThemeProvider,
@@ -18,6 +19,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <NotificationsProvider>
         <ChatProvider>
           <JobsProvider>
             <MechanicProfileProvider>
@@ -36,6 +38,7 @@ export default function App() {
             </MechanicProfileProvider>
           </JobsProvider>
         </ChatProvider>
+        </NotificationsProvider>
       </AuthProvider>
     </ThemeProvider>
   );

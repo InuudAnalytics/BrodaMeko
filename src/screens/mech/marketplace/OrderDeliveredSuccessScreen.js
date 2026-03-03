@@ -7,7 +7,19 @@ import { ROUTES } from '../../../utils';
 
 const OrderDeliveredSuccessScreen = ({ navigation, route }) => {
   const productName = route?.params?.productName || route?.params?.product?.name || 'LED headlights';
-  const productImage = route?.params?.productImage || route?.params?.product?.images?.[0] || '';
+  const resolveImageUri = (value) => {
+    if (!value) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'object') {
+      return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    }
+    return '';
+  };
+  const productImage = resolveImageUri(route?.params?.productImage || route?.params?.product?.images?.[0]);
   const sellerName = route?.params?.sellerName || route?.params?.seller?.name || 'Okon spare part hub';
   const orderId = route?.params?.orderId || route?.params?.order_id || 'BM-98-09';
 

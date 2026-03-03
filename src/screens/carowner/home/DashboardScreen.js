@@ -18,7 +18,7 @@ import { openSettings } from 'react-native-permissions';
 import { AppBottomNav, AppButton, AppText, OpenStreetMapView, PersonalInfoAlert, ScreenContainer } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
-import { useAuth } from '../../../context';
+import { useAuth, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 import { confirmJob, updateJobStatus } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
@@ -145,14 +145,17 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
 
 const DashboardScreen = ({ navigation, route }) => {
   const { user } = useAuth();
+  const { unreadTick } = useNotifications();
   const { location, permissionStatus, loading, requestPermission, refreshOnce } = useUserLocation();
   const [activeSession, setActiveSession] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [trackedLocation, setTrackedLocation] = useState(null);
   const panelY = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
+  const trackerAngleRef = useRef(0);
 
   useEffect(() => {
     const id = panelY.addListener(({ value }) => {
@@ -228,8 +231,37 @@ const DashboardScreen = ({ navigation, route }) => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [unreadTick])
   );
+
+  useEffect(() => {
+    if (!activeSession || !location) {
+      setTrackedLocation(null);
+      return undefined;
+    }
+
+    const radius = 0.0024;
+    const centerLat = location.latitude;
+    const centerLng = location.longitude;
+    let mounted = true;
+
+    const tick = () => {
+      trackerAngleRef.current = (trackerAngleRef.current + 0.18) % (Math.PI * 2);
+      const nextLat = centerLat + radius * Math.cos(trackerAngleRef.current);
+      const nextLng = centerLng + radius * Math.sin(trackerAngleRef.current);
+      if (mounted) {
+        setTrackedLocation({ latitude: nextLat, longitude: nextLng });
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1400);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [activeSession, location]);
 
   const locationBadgeText = useMemo(() => {
     if (!location) {
@@ -482,7 +514,12 @@ const DashboardScreen = ({ navigation, route }) => {
       <View style={styles.mapBackdrop}>
         {hasLocationPermission ? (
           <>
-            <OpenStreetMapView latitude={location?.latitude} longitude={location?.longitude} />
+            <OpenStreetMapView
+              latitude={location?.latitude}
+              longitude={location?.longitude}
+              otherLatitude={trackedLocation?.latitude}
+              otherLongitude={trackedLocation?.longitude}
+            />
             {!location ? (
               <View style={styles.locationLoadingOverlay}>
                 <ActivityIndicator size="small" color={darkTheme.colors.accent} />

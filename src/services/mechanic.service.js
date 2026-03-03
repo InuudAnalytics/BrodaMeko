@@ -203,7 +203,7 @@ export const getMechanicBankList = async () => {
 };
 
 export const setMechanicOnlineStatus = async (isOnline) => {
-  const response = await api.post(ENDPOINTS.me.mechanic.onlineStatus, {
+  const response = await api.patch(ENDPOINTS.me.mechanic.onlineStatus, {
     is_online: Boolean(isOnline),
   });
   return response.data;

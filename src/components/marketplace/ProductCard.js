@@ -7,7 +7,20 @@ import { useFavorites } from '../../context';
 
 const ProductCard = ({ product, onPress, onAddToCart }) => {
   const { toggleFavorite, isFavorite } = useFavorites();
-  const imageUri = product?.images?.[0] || '';
+  const resolveImageUri = (value) => {
+    if (!value) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'object') {
+      return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    }
+    return '';
+  };
+
+  const imageUri = resolveImageUri(product?.images?.[0]);
   const favorited = isFavorite(product?.id);
 
   const handleFavoritePress = (event) => {

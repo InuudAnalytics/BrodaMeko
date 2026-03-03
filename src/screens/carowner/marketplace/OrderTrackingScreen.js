@@ -121,7 +121,19 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     return { latitude: lat, longitude: lng };
   }, [route?.params?.latitude, route?.params?.longitude]);
 
-  const imageUri = product?.images?.[0] || '';
+  const resolveImageUri = (value) => {
+    if (!value) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'object') {
+      return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    }
+    return '';
+  };
+  const imageUri = resolveImageUri(product?.images?.[0]);
 
   const animatePanelTo = toValue => {
     Animated.spring(panelY, {
@@ -373,7 +385,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <View style={styles.sellerAvatarWrap}>
                 {seller?.avatar ? (
                   <Image
-                    source={{ uri: seller.avatar }}
+                    source={{ uri: resolveImageUri(seller.avatar) }}
                     style={styles.sellerAvatar}
                   />
                 ) : (
