@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { CallIcon, Location01Icon, Mail01Icon } from '@hugeicons/core-free-icons';
+import { CallIcon, CancelCircleIcon, Location01Icon, Mail01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
@@ -79,6 +79,13 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.mapArea}>
+        <TouchableOpacity
+          style={styles.closeButton}
+          activeOpacity={0.85}
+          onPress={() => navigation.goBack()}
+        >
+          <HugeiconsIcon icon={CancelCircleIcon} size={22} color={darkTheme.colors.accent} strokeWidth={2} />
+        </TouchableOpacity>
         <View style={styles.mapRoadA} />
         <View style={styles.mapRoadB} />
         <View style={styles.mapRoadC} />
@@ -152,6 +159,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#2B2B31',
     overflow: 'hidden',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   mapRoadA: {
     position: 'absolute',

@@ -2,15 +2,16 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Location01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
+import { Location01Icon, Mail01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, PersonalInfoAlert, ScrollableTabs } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
-import { getAvailableJobs } from '../../../services/jobs.service';
+import { getAvailableJobs, getConversationByJobId } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
 import { setMechanicOnlineStatus } from '../../../services/mechanic.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme, withAlpha } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
 const FILTERS = [
   { key: 'available', label: 'Available jobs' },
@@ -34,8 +35,12 @@ const formatCurrency = (amount) => {
 const normalizeJob = (job) => {
   return {
     id: job.id || job._id,
+    jobId: String(job.id || job._id || job.job_id || job.jobId || '').trim(),
     name: job.car_owner?.name || job.user?.name || 'Customer',
+    ownerId: job.car_owner?.id || job.car_owner?._id || job.user?.id || job.user?._id || '',
     issue: job.title || job.issue_type || job.description || 'Car Issue',
+    description: job.description || job.title || '',
+    status: String(job.status || '').toLowerCase(),
     distance: job.distance || '',
     eta: job.eta || '',
     urgent: job.priority === 'urgent' || false,
@@ -98,6 +103,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOnline, setIsOnline] = useState(Boolean(user?.is_online ?? user?.isOnline));
+  const [activeJob, setActiveJob] = useState(null);
+  const [activeConversationId, setActiveConversationId] = useState('');
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
   const avatarUri = readAvatarUri(user);
@@ -121,6 +128,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
     return jobs;
   }, [activeFilter, jobs]);
 
+  const resolveActiveJob = useCallback((jobList) => {
+    const activeStatuses = new Set(['accepted', 'active', 'in_progress', 'repairing', 'en_route', 'arrived']);
+    return jobList.find((job) => activeStatuses.has(job.status));
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -142,8 +154,25 @@ const MechanicDashboardScreen = ({ navigation }) => {
               const rawJobs = Array.isArray(jobsPayload)
                 ? jobsPayload
                 : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
-              setJobs(rawJobs.map(normalizeJob));
+              const mappedJobs = rawJobs.map(normalizeJob);
+              setJobs(mappedJobs);
               setTotalJobs(Number(jobsPayload?.total || rawJobs.length || 0));
+              const currentActive = resolveActiveJob(mappedJobs);
+              setActiveJob(currentActive || null);
+              if (currentActive?.jobId) {
+                try {
+                  const convoRes = await getConversationByJobId(currentActive.jobId);
+                  const payload = convoRes?.data || convoRes || {};
+                  const data = payload?.data || payload;
+                  const convo = data?.conversation || data;
+                  const conversationId = String(convo?.id || convo?._id || '').trim();
+                  setActiveConversationId(conversationId);
+                } catch {
+                  setActiveConversationId('');
+                }
+              } else {
+                setActiveConversationId('');
+              }
             }
             setError('');
           }
@@ -161,7 +190,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
       return () => {
         active = false;
       };
-    }, [])
+    }, [resolveActiveJob])
   );
 
   useFocusEffect(
@@ -249,6 +278,71 @@ const MechanicDashboardScreen = ({ navigation }) => {
           <AppText style={styles.statValue}>{formatCurrency(walletBalance)}</AppText>
         </View>
       </View>
+
+      {activeJob && activeJob.jobId && activeConversationId ? (
+        <View style={styles.activeJobCard}>
+          <View style={styles.activeJobHeader}>
+            <AppText style={styles.activeJobTitle}>Active job</AppText>
+            <View style={styles.activeJobPill}>
+              <AppText style={styles.activeJobPillText}>{activeJob.status || 'Active'}</AppText>
+            </View>
+          </View>
+          <AppText style={styles.activeJobIssue} numberOfLines={2}>
+            {activeJob.issue}
+          </AppText>
+          {activeJob.description ? (
+            <AppText style={styles.activeJobDesc} numberOfLines={2}>
+              {activeJob.description}
+            </AppText>
+          ) : null}
+          <View style={styles.activeJobMeta}>
+            <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2} />
+            <AppText style={styles.activeJobMetaText}>{activeJob.distance || 'Distance updating'}</AppText>
+            <HugeiconsIcon icon={Time04Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2} />
+            <AppText style={styles.activeJobMetaText}>{activeJob.eta || 'ETA updating'}</AppText>
+          </View>
+          <View style={styles.activeJobActions}>
+            <TouchableOpacity
+              style={[
+                styles.activeJobChat,
+                !activeConversationId ? styles.activeJobChatDisabled : null,
+              ]}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation.navigate(ROUTES.MECH_CHAT, {
+                  conversationId: activeConversationId,
+                  jobId: activeJob.jobId,
+                  mechanicId: user?.id || user?._id,
+                  customer: {
+                    id: activeJob.ownerId,
+                    name: activeJob.name,
+                    initials: initialsFromName(activeJob.name),
+                  },
+                })
+              }
+              disabled={!activeConversationId}
+            >
+              <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.accent} strokeWidth={2} />
+              <AppText style={styles.activeJobChatText}>Chat</AppText>
+            </TouchableOpacity>
+            <AppButton
+              label="Live tracking"
+              onPress={() =>
+                navigation.navigate(ROUTES.MECH_LIVE_TRACKING, {
+                  jobId: activeJob.jobId,
+                  mechanicId: user?.id || user?._id,
+                  carOwnerId: activeJob.ownerId,
+                  carOwnerName: activeJob.name,
+                  conversationId: activeConversationId,
+                  issueSummary: activeJob.issue,
+                })
+              }
+              style={styles.activeJobTrackBtn}
+              textStyle={styles.activeJobTrackText}
+            />
+          </View>
+        </View>
+      ) : null}
 
       <AppText style={styles.sectionTitle}>Nearby requests</AppText>
 
@@ -485,6 +579,95 @@ const styles = StyleSheet.create({
   tabsWrap: {
     marginTop: 10,
     marginBottom: 4,
+  },
+  activeJobCard: {
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.2,
+    borderColor: withAlpha(darkTheme.colors.accent, 0.75),
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    shadowColor: darkTheme.colors.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  activeJobHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  activeJobTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 14,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  activeJobPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.2),
+  },
+  activeJobPillText: {
+    color: darkTheme.colors.accent,
+    fontSize: 11,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  activeJobIssue: {
+    marginTop: 8,
+    color: darkTheme.colors.text,
+    fontSize: 13,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  activeJobDesc: {
+    marginTop: 4,
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+  },
+  activeJobMeta: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
+  },
+  activeJobMetaText: {
+    color: darkTheme.colors.muted,
+    fontSize: 11,
+  },
+  activeJobActions: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
+  },
+  activeJobChat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
+    borderWidth: 1,
+    borderColor: withAlpha(darkTheme.colors.accent, 0.7),
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  activeJobChatText: {
+    color: darkTheme.colors.accent,
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  activeJobChatDisabled: {
+    opacity: 0.5,
+  },
+  activeJobTrackBtn: {
+    flex: 1,
+    minHeight: 40,
+  },
+  activeJobTrackText: {
+    color: '#1A1A1A',
+    fontSize: 12,
   },
   jobsList: {
     marginTop: 12,
