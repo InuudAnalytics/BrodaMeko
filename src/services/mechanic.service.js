@@ -70,7 +70,11 @@ const toId = (value, fieldName) => {
   return safe;
 };
 
-export const addMechanicService = async ({ issue_type, min_price, max_price }) => {
+export const addMechanicService = async ({
+  issue_type,
+  min_price,
+  max_price,
+}) => {
   const safeIssueType = String(issue_type || '').trim();
   const minPrice = toNumber(min_price, 'min_price');
   const maxPrice = toNumber(max_price, 'max_price');
@@ -103,7 +107,10 @@ export const getMyMechanicServices = async () => {
   return response.data;
 };
 
-export const updateMechanicService = async (serviceId, { min_price, max_price } = {}) => {
+export const updateMechanicService = async (
+  serviceId,
+  { min_price, max_price } = {},
+) => {
   const safeServiceId = toId(serviceId, 'serviceId');
   const payload = {};
 
@@ -116,26 +123,37 @@ export const updateMechanicService = async (serviceId, { min_price, max_price } 
   }
 
   if (!Object.keys(payload).length) {
-    const error = new Error('At least one of min_price or max_price is required.');
+    const error = new Error(
+      'At least one of min_price or max_price is required.',
+    );
     error.statusCode = 400;
     error.data = null;
     throw error;
   }
 
-  if (payload.min_price !== undefined && payload.max_price !== undefined && payload.min_price > payload.max_price) {
+  if (
+    payload.min_price !== undefined &&
+    payload.max_price !== undefined &&
+    payload.min_price > payload.max_price
+  ) {
     const error = new Error('min_price cannot be greater than max_price.');
     error.statusCode = 400;
     error.data = null;
     throw error;
   }
 
-  const response = await api.patch(ENDPOINTS.me.mechanic.serviceUpdate(safeServiceId), payload);
+  const response = await api.patch(
+    ENDPOINTS.me.mechanic.serviceUpdate(safeServiceId),
+    payload,
+  );
   return response.data;
 };
 
-export const deleteMechanicService = async (serviceId) => {
+export const deleteMechanicService = async serviceId => {
   const safeServiceId = toId(serviceId, 'serviceId');
-  const response = await api.delete(ENDPOINTS.me.mechanic.serviceDelete(safeServiceId));
+  const response = await api.delete(
+    ENDPOINTS.me.mechanic.serviceDelete(safeServiceId),
+  );
   return response.data;
 };
 
@@ -144,30 +162,43 @@ export const getMechanicAddresses = async () => {
   return response.data;
 };
 
-export const addMechanicAddress = async (payload) => {
+export const addMechanicAddress = async payload => {
   const response = await api.post(ENDPOINTS.me.mechanic.addressAdd, payload);
   return response.data;
 };
 
 export const updateMechanicAddress = async (addressId, payload) => {
   const safeAddressId = toId(addressId, 'addressId');
-  const response = await api.patch(ENDPOINTS.me.mechanic.addressUpdate(safeAddressId), payload);
+  const response = await api.patch(
+    ENDPOINTS.me.mechanic.addressUpdate(safeAddressId),
+    payload,
+  );
   return response.data;
 };
 
-export const deleteMechanicAddress = async (addressId) => {
+export const deleteMechanicAddress = async addressId => {
   const safeAddressId = toId(addressId, 'addressId');
-  const response = await api.delete(ENDPOINTS.me.mechanic.addressDelete(safeAddressId));
+  const response = await api.delete(
+    ENDPOINTS.me.mechanic.addressDelete(safeAddressId),
+  );
   return response.data;
 };
 
-export const setPrimaryMechanicAddress = async (addressId) => {
+export const setPrimaryMechanicAddress = async addressId => {
   const safeAddressId = toId(addressId, 'addressId');
-  const response = await api.post(ENDPOINTS.me.mechanic.addressSetPrimary(safeAddressId), {});
+  const response = await api.patch(
+    ENDPOINTS.me.mechanic.addressSetPrimary(safeAddressId),
+    {},
+  );
   return response.data;
 };
 
-export const addMechanicBank = async ({ account_name, account_number, bank_code, bank_name }) => {
+export const addMechanicBank = async ({
+  account_name,
+  account_number,
+  bank_code,
+  bank_name,
+}) => {
   const response = await api.post(ENDPOINTS.me.mechanic.bankAdd, {
     account_name: String(account_name || '').trim(),
     account_number: String(account_number || '').trim(),
@@ -185,15 +216,20 @@ export const verifyMechanicBank = async ({ account_number, bank_name }) => {
   return response.data;
 };
 
-export const deleteMechanicBank = async (bankId) => {
+export const deleteMechanicBank = async bankId => {
   const safeBankId = toId(bankId, 'bankId');
-  const response = await api.delete(ENDPOINTS.me.mechanic.bankDelete(safeBankId));
+  const response = await api.delete(
+    ENDPOINTS.me.mechanic.bankDelete(safeBankId),
+  );
   return response.data;
 };
 
-export const setPrimaryMechanicBank = async (bankId) => {
+export const setPrimaryMechanicBank = async bankId => {
   const safeBankId = toId(bankId, 'bankId');
-  const response = await api.post(ENDPOINTS.me.mechanic.bankSetPrimary(safeBankId), {});
+  const response = await api.post(
+    ENDPOINTS.me.mechanic.bankSetPrimary(safeBankId),
+    {},
+  );
   return response.data;
 };
 
@@ -202,7 +238,7 @@ export const getMechanicBankList = async () => {
   return response.data;
 };
 
-export const setMechanicOnlineStatus = async (isOnline) => {
+export const setMechanicOnlineStatus = async isOnline => {
   const response = await api.patch(ENDPOINTS.me.mechanic.onlineStatus, {
     is_online: Boolean(isOnline),
   });
