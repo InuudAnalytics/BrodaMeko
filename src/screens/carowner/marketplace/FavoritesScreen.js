@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Search01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../../components';
 import ProductCard from '../../../components/marketplace/ProductCard';
 import { useFavorites } from '../../../context';
@@ -23,6 +23,9 @@ const FavoritesScreen = ({ navigation }) => {
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <View style={styles.content}>
         <View style={styles.header}>
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#FFFFFF" strokeWidth={2} />
+          </Pressable>
           <AppText style={styles.headerTitle}>Favorites</AppText>
         </View>
 
@@ -84,6 +87,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
+    position: 'relative',
+  },
+  backBtn: {
+    position: 'absolute',
+    left: 0,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     color: '#FFFFFF',

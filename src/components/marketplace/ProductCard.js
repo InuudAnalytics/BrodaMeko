@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Animated, Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FavouriteIcon, ShoppingCart02Icon, StarIcon } from '@hugeicons/core-free-icons';
 import { AppText } from '../';
@@ -22,12 +22,50 @@ const ProductCard = ({ product, onPress, onAddToCart }) => {
 
   const imageUri = resolveImageUri(product?.images?.[0]);
   const favorited = isFavorite(product?.id);
+  const [showPulse, setShowPulse] = useState(false);
+  const pulseOpacity = useRef(new Animated.Value(0)).current;
+  const pulseTranslate = useRef(new Animated.Value(0)).current;
 
   const handleFavoritePress = (event) => {
     if (event?.stopPropagation) {
       event.stopPropagation();
     }
     toggleFavorite(product);
+  };
+
+  const triggerCartPulse = () => {
+    setShowPulse(true);
+    pulseOpacity.setValue(0);
+    pulseTranslate.setValue(0);
+
+    Animated.sequence([
+      Animated.timing(pulseOpacity, {
+        toValue: 1,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(pulseOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseTranslate, {
+          toValue: -18,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      setShowPulse(false);
+    });
+  };
+
+  const handleAddToCartPress = () => {
+    triggerCartPulse();
+    if (onAddToCart) {
+      onAddToCart(product);
+    }
   };
 
   return (
@@ -64,10 +102,26 @@ const ProductCard = ({ product, onPress, onAddToCart }) => {
         </View>
 
         <View style={styles.bottomRow}>
-          <AppText style={styles.price}>₦{Number(product?.price || 0).toLocaleString('en-NG')}</AppText>
-          <TouchableOpacity style={styles.cartButton} activeOpacity={0.85} onPress={onAddToCart}>
-            <HugeiconsIcon icon={ShoppingCart02Icon} size={18} color="#E6C714" strokeWidth={2} />
-          </TouchableOpacity>
+          <AppText style={styles.price}>{'\u20A6'}{Number(product?.price || 0).toLocaleString('en-NG')}</AppText>
+          <View style={styles.cartWrap}>
+            {showPulse ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.cartPulse,
+                  {
+                    opacity: pulseOpacity,
+                    transform: [{ translateY: pulseTranslate }],
+                  },
+                ]}
+              >
+                <AppText style={styles.cartPulseText}>+1</AppText>
+              </Animated.View>
+            ) : null}
+            <TouchableOpacity style={styles.cartButton} activeOpacity={0.85} onPress={handleAddToCartPress}>
+              <HugeiconsIcon icon={ShoppingCart02Icon} size={18} color="#E6C714" strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -153,6 +207,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(230,199,20,0.6)',
+  },
+  cartWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartPulse: {
+    position: 'absolute',
+    bottom: 26,
+    backgroundColor: '#E6C714',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  cartPulseText: {
+    color: '#111827',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 

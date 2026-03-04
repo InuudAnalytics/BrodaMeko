@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 130,
+    paddingBottom: 180,
   },
   itemCard: {
     backgroundColor: '#1A1A4A',
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
-    bottom: 16,
+    bottom: 90,
   },
 });
 
