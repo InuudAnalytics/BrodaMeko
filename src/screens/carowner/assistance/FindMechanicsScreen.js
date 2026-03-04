@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,9 +13,11 @@ import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useChat } from '../../../context';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 import { getMechanicsForJob, hireMechanicForJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
+import { parseAddressComponents, reverseGeocode } from '../../../utils/places';
 
 const BackIcon = ({ color }) => {
   return (
@@ -286,18 +288,53 @@ const MechanicCard = ({ item, loading, onHire }) => {
 
 const FindMechanicsScreen = ({ navigation, route }) => {
   const { clearActiveConversation } = useChat();
+  const { location, refreshOnce } = useUserLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadingMechanicId, setLoadingMechanicId] = useState(null);
   const [mechanics, setMechanics] = useState([]);
   const [matchedIssueType, setMatchedIssueType] = useState('');
+  const [locationLabel, setLocationLabel] = useState('');
 
   const jobId = String(route?.params?.jobId || '').trim();
   const issueSummary = normalizeIssueSummary(route?.params?.job);
-  // TODO(map/location): replace this fallback with the user's live location label.
-  // Mechanics are already filtered by service capability from backend, but this
-  // screen should also filter/sort by proximity to the user's current location.
-  const locationText = route?.params?.location || 'Ahmadu Bello way, Kwara state';
+  const locationText = locationLabel || route?.params?.location || 'Detecting location...';
+
+  useEffect(() => {
+    refreshOnce?.();
+  }, [refreshOnce]);
+
+  useEffect(() => {
+    let active = true;
+
+    const resolveLocation = async () => {
+      if (!location?.latitude || !location?.longitude) {
+        return;
+      }
+
+      try {
+        const response = await reverseGeocode({
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+        const parsed = parseAddressComponents(response?.components || []);
+        const city = parsed.city || '';
+        const state = parsed.state || '';
+        const label = [city, state].filter(Boolean).join(', ');
+        if (active && label) {
+          setLocationLabel(label);
+        }
+      } catch {
+        // ignore geocode errors
+      }
+    };
+
+    resolveLocation();
+
+    return () => {
+      active = false;
+    };
+  }, [location]);
 
   const fetchMechanics = useCallback(async () => {
     if (!jobId) {
