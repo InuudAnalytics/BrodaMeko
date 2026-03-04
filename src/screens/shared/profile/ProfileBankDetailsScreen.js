@@ -15,6 +15,7 @@ import { getCurrentUser } from '../../../services/auth.service';
 import {
   addMechanicBank,
   deleteMechanicBank,
+  getMechanicBankDetails,
   getMechanicBankList,
   setPrimaryMechanicBank,
   verifyMechanicBank,
@@ -98,15 +99,24 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
     setLoading(true);
     setFetchError('');
     try {
-      const response = await getCurrentUser();
-      const payload = response?.data || response || {};
-      setProfile(payload);
+      if (role === ROLES.MECH) {
+        const response = await getMechanicBankDetails();
+        const payload = response?.data || response || {};
+        setProfile((prev) => ({
+          ...(prev || {}),
+          bank_details: normalizeBankItems(payload),
+        }));
+      } else {
+        const response = await getCurrentUser();
+        const payload = response?.data || response || {};
+        setProfile(payload);
+      }
     } catch (error) {
       setFetchError(error?.message || 'Could not load profile.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     reloadProfile();

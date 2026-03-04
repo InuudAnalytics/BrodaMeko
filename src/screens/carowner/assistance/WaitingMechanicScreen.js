@@ -112,6 +112,18 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
       });
     };
 
+    const onCancelled = () => {
+      if (!active) {
+        return;
+      }
+      Alert.alert('Mechanic cancelled', 'Please choose another mechanic.');
+      navigation.replace(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
+        jobId: sessionPayload.jobId,
+        job: route?.params?.job,
+        location: route?.params?.location,
+      });
+    };
+
     const onAccepted = async () => {
       if (!active) {
         return;
@@ -123,6 +135,28 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
             activateSession(jobId);
           }
         }, 1200);
+      }
+    };
+
+    const checkConversation = async () => {
+      try {
+        const response = await getConversationByJobId(jobId);
+        const payload = response?.data || response || {};
+        const data = payload?.data || payload;
+        const conversation = data?.conversation || data || null;
+        const conversationId = String(conversation?.id || conversation?._id || '').trim();
+        if (conversationId) {
+          navigation.replace(ROUTES.CAR_OWNER_DASHBOARD, {
+            activeSession: {
+              ...sessionPayload,
+              status: 'active',
+              progressStatus: 'accepted',
+              conversationId,
+            },
+          });
+        }
+      } catch {
+        // ignore conversation lookup errors
       }
     };
 
@@ -147,6 +181,11 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
 
         if (status === 'declined') {
           onDeclined();
+          return;
+        }
+
+        if (status === 'cancelled' || status === 'canceled') {
+          onCancelled();
         }
       } catch {
         // Ignore malformed socket payloads.
@@ -167,6 +206,13 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
         }
         if (status === 'declined') {
           onDeclined();
+          return;
+        }
+        if (status === 'cancelled' || status === 'canceled') {
+          onCancelled();
+        }
+        if (!status || status === 'pending') {
+          await checkConversation();
         }
       } catch {
         // Ignore poll errors and continue polling.

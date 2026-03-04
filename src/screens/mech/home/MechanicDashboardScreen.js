@@ -9,9 +9,9 @@ import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { getAvailableJobs, getConversationByJobId } from '../../../services/jobs.service';
+import { getAvailableJobs, getConversationByJobId, getMechanicPendingJobRequests, respondToJobRequest } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
-import { setMechanicOnlineStatus } from '../../../services/mechanic.service';
+import { getMechanicEarnings, setMechanicOnlineStatus } from '../../../services/mechanic.service';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { ROUTES } from '../../../utils';
@@ -35,7 +35,8 @@ const formatCurrency = (amount) => {
   return `\u20A6${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const normalizeJob = (job) => {
+const normalizeJob = (job, fallbackStatus = '') => {
+  const resolvedStatus = String(job.status || fallbackStatus || '').toLowerCase();
   return {
     id: job.id || job._id,
     jobId: String(job.id || job._id || job.job_id || job.jobId || '').trim(),
@@ -43,7 +44,7 @@ const normalizeJob = (job) => {
     ownerId: job.car_owner?.id || job.car_owner?._id || job.user?.id || job.user?._id || '',
     issue: job.title || job.issue_type || job.description || 'Car Issue',
     description: job.description || job.title || '',
-    status: String(job.status || '').toLowerCase(),
+    status: resolvedStatus,
     distance: job.distance || '',
     eta: job.eta || '',
     urgent: job.priority === 'urgent' || false,
@@ -108,6 +109,13 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const { permissionStatus, requestPermission } = useUserLocation();
   const [activeFilter, setActiveFilter] = useState('available');
   const [walletBalance, setWalletBalance] = useState(0);
+  const [earnings, setEarnings] = useState({
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    allTime: 0,
+    pendingRelease: 0,
+  });
   const [jobs, setJobs] = useState([]);
   const [totalJobs, setTotalJobs] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -161,19 +169,55 @@ const MechanicDashboardScreen = ({ navigation }) => {
       if (!canProceed) {
         return;
       }
-      console.log('Accept job:', job?.id || job?.jobId);
+      const safeJobId = String(job?.jobId || job?.id || '').trim();
+      if (!safeJobId) {
+        setError('Missing job id for this request.');
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      try {
+        const response = await respondToJobRequest(safeJobId, 'accept');
+        const payload = response?.data || response || {};
+        const conversationId = String(payload?.conversation_id || '').trim();
+        if (conversationId) {
+          setActiveConversationId(conversationId);
+        }
+        const refreshed = await getAvailableJobs({ page: 1, limit: 100 }).catch(() => null);
+        if (refreshed) {
+          const refreshedPayload = refreshed?.data || refreshed;
+          const rawJobs = Array.isArray(refreshedPayload)
+            ? refreshedPayload
+            : (refreshedPayload?.jobs || refreshedPayload?.items || refreshedPayload?.results || []);
+          const mappedAssigned = rawJobs.map((jobItem) => normalizeJob(jobItem));
+          setJobs((prev) => {
+            const pending = prev.filter((item) => item.status === 'pending');
+            return [...pending, ...mappedAssigned];
+          });
+        }
+      } catch (error) {
+        setError(error?.message || 'Could not accept job.');
+      } finally {
+        setLoading(false);
+      }
     },
     [ensureLocationPermission],
   );
 
   const visibleJobs = useMemo(() => {
-    if (activeFilter === 'active') {
-      return jobs.filter((job) => job?.status === 'active');
+    const status = String(activeFilter || '').toLowerCase();
+    const availableStatuses = new Set(['pending', 'available', 'open', 'request']);
+    const activeStatuses = new Set(['accepted', 'active', 'in_progress', 'repairing', 'en_route', 'arrived']);
+    const completedStatuses = new Set(['completed', 'done']);
+
+    if (status === 'active') {
+      return jobs.filter((job) => activeStatuses.has(job?.status));
     }
-    if (activeFilter === 'completed') {
-      return jobs.filter((job) => job?.status === 'completed');
+    if (status === 'completed') {
+      return jobs.filter((job) => completedStatuses.has(job?.status));
     }
-    return jobs;
+    return jobs.filter((job) => availableStatuses.has(job?.status) || !job?.status);
   }, [activeFilter, jobs]);
 
   const resolveActiveJob = useCallback((jobList) => {
@@ -187,9 +231,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
 
       const fetchData = async () => {
         try {
-          const [walletRes, jobsRes] = await Promise.all([
+          const [walletRes, jobsRes, pendingRes, earningsRes] = await Promise.all([
             getWalletBalance().catch(() => null),
-            getAvailableJobs({ page: 1, limit: 100 }).catch(() => null)
+            getAvailableJobs({ page: 1, limit: 100 }).catch(() => null),
+            getMechanicPendingJobRequests().catch(() => null),
+            getMechanicEarnings().catch(() => null),
           ]);
 
           if (active) {
@@ -197,15 +243,40 @@ const MechanicDashboardScreen = ({ navigation }) => {
               const walletPayload = walletRes?.data || walletRes;
               setWalletBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
             }
+            if (earningsRes) {
+              const earningsPayload = earningsRes?.data || earningsRes || {};
+              const earningsData = earningsPayload?.data || earningsPayload;
+              const earningsInfo = earningsData?.earnings || {};
+              const jobsInfo = earningsData?.jobs || {};
+              setEarnings({
+                today: Number(earningsInfo?.today || 0),
+                thisWeek: Number(earningsInfo?.this_week || earningsInfo?.thisWeek || 0),
+                thisMonth: Number(earningsInfo?.this_month || earningsInfo?.thisMonth || 0),
+                allTime: Number(earningsInfo?.all_time || earningsInfo?.allTime || 0),
+                pendingRelease: Number(earningsInfo?.pending_release || earningsInfo?.pendingRelease || 0),
+              });
+              if (Number.isFinite(Number(earningsData?.wallet_balance))) {
+                setWalletBalance(Number(earningsData?.wallet_balance || 0));
+              }
+              if (Number.isFinite(Number(jobsInfo?.total))) {
+                setTotalJobs(Number(jobsInfo?.total || 0));
+              }
+            }
             if (jobsRes) {
               const jobsPayload = jobsRes?.data || jobsRes;
               const rawJobs = Array.isArray(jobsPayload)
                 ? jobsPayload
                 : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
-              const mappedJobs = rawJobs.map(normalizeJob);
-              setJobs(mappedJobs);
+              const mappedAssigned = rawJobs.map((job) => normalizeJob(job));
+              const pendingPayload = pendingRes?.data || pendingRes;
+              const pendingRaw = Array.isArray(pendingPayload)
+                ? pendingPayload
+                : (pendingPayload?.jobs || pendingPayload?.items || pendingPayload?.results || pendingPayload?.data || []);
+              const mappedPending = pendingRaw.map((job) => normalizeJob(job, 'pending'));
+              const mergedJobs = [...mappedPending, ...mappedAssigned];
+              setJobs(mergedJobs);
               setTotalJobs(Number(jobsPayload?.total || rawJobs.length || 0));
-              const currentActive = resolveActiveJob(mappedJobs);
+              const currentActive = resolveActiveJob(mergedJobs);
               setActiveJob(currentActive || null);
               if (currentActive?.jobId) {
                 try {
@@ -305,8 +376,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
             />
           </View>
         </View>
-        <AppText style={styles.earningsAmount}>{'\u20A6'}25,000.00</AppText>
-        <AppText style={styles.trendText}>1.5% increase in the past 5 days</AppText>
+        <AppText style={styles.earningsAmount}>{formatCurrency(earnings.today)}</AppText>
+        <AppText style={styles.trendText}>This week: {formatCurrency(earnings.thisWeek)}</AppText>
       </View>
 
       <View style={styles.statsRow}>
