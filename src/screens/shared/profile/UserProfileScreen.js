@@ -299,7 +299,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
           {getSettingsRows(role).map((row, index, array) => (
             <SettingRow
               key={row.key}
-              label={row.label}
+              label={row.key === 'logout' && isSigningOut ? 'Logging out...' : row.label}
               icon={row.icon}
               tone={row.tone}
               isLast={index === array.length - 1}
@@ -337,6 +337,9 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                   return;
                 }
                 if (row.key === 'logout') {
+                  if (isSigningOut) {
+                    return;
+                  }
                   handleSignOut();
                 }
               }}

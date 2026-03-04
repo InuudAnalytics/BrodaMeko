@@ -24,7 +24,7 @@ import {
   WalletAdd02Icon,
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppBottomNav, AppText, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
 import { getTransactions } from '../../../services/transactions.service';
 import { getWalletBalance, getWithdrawals, requestWithdrawal } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
@@ -35,9 +35,9 @@ const toNaira = (value) => {
   return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 };
 
-const toAmountWithSign = (amount) => {
+const toAmountWithSign = (amount, forceNegative = false) => {
   const numeric = Number(amount || 0);
-  const sign = numeric >= 0 ? '+' : '-';
+  const sign = forceNegative ? '-' : numeric >= 0 ? '+' : '-';
   return `${sign}${Math.abs(numeric).toLocaleString('en-NG')}`;
 };
 
@@ -74,18 +74,20 @@ const normalizeTransaction = (item, index, source) => {
   const parsedTime = Date.parse(String(createdAtRaw || ''));
   const createdAtMs = Number.isFinite(parsedTime) ? parsedTime : 0;
   const baseTitle = item?.title || item?.narration || item?.description || '';
-  const resolvedTitle = baseTitle || (type.includes('withdraw') ? 'Withdrawal' : 'Transaction');
+  const isWithdrawal = source === 'withdrawals' || type.includes('withdraw');
+  const resolvedTitle = baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
+  const forceNegative = isWithdrawal;
 
   return {
     id: String(item?.id || item?._id || item?.reference || `txn-${index}`),
     reference: String(item?.reference || item?.trxref || item?.id || '').trim(),
     title: resolvedTitle,
     subtitle: item?.subtitle || item?.channel || item?.status || '',
-    amountText: toAmountWithSign(amount),
+    amountText: toAmountWithSign(amount, forceNegative),
     time: createdAtRaw,
     createdAtMs,
-    positive: amount >= 0 || type.includes('credit'),
-    icon: amount >= 0 ? PlusSignIcon : Wrench01Icon,
+    positive: forceNegative ? false : amount >= 0 || type.includes('credit'),
+    icon: isWithdrawal || amount < 0 ? ArrowDownLeft01Icon : PlusSignIcon,
     rawAmount: amount,
     rawType: type,
     rawStatus: String(item?.status || '').toLowerCase(),
@@ -228,6 +230,7 @@ const WalletScreen = ({ navigation }) => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawErrorAction, setWithdrawErrorAction] = useState('');
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
 
   const fetchWalletData = useCallback(async () => {
@@ -311,6 +314,7 @@ const WalletScreen = ({ navigation }) => {
 
   const openWithdrawModal = () => {
     setWithdrawError('');
+    setWithdrawErrorAction('');
     setWithdrawAmount('');
     setIsWithdrawModalOpen(true);
   };
@@ -327,6 +331,7 @@ const WalletScreen = ({ navigation }) => {
     setWithdrawAmount(sanitized);
     if (withdrawError) {
       setWithdrawError('');
+      setWithdrawErrorAction('');
     }
   };
 
@@ -334,7 +339,32 @@ const WalletScreen = ({ navigation }) => {
     setWithdrawAmount(String(amount));
     if (withdrawError) {
       setWithdrawError('');
+      setWithdrawErrorAction('');
     }
+  };
+
+  const resolveWithdrawError = (error) => {
+    const code = String(error?.data?.code || '').toUpperCase();
+    const message = String(error?.message || '').toLowerCase();
+    const requiredAmount = Number(error?.data?.required || 0);
+
+    if (code.includes('INSUFFICIENT') || message.includes('insufficient')) {
+      return {
+        text: requiredAmount
+          ? `Insufficient balance. You need ₦${requiredAmount.toLocaleString('en-NG')}.`
+          : 'Insufficient balance.',
+        action: '',
+      };
+    }
+
+    if (code.includes('NO_PRIMARY') || message.includes('primary bank')) {
+      return {
+        text: 'No primary bank account found.',
+        action: 'bank',
+      };
+    }
+
+    return { text: 'Unable to request withdrawal right now.', action: '' };
   };
 
   const handleSubmitWithdraw = async () => {
@@ -346,12 +376,15 @@ const WalletScreen = ({ navigation }) => {
 
     setWithdrawSubmitting(true);
     setWithdrawError('');
+    setWithdrawErrorAction('');
     try {
       await requestWithdrawal(parsedAmount);
       closeWithdrawModal();
       fetchWalletData();
     } catch (requestError) {
-      setWithdrawError('Unable to request withdrawal right now.');
+      const resolved = resolveWithdrawError(requestError);
+      setWithdrawError(resolved.text);
+      setWithdrawErrorAction(resolved.action);
     } finally {
       setWithdrawSubmitting(false);
     }
@@ -689,6 +722,17 @@ const WalletScreen = ({ navigation }) => {
             </View>
 
             {withdrawError ? <AppText style={styles.withdrawError}>{withdrawError}</AppText> : null}
+            {withdrawErrorAction === 'bank' ? (
+              <AppButton
+                label="Add bank details"
+                onPress={() => {
+                  closeWithdrawModal();
+                  navigation.navigate(ROUTES.PROFILE_BANK_DETAILS);
+                }}
+                style={styles.withdrawCta}
+                textStyle={styles.withdrawCtaText}
+              />
+            ) : null}
 
             <TouchableOpacity
               activeOpacity={0.85}
@@ -1140,6 +1184,15 @@ const styles = StyleSheet.create({
   withdrawError: {
     marginTop: 10,
     color: '#F87171',
+    fontSize: 12,
+  },
+  withdrawCta: {
+    marginTop: 10,
+    minHeight: 38,
+    backgroundColor: darkTheme.colors.accent,
+  },
+  withdrawCtaText: {
+    color: '#111827',
     fontSize: 12,
   },
   withdrawSubmit: {

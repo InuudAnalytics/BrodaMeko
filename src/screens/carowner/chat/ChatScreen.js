@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppBottomNav, AppText } from '../../../components';
@@ -34,10 +34,6 @@ const ChatScreen = ({ navigation, route }) => {
     }
   }, [hasValidParams, navigation]);
 
-  if (!hasValidParams) {
-    return null;
-  }
-
   const mechanic = route?.params?.mechanic || {
     name: 'Samuel Olamilekan',
     initials: 'SO',
@@ -47,6 +43,7 @@ const ChatScreen = ({ navigation, route }) => {
   const recipient = {
     name: mechanic.name,
     initials: mechanic.initials || 'M',
+    avatarUri: mechanic?.avatar?.url || mechanic?.avatarUrl || mechanic?.avatarUri || '',
     metaText: mechanic.distanceKm ? `${mechanic.distanceKm}km away` : null,
   };
 
@@ -58,7 +55,7 @@ const ChatScreen = ({ navigation, route }) => {
     Array.isArray(issueSummary?.images) && issueSummary.images.length ? `Images: ${issueSummary.images.length}` : '',
   ].filter(Boolean);
 
-  const renderIssueSummary = () => {
+  const renderIssueSummary = useCallback(() => {
     if (!summaryLines.length) {
       return null;
     }
@@ -73,11 +70,15 @@ const ChatScreen = ({ navigation, route }) => {
         ))}
       </View>
     );
-  };
+  }, [summaryLines]);
 
   const renderBottomNav = () => (
     <AppBottomNav activeTab={ROUTES.CAR_OWNER_SETTINGS} onTabPress={(routeName) => navigation.navigate(routeName)} />
   );
+
+  if (!hasValidParams) {
+    return null;
+  }
 
   return (
     <SharedChatScreen

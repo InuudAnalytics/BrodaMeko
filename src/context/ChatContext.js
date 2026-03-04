@@ -11,6 +11,7 @@ import {
 } from '../services/chat.service';
 import { close, connect, send } from '../services/ws.service';
 import { useAuth } from './AuthContext';
+import { CHAT_WS_URL } from '../config/endpoints';
 
 const ChatContext = createContext(undefined);
 
@@ -148,6 +149,9 @@ export const ChatProvider = ({ children }) => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [wsStatus, setWsStatus] = useState('idle');
+  const [wsCloseInfo, setWsCloseInfo] = useState(null);
+  const [wsErrorInfo, setWsErrorInfo] = useState(null);
+  const [wsDebugInfo, setWsDebugInfo] = useState({ url: '', tokenLength: 0, state: 'idle' });
   const [latestJobRequestUpdate, setLatestJobRequestUpdate] = useState(null);
   const [latestJobStatusUpdate, setLatestJobStatusUpdate] = useState(null);
   const [error, setError] = useState(null);
@@ -155,6 +159,16 @@ export const ChatProvider = ({ children }) => {
 
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef(null);
+  const connectTimeoutRef = useRef(null);
+  const connectAttemptRef = useRef(0);
+  const [wsEventInfo, setWsEventInfo] = useState('');
+  const [wsDebugExtras, setWsDebugExtras] = useState({
+    connecting: false,
+    activeConversationId: '',
+    attemptId: '',
+  });
+  const chatActiveRef = useRef(false);
+  const connectingRef = useRef(false);
   const manualDisconnectRef = useRef(false);
   const activeConversationIdRef = useRef('');
   const socketReadyRef = useRef(false);
@@ -178,6 +192,15 @@ export const ChatProvider = ({ children }) => {
       reconnectTimerRef.current = null;
     }
   }, []);
+
+  const clearConnectTimeout = useCallback(() => {
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearConnectTimeout(), [clearConnectTimeout]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -204,13 +227,22 @@ export const ChatProvider = ({ children }) => {
     });
   }, []);
 
-  const disconnectChatSocket = useCallback(() => {
+  const disconnectChatSocket = useCallback((reason = '') => {
     manualDisconnectRef.current = true;
     socketReadyRef.current = false;
     clearReconnectTimer();
+    clearConnectTimeout();
     close();
     setWsStatus('disconnected');
-  }, [clearReconnectTimer]);
+    setWsCloseInfo(null);
+    setWsErrorInfo(null);
+    setWsEventInfo(reason ? `disconnect:${reason}` : 'disconnect-called');
+    setWsDebugInfo((prev) => ({ ...prev, state: 'closed' }));
+    setWsDebugExtras((prev) => ({
+      ...prev,
+      connecting: false,
+    }));
+  }, [clearReconnectTimer, clearConnectTimeout]);
 
   const flushPendingMessages = useCallback((conversationId) => {
     const safeConversationId = String(conversationId || '').trim();
@@ -262,9 +294,45 @@ export const ChatProvider = ({ children }) => {
     });
   }, []);
 
+  const clearActiveConversation = useCallback((options = {}) => {
+    const { force = false } = options;
+    if (chatActiveRef.current && !force) {
+      return;
+    }
+    disconnectChatSocket('clear-active');
+    setActiveConversation(null);
+    setMessagesByConversationId({});
+    setConversations([]);
+    activeConversationIdRef.current = '';
+    reconnectAttemptsRef.current = 0;
+  }, [disconnectChatSocket]);
+
+  const handleJobStatusChange = useCallback(
+    (status) => {
+      const normalized = String(status || '').trim().toLowerCase();
+
+      if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'canceled') {
+        clearActiveConversation();
+      }
+    },
+    [clearActiveConversation]
+  );
+
+  const setChatActive = useCallback((isActive) => {
+    chatActiveRef.current = Boolean(isActive);
+  }, []);
+
   const connectChatSocket = useCallback((conversationId) => {
     const safeConversationId = String(conversationId || '').trim();
     const safeToken = String(token || '').trim();
+    const url = CHAT_WS_URL
+      ? `${CHAT_WS_URL}${CHAT_WS_URL.includes('?') ? '&' : '?'}token=${encodeURIComponent(safeToken)}`
+      : '';
+    setWsDebugInfo({
+      url,
+      tokenLength: safeToken.length,
+      state: 'connecting',
+    });
 
     if (!safeConversationId || !safeToken) {
       setWsStatus('error');
@@ -273,19 +341,39 @@ export const ChatProvider = ({ children }) => {
 
     if (
       activeConversationIdRef.current === safeConversationId &&
-      (wsStatusRef.current === 'connected' || wsStatusRef.current === 'connecting')
+      (wsStatusRef.current === 'connected' || wsStatusRef.current === 'connecting' || connectingRef.current)
     ) {
       return true;
     }
 
-    if (activeConversationIdRef.current !== safeConversationId) {
-      disconnectChatSocket();
+    if (activeConversationIdRef.current && activeConversationIdRef.current !== safeConversationId) {
+      disconnectChatSocket('switch-conversation');
     }
 
     manualDisconnectRef.current = false;
     activeConversationIdRef.current = safeConversationId;
     clearReconnectTimer();
+    clearConnectTimeout();
     setWsStatus('connecting');
+    connectingRef.current = true;
+    const attemptId = Date.now();
+    connectAttemptRef.current = attemptId;
+    setWsEventInfo('connect-called');
+    setWsDebugExtras({
+      connecting: true,
+      activeConversationId: safeConversationId,
+      attemptId: String(attemptId),
+    });
+    connectTimeoutRef.current = setTimeout(() => {
+      if (connectingRef.current && connectAttemptRef.current === attemptId) {
+        setWsStatus('error');
+        setWsErrorInfo({ message: 'WebSocket handshake timeout' });
+        setWsDebugInfo((prev) => ({ ...prev, state: 'timeout' }));
+        setWsEventInfo('timeout');
+        connectingRef.current = false;
+        setWsDebugExtras((prev) => ({ ...prev, connecting: false }));
+      }
+    }, 6000);
 
     connect(
       safeToken,
@@ -337,11 +425,27 @@ export const ChatProvider = ({ children }) => {
         socketReadyRef.current = true;
         reconnectAttemptsRef.current = 0;
         setWsStatus('connected');
+        connectingRef.current = false;
+        clearConnectTimeout();
+        setWsDebugInfo((prev) => ({ ...prev, state: 'open' }));
+        setWsCloseInfo(null);
+        setWsErrorInfo(null);
+        setWsEventInfo('open');
+        setWsDebugExtras((prev) => ({ ...prev, connecting: false }));
         flushPendingMessages(safeConversationId);
       },
       (event) => {
         socketReadyRef.current = false;
         setWsStatus('disconnected');
+        connectingRef.current = false;
+        clearConnectTimeout();
+        setWsDebugInfo((prev) => ({ ...prev, state: 'closed' }));
+        setWsCloseInfo({
+          code: event?.code,
+          reason: event?.reason,
+        });
+        setWsEventInfo('close');
+        setWsDebugExtras((prev) => ({ ...prev, connecting: false }));
 
         if (manualDisconnectRef.current) {
           return;
@@ -370,32 +474,23 @@ export const ChatProvider = ({ children }) => {
           }
         }, delay);
       },
-      () => {
+      (event) => {
         setWsStatus('error');
+        connectingRef.current = false;
+        clearConnectTimeout();
+        setWsDebugInfo((prev) => ({ ...prev, state: 'error' }));
+        setWsErrorInfo({
+          message: event?.message,
+        });
+        setWsEventInfo('error');
+        setWsDebugExtras((prev) => ({ ...prev, connecting: false }));
       }
     );
 
     return true;
     // wsStatus intentionally omitted — read via wsStatusRef.current to avoid
     // stale closure captures and spurious reconnect loops on status transitions.
-  }, [appendMessage, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, handleJobStatusChange, token]);
-
-  const clearActiveConversation = useCallback(() => {
-    disconnectChatSocket();
-    setActiveConversation(null);
-    setMessagesByConversationId({});
-    setConversations([]);
-    activeConversationIdRef.current = '';
-    reconnectAttemptsRef.current = 0;
-  }, [disconnectChatSocket]);
-
-  const handleJobStatusChange = useCallback((status) => {
-    const normalized = String(status || '').trim().toLowerCase();
-
-    if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'canceled') {
-      clearActiveConversation();
-    }
-  }, [clearActiveConversation]);
+  }, [appendMessage, clearConnectTimeout, clearReconnectTimer, disconnectChatSocket, flushPendingMessages, handleJobStatusChange, token]);
 
   const fetchConversations = useCallback(async () => {
     setLoadingConversations(true);
@@ -526,6 +621,9 @@ export const ChatProvider = ({ children }) => {
       const response = await createQuotation(safeConversationId, { amount, job_id });
       return response;
     } catch (quotationError) {
+      if (__DEV__) {
+        console.log('[Chat] Quotation error:', quotationError?.response?.data || quotationError?.message);
+      }
       setError(quotationError?.message || 'Failed to send quotation.');
       return null;
     }
@@ -640,7 +738,7 @@ export const ChatProvider = ({ children }) => {
       return false;
     }
 
-    if (!socketReadyRef.current || wsStatus !== 'connected') {
+    if (!socketReadyRef.current || wsStatusRef.current !== 'connected') {
       return false;
     }
 
@@ -669,12 +767,12 @@ export const ChatProvider = ({ children }) => {
       return true;
     }
     return true;
-  }, [wsStatus]);
+  }, []);
 
   const sendTypingEvent = useCallback((conversationId) => {
     const safeConversationId = String(conversationId || '').trim();
 
-    if (!safeConversationId || !socketReadyRef.current || wsStatus !== 'connected') {
+    if (!safeConversationId || !socketReadyRef.current || wsStatusRef.current !== 'connected') {
       return false;
     }
 
@@ -682,12 +780,12 @@ export const ChatProvider = ({ children }) => {
       type: 'typing',
       conversation_id: safeConversationId,
     });
-  }, [wsStatus]);
+  }, []);
 
   const sendReadEvent = useCallback((conversationId) => {
     const safeConversationId = String(conversationId || '').trim();
 
-    if (!safeConversationId || !socketReadyRef.current || wsStatus !== 'connected') {
+    if (!safeConversationId || !socketReadyRef.current || wsStatusRef.current !== 'connected') {
       return false;
     }
 
@@ -695,7 +793,7 @@ export const ChatProvider = ({ children }) => {
       type: 'read',
       conversation_id: safeConversationId,
     });
-  }, [wsStatus]);
+  }, []);
 
   const retryPendingMessage = useCallback((conversationId, messageId) => {
     const safeConversationId = String(conversationId || '').trim();
@@ -783,8 +881,9 @@ export const ChatProvider = ({ children }) => {
 
   useEffect(() => () => {
     clearReconnectTimer();
+    clearConnectTimeout();
     close();
-  }, [clearReconnectTimer]);
+  }, [clearReconnectTimer, clearConnectTimeout]);
 
   // When the auth token changes (logout, login as different user, role switch),
   // fully tear down the existing socket and reset all chat state so the new
@@ -802,9 +901,16 @@ export const ChatProvider = ({ children }) => {
     manualDisconnectRef.current = true;
     socketReadyRef.current = false;
     clearReconnectTimer();
+    clearConnectTimeout();
     close();
     wsStatusRef.current = 'idle';
     setWsStatus('idle');
+    setWsCloseInfo(null);
+    setWsErrorInfo(null);
+    setWsDebugInfo({ url: '', tokenLength: 0, state: 'idle' });
+    connectingRef.current = false;
+    setWsEventInfo('');
+    setWsDebugExtras({ connecting: false, activeConversationId: '', attemptId: '' });
 
     // Reset all chat state so the next session starts fresh.
     setConversations([]);
@@ -813,7 +919,7 @@ export const ChatProvider = ({ children }) => {
     activeConversationIdRef.current = '';
     reconnectAttemptsRef.current = 0;
     setError(null);
-  }, [token, clearReconnectTimer]);
+  }, [token, clearReconnectTimer, clearConnectTimeout]);
 
   const value = useMemo(
     () => ({
@@ -825,6 +931,11 @@ export const ChatProvider = ({ children }) => {
       sendingMessage,
       uploadingImages,
       wsStatus,
+      wsCloseInfo,
+      wsErrorInfo,
+      wsDebugInfo,
+      wsEventInfo,
+      wsDebugExtras,
       latestJobRequestUpdate,
       latestJobStatusUpdate,
       error,
@@ -849,6 +960,7 @@ export const ChatProvider = ({ children }) => {
       addPendingSocketMessage,
       addMockTextMessage,
       addLocalMessage,
+      setChatActive,
     }),
     [
       conversations,
@@ -859,6 +971,11 @@ export const ChatProvider = ({ children }) => {
       sendingMessage,
       uploadingImages,
       wsStatus,
+      wsCloseInfo,
+      wsErrorInfo,
+      wsDebugInfo,
+      wsEventInfo,
+      wsDebugExtras,
       latestJobRequestUpdate,
       latestJobStatusUpdate,
       error,
@@ -883,6 +1000,7 @@ export const ChatProvider = ({ children }) => {
       addPendingSocketMessage,
       addMockTextMessage,
       addLocalMessage,
+      setChatActive,
     ]
   );
 
@@ -893,7 +1011,44 @@ export const useChat = () => {
   const context = useContext(ChatContext);
 
   if (!context) {
-    throw new Error('useChat must be used within ChatProvider');
+    if (__DEV__) {
+      console.warn('[Chat] useChat called outside ChatProvider. Returning no-op fallback.');
+    }
+    return {
+      conversations: [],
+      activeConversation: null,
+      messagesByConversationId: {},
+      loadingConversations: false,
+      loadingMessages: false,
+      sendingMessage: false,
+      uploadingImages: false,
+      wsStatus: 'error',
+      latestJobRequestUpdate: null,
+      latestJobStatusUpdate: null,
+      error: 'Chat provider unavailable',
+      clearError: () => {},
+      clearActiveConversation: () => {},
+      handleJobStatusChange: () => {},
+      fetchConversations: async () => null,
+      openConversation: async () => null,
+      fetchMessages: async () => null,
+      markConversationRead: async () => null,
+      startConversation: async () => null,
+      sendQuotation: async () => null,
+      respondQuotation: async () => null,
+      initiatePaymentForJob: async () => null,
+      uploadImages: async () => null,
+      connectChatSocket: () => false,
+      disconnectChatSocket: () => {},
+      sendSocketMessage: () => false,
+      sendTypingEvent: () => false,
+      sendReadEvent: () => false,
+      retryPendingMessage: () => false,
+      addPendingSocketMessage: () => null,
+      addMockTextMessage: () => {},
+      addLocalMessage: () => {},
+      setChatActive: () => {},
+    };
   }
 
   return context;

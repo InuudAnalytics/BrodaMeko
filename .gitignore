@@ -40,4 +40,8 @@ yarn-error.*
 /ios
 /android
 
+.gradle-local/.env
+
+.env
+# Ignore local Gradle artifacts
 .gradle-local/

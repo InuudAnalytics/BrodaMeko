@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
-  ScrollView,
+  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -13,11 +14,13 @@ import {
   AppButton,
   AppText,
   CenteredHeader,
+  PullToRefreshIndicator,
   ScreenContainer,
   ScrollableTabs,
 } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { useUserLocation } from '../../../hooks/useUserLocation';
+import { useAuth } from '../../../context';
 import {
   getMechanicAssignedJobs,
   getMechanicPendingJobRequests,
@@ -69,6 +72,7 @@ const normalizePendingRequest = (item, index) => ({
   issue: String(item?.issue_type || item?.title || 'Car issue'),
   carMake: String(item?.car_make || ''),
   avatarUri: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
+  ownerAvatar: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
   urgent: String(item?.priority || '').toLowerCase() === 'urgent',
   status: String(item?.status || 'pending').toLowerCase(),
 });
@@ -162,7 +166,7 @@ const AssignedCard = ({ item, onOpen }) => (
   </TouchableOpacity>
 );
 
-const MechanicJobsScreen = ({ navigation, route }) => {
+const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
   const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -171,7 +175,9 @@ const MechanicJobsScreen = ({ navigation, route }) => {
   const [completedJobs, setCompletedJobs] = useState([]);
   const [busyRequestId, setBusyRequestId] = useState('');
   const [busyAction, setBusyAction] = useState('');
+  const pullDistance = useRef(new Animated.Value(0)).current;
   const { permissionStatus, requestPermission } = useUserLocation();
+  const { user } = useAuth();
 
   const requestedJobId = String(route?.params?.requestJobId || '').trim();
 
@@ -244,6 +250,18 @@ const MechanicJobsScreen = ({ navigation, route }) => {
         navigation.navigate(ROUTES.MECH_CHAT, {
           conversationId,
           jobId: safeJobId,
+          mechanicId: user?.id || user?._id,
+          customer: {
+            id: item?.ownerId || null,
+            name: item?.ownerName || 'Customer',
+            initials: initialsFromName(item?.ownerName || 'Customer'),
+            avatarUri: item?.ownerAvatar || item?.avatarUri || '',
+          },
+          issueSummary: {
+            issueType: item?.issue,
+            description: item?.issue,
+            carMake: item?.carMake,
+          },
           tab: 'jobs',
         });
       } else {
@@ -278,12 +296,22 @@ const MechanicJobsScreen = ({ navigation, route }) => {
       style={styles.screen}
     >
       <View style={styles.container}>
-        <CenteredHeader title="Jobs" />
-        <ScrollableTabs
-          tabs={TABS}
-          activeKey={activeTab}
-          onChange={setActiveTab}
+        <CenteredHeader
+          title="Jobs"
+          onBackPress={
+            onBackToHome ||
+            (() =>
+              navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'home' }))
+          }
         />
+        <View style={styles.tabsWrap}>
+          <ScrollableTabs
+            tabs={TABS}
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            contentContainerStyle={{ flexGrow: 0 }}
+          />
+        </View>
 
         <AppText style={styles.heading}>Nearby requests</AppText>
 
@@ -303,36 +331,60 @@ const MechanicJobsScreen = ({ navigation, route }) => {
         ) : null}
 
         {!loading && !error ? (
-          <ScrollView
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {activeTab === 'available'
-              ? currentItems.map(item => (
-                  <RequestCard
-                    key={item.id}
-                    item={item}
-                    busyAction={busyRequestId === item.id ? busyAction : ''}
-                    onAccept={target => handleRespond(target, 'accept')}
-                    onDecline={target => handleRespond(target, 'decline')}
-                  />
-                ))
-              : currentItems.map(item => (
-                  <AssignedCard
-                    key={item.id}
-                    item={item}
-                    onOpen={handleOpenJob}
-                  />
-                ))}
+          <View style={styles.listWrap}>
+            <PullToRefreshIndicator
+              pullDistance={pullDistance}
+              refreshing={loading}
+            />
+            <Animated.ScrollView
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.scrollView}
+              bounces
+              alwaysBounceVertical
+              overScrollMode="always"
+              onScroll={event => {
+                const offsetY = event.nativeEvent.contentOffset.y;
+                const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+                pullDistance.setValue(pullValue);
+              }}
+              scrollEventThrottle={16}
+              refreshControl={
+                <RefreshControl
+                  refreshing={loading}
+                  onRefresh={fetchData}
+                  tintColor="transparent"
+                  colors={['transparent']}
+                />
+              }
+            >
+              {activeTab === 'available'
+                ? currentItems.map(item => (
+                    <RequestCard
+                      key={item.id}
+                      item={item}
+                      busyAction={busyRequestId === item.id ? busyAction : ''}
+                      onAccept={target => handleRespond(target, 'accept')}
+                      onDecline={target => handleRespond(target, 'decline')}
+                    />
+                  ))
+                : currentItems.map(item => (
+                    <AssignedCard
+                      key={item.id}
+                      item={item}
+                      onOpen={handleOpenJob}
+                    />
+                  ))}
 
-            {!currentItems.length ? (
-              <View style={styles.centerState}>
-                <AppText style={styles.emptyText}>
-                  No jobs in this tab right now.
-                </AppText>
-              </View>
-            ) : null}
-          </ScrollView>
+              {!currentItems.length ? (
+                <View style={styles.centerState}>
+                  <AppText style={styles.emptyText}>
+                    No jobs in this tab right now.
+                  </AppText>
+                </View>
+              ) : null}
+            </Animated.ScrollView>
+          </View>
         ) : null}
       </View>
     </ScreenContainer>
@@ -345,6 +397,7 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   container: {
+    flex: 1,
     paddingHorizontal: 14,
     paddingTop: 10,
   },
@@ -359,6 +412,17 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 24,
     rowGap: 12,
+    flexGrow: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  listWrap: {
+    flex: 1,
+  },
+  tabsWrap: {
+    height: 40,
+    justifyContent: 'center',
   },
   card: {
     borderWidth: 1,

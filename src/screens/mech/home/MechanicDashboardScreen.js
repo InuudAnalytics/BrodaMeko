@@ -37,10 +37,15 @@ const formatCurrency = (amount) => {
 
 const normalizeJob = (job, fallbackStatus = '') => {
   const resolvedStatus = String(job.status || fallbackStatus || '').toLowerCase();
+  const resolvedJobId =
+    String(job.job_id || job.jobId || job.id || job._id || '').trim();
+  const resolvedRequestId = String(job.id || job._id || '').trim();
   return {
-    id: job.id || job._id,
-    jobId: String(job.id || job._id || job.job_id || job.jobId || '').trim(),
+    id: resolvedRequestId || resolvedJobId,
+    jobId: resolvedJobId,
+    requestId: resolvedRequestId,
     name: job.car_owner?.name || job.user?.name || 'Customer',
+    ownerAvatar: job.car_owner?.avatar || job.user?.avatar || '',
     ownerId: job.car_owner?.id || job.car_owner?._id || job.user?.id || job.user?._id || '',
     issue: job.title || job.issue_type || job.description || 'Car Issue',
     description: job.description || job.title || '',
@@ -169,7 +174,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
       if (!canProceed) {
         return;
       }
-      const safeJobId = String(job?.jobId || job?.id || '').trim();
+      const safeJobId = String(job?.jobId || '').trim();
       if (!safeJobId) {
         setError('Missing job id for this request.');
         return;
@@ -183,6 +188,19 @@ const MechanicDashboardScreen = ({ navigation }) => {
         const conversationId = String(payload?.conversation_id || '').trim();
         if (conversationId) {
           setActiveConversationId(conversationId);
+          navigation.navigate(ROUTES.MECH_CHAT, {
+            conversationId,
+            jobId: safeJobId,
+            mechanicId: user?.id || user?._id,
+            customer: {
+              id: job?.ownerId || null,
+              name: job?.name || 'Customer',
+              initials: initialsFromName(job?.name || 'Customer'),
+              avatarUri: job?.avatarUri || job?.ownerAvatar || '',
+            },
+            issueSummary: job,
+          });
+          return;
         }
         const refreshed = await getAvailableJobs({ page: 1, limit: 100 }).catch(() => null);
         if (refreshed) {
@@ -204,6 +222,36 @@ const MechanicDashboardScreen = ({ navigation }) => {
     },
     [ensureLocationPermission],
   );
+
+  const handleDeclineJob = useCallback(async (job) => {
+    const safeJobId = String(job?.jobId || '').trim();
+    if (!safeJobId) {
+      setError('Missing job id for this request.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await respondToJobRequest(safeJobId, 'decline');
+      const refreshed = await getAvailableJobs({ page: 1, limit: 100 }).catch(() => null);
+      if (refreshed) {
+        const refreshedPayload = refreshed?.data || refreshed;
+        const rawJobs = Array.isArray(refreshedPayload)
+          ? refreshedPayload
+          : (refreshedPayload?.jobs || refreshedPayload?.items || refreshedPayload?.results || []);
+        const mappedAssigned = rawJobs.map((jobItem) => normalizeJob(jobItem));
+        setJobs((prev) => {
+          const pending = prev.filter((item) => item.status === 'pending');
+          return [...pending, ...mappedAssigned];
+        });
+      }
+    } catch (error) {
+      setError(error?.message || 'Could not decline job.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const visibleJobs = useMemo(() => {
     const status = String(activeFilter || '').toLowerCase();
@@ -516,7 +564,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
                   />
                 <AppButton
                   label="Cancel"
-                  onPress={() => console.log('Cancel job:', job.id)}
+                  onPress={() => handleDeclineJob(job)}
                   style={[styles.actionBtn, styles.cancelBtn]}
                   textStyle={styles.cancelBtnText}
                 />

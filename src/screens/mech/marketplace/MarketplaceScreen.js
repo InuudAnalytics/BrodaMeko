@@ -114,7 +114,9 @@ const MechanicMarketplaceScreen = ({ navigation }) => {
           <View style={styles.header}>
             <Pressable
               style={styles.headerIconBtn}
-              onPress={() => navigation.goBack()}
+              onPress={() =>
+                navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'home' })
+              }
             >
               <HugeiconsIcon
                 icon={ArrowLeft01Icon}

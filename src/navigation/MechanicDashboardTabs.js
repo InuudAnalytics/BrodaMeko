@@ -37,7 +37,7 @@ const MechanicDashboardTabs = ({ navigation, route }) => {
     }
 
     if (activeTab === 'jobs') {
-      return <MechanicJobsScreen navigation={navigation} />;
+      return <MechanicJobsScreen navigation={navigation} onBackToHome={() => setActiveTab('home')} />;
     }
 
     if (activeTab === 'wallet') {

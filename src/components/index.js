@@ -16,3 +16,4 @@ export { default as OpenStreetMapView } from './OpenStreetMapView';
 export { default as ScreenContainer } from './ScreenContainer';
 export { default as NigerianPhoneInput } from './NigerianPhoneInput';
 
+export { default as PullToRefreshIndicator } from './PullToRefreshIndicator';

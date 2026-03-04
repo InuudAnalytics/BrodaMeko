@@ -46,6 +46,7 @@ const MechanicChatScreen = ({ navigation, route }) => {
             return {
                 name: route.params.customer.name || 'Customer',
                 initials: route.params.customer.initials || 'C',
+                avatarUri: route.params.customer.avatarUri || route.params.customer.avatar || '',
                 rating: route.params.customer.rating || '',
                 id: route.params.customer.id || route.params.carOwnerId || null,
             };
@@ -56,6 +57,7 @@ const MechanicChatScreen = ({ navigation, route }) => {
             return {
                 name: interaction.user.name,
                 initials: interaction.user.initials,
+                avatarUri: interaction.user.avatar || interaction.user.avatarUri || '',
                 // metaText: 'Customer', // Optional
             };
         }
@@ -68,12 +70,14 @@ const MechanicChatScreen = ({ navigation, route }) => {
             return {
                 name: otherUser.name,
                 initials: otherUser.initials || 'U',
+                avatarUri: otherUser.avatar || otherUser.avatarUrl || '',
             };
         }
 
         return {
             name: route.params?.name || 'Customer',
             initials: 'C',
+            avatarUri: route.params?.avatarUri || route.params?.avatar || '',
         };
     })();
 

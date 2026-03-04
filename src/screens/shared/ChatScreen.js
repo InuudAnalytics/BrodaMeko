@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Pressable as RNPressable,
   Pressable,
   StyleSheet,
   TextInput,
@@ -19,6 +20,7 @@ import { AppText, ScreenContainer } from '../../components';
 import { useChat } from '../../context/ChatContext';
 import { darkTheme } from '../../theme';
 import { ROLES, ROUTES, useKeyboardLift } from '../../utils';
+import { useFocusEffect } from '@react-navigation/native';
 
 const hexToRgba = (hex, alpha) => {
   const cleaned = String(hex || '').replace('#', '').trim();
@@ -170,7 +172,15 @@ const MessageBubble = ({ item, currentUserRole, onAcceptPrice, onDeclinePrice, o
   );
 };
 
-const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBackPress, renderExtraContent }) => {
+const SharedChatScreen = ({
+  route,
+  navigation,
+  recipient,
+  currentUserRole,
+  onBackPress,
+  renderExtraContent,
+  renderBottomNav,
+}) => {
   const listRef = useRef(null);
   const { targetRef, animatedStyle } = useKeyboardLift({
     extraOffset: darkTheme.spacing.xxxl,
@@ -193,6 +203,12 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     sendQuotation,
     respondQuotation,
     wsStatus,
+    wsCloseInfo,
+    wsErrorInfo,
+    wsDebugInfo,
+    wsEventInfo,
+    wsDebugExtras,
+    setChatActive,
   } = useChat();
 
   const conversationId = useMemo(() => resolveConversationId(route?.params), [route?.params]);
@@ -204,6 +220,7 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
   const [hasInteracted, setHasInteracted] = useState(false);
   const [isSettingPrice, setIsSettingPrice] = useState(false);
   const [showPriceConfirm, setShowPriceConfirm] = useState(false);
+  const [showDebug, setShowDebug] = useState(__DEV__);
   const typingLastSentAtRef = useRef(0);
 
   const syncReadState = useCallback(async () => {
@@ -227,9 +244,7 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
 
       if (mounted) {
         await syncReadState();
-        if (wsStatus !== 'connected' && wsStatus !== 'connecting') {
-          connectChatSocket(conversationId);
-        }
+        connectChatSocket(conversationId);
       }
     };
 
@@ -237,7 +252,7 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
 
     return () => {
       mounted = false;
-      disconnectChatSocket();
+      disconnectChatSocket('screen-unmount');
     };
   }, [
     connectChatSocket,
@@ -246,7 +261,6 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
     fetchMessages,
     hasRealConversation,
     syncReadState,
-    wsStatus,
   ]);
 
   useEffect(() => {
@@ -258,14 +272,19 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
       if (nextState === 'active') {
         await fetchMessages(conversationId, { limit: 50, offset: 0 });
         await syncReadState();
-        if (wsStatus !== 'connected' && wsStatus !== 'connecting') {
-          connectChatSocket(conversationId);
-        }
+        connectChatSocket(conversationId);
       }
     });
 
     return () => sub.remove();
-  }, [connectChatSocket, conversationId, fetchMessages, hasRealConversation, syncReadState, wsStatus]);
+  }, [connectChatSocket, conversationId, fetchMessages, hasRealConversation, syncReadState]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setChatActive(true);
+      return () => setChatActive(false);
+    }, [setChatActive])
+  );
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -392,7 +411,11 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
 
           <View style={styles.userBlock}>
             <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>{recipient?.initials || 'U'}</AppText>
+              {recipient?.avatarUri ? (
+                <Image source={{ uri: recipient.avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <AppText style={styles.avatarText}>{recipient?.initials || 'U'}</AppText>
+              )}
             </View>
             <View style={styles.nameWrap}>
               <AppText style={styles.name}>{recipient?.name || 'User'}</AppText>
@@ -431,6 +454,17 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
                     : 'Disconnected'}
             </AppText>
           </View>
+        ) : null}
+
+        {hasRealConversation && showDebug ? (
+          <RNPressable
+            onLongPress={() => setShowDebug(false)}
+            style={styles.debugWrap}
+          >
+            <AppText style={styles.debugText}>
+              {`conversationId: ${conversationId}\nstatus: ${wsStatus}\nwsState: ${wsDebugInfo?.state || 'n/a'}\nwsEvent: ${wsEventInfo || 'n/a'}\nwsUrl: ${wsDebugInfo?.url || 'n/a'}\ntokenLength: ${wsDebugInfo?.tokenLength ?? 0}\nconnecting: ${wsDebugExtras?.connecting ? 'yes' : 'no'}\nactiveConversationIdRef: ${wsDebugExtras?.activeConversationId || 'n/a'}\nconnectAttemptId: ${wsDebugExtras?.attemptId || 'n/a'}\njobId: ${route?.params?.jobId || 'n/a'}\nmechanicId: ${route?.params?.mechanicId || 'n/a'}\nrole: ${currentUserRole}\ncloseCode: ${wsCloseInfo?.code ?? 'n/a'}\ncloseReason: ${wsCloseInfo?.reason || 'n/a'}\nerror: ${wsErrorInfo?.message || 'n/a'}`}
+            </AppText>
+          </RNPressable>
         ) : null}
 
         {isMechanic ? (
@@ -521,6 +555,7 @@ const SharedChatScreen = ({ route, navigation, recipient, currentUserRole, onBac
             />
           </Pressable>
         </View>
+        {renderBottomNav ? renderBottomNav() : null}
       </Animated.View>
 
       <Modal visible={showPriceConfirm} transparent animationType="fade" onRequestClose={() => setShowPriceConfirm(false)}>
@@ -557,7 +592,8 @@ const styles = StyleSheet.create({
   },
   iconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   userBlock: { flex: 1, flexDirection: 'row', alignItems: 'center', columnGap: darkTheme.spacing.xs },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF7B4A', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FF7B4A', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   avatarText: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.xs, fontWeight: darkTheme.typography.fontWeights.semibold },
   nameWrap: { flex: 1 },
   name: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.md, lineHeight: 20, fontWeight: darkTheme.typography.fontWeights.medium },
@@ -581,6 +617,19 @@ const styles = StyleSheet.create({
   socketDotConnecting: { backgroundColor: darkTheme.colors.accent },
   socketDotDisconnected: { backgroundColor: '#FF7F7F' },
   socketStatusText: { color: darkTheme.colors.muted, fontSize: 11, lineHeight: 14 },
+  debugWrap: {
+    alignSelf: 'center',
+    marginBottom: darkTheme.spacing.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  debugText: {
+    color: '#E5E7EB',
+    fontSize: 11,
+    lineHeight: 14,
+  },
   todayLabel: { textAlign: 'center', color: darkTheme.colors.muted, fontSize: darkTheme.typography.fontSizes.md, marginVertical: darkTheme.spacing.sm },
   messagesContent: { flexGrow: 1, paddingHorizontal: darkTheme.spacing.md, paddingBottom: darkTheme.spacing.sm },
   emptyStateWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', rowGap: darkTheme.spacing.xs, paddingHorizontal: darkTheme.spacing.lg },

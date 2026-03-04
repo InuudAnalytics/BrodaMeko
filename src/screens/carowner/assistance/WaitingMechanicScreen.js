@@ -80,13 +80,12 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
         return false;
       }
 
-      navigation.replace(ROUTES.CAR_OWNER_DASHBOARD, {
-        activeSession: {
-          ...sessionPayload,
-          status: 'active',
-          progressStatus: 'accepted',
-          conversationId,
-        },
+      navigation.replace(ROUTES.CAR_OWNER_CHAT, {
+        conversationId,
+        jobId: sessionPayload.jobId,
+        mechanicId: sessionPayload.mechanicId,
+        mechanic: sessionPayload.mechanic,
+        issueSummary: sessionPayload.issueSummary,
       });
       return true;
     },
@@ -146,13 +145,12 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
         const conversation = data?.conversation || data || null;
         const conversationId = String(conversation?.id || conversation?._id || '').trim();
         if (conversationId) {
-          navigation.replace(ROUTES.CAR_OWNER_DASHBOARD, {
-            activeSession: {
-              ...sessionPayload,
-              status: 'active',
-              progressStatus: 'accepted',
-              conversationId,
-            },
+          navigation.replace(ROUTES.CAR_OWNER_CHAT, {
+            conversationId,
+            jobId: sessionPayload.jobId,
+            mechanicId: sessionPayload.mechanicId,
+            mechanic: sessionPayload.mechanic,
+            issueSummary: sessionPayload.issueSummary,
           });
         }
       } catch {

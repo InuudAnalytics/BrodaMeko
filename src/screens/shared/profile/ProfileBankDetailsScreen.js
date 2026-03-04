@@ -109,7 +109,8 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
       } else {
         const response = await getCurrentUser();
         const payload = response?.data || response || {};
-        setProfile(payload);
+        const resolved = payload?.data || payload;
+        setProfile(resolved);
       }
     } catch (error) {
       setFetchError(error?.message || 'Could not load profile.');

@@ -25,6 +25,7 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
+import AddContactSuccessScreen from '../screens/carowner/profile/AddContactSuccessScreen';
 import { useAuth, useSparePartsProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -104,6 +105,11 @@ const SparePartsStack = () => {
       <Stack.Screen
         name={ROUTES.PROFILE_BANK_DETAILS}
         component={ProfileBankDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_ADD_CONTACT_SUCCESS}
+        component={AddContactSuccessScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
