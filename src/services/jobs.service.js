@@ -249,7 +249,7 @@ export const updateJobStatus = async (jobId, status) => {
     buildServiceError('status is required.');
   }
 
-  const response = await api.post(ENDPOINTS.jobs.updateStatus(safeJobId), { status: safeStatus });
+  const response = await api.patch(ENDPOINTS.jobs.updateStatus(safeJobId), { status: safeStatus });
   return response.data;
 };
 
@@ -321,6 +321,33 @@ export const getMechanicJobStats = async (mechanicId) => {
   return response.data;
 };
 
+export const updateJobLocation = async (jobId, { lat, lng, heading, speed } = {}) => {
+  const safeJobId = assertJobId(jobId);
+  const payload = {};
+
+  if (lat !== undefined) {
+    payload.lat = Number(lat);
+  }
+  if (lng !== undefined) {
+    payload.lng = Number(lng);
+  }
+  if (heading !== undefined) {
+    payload.heading = Number(heading);
+  }
+  if (speed !== undefined) {
+    payload.speed = Number(speed);
+  }
+
+  const response = await api.post(ENDPOINTS.jobs.locationUpdate(safeJobId), payload);
+  return response.data;
+};
+
+export const getLatestJobLocation = async (jobId) => {
+  const safeJobId = assertJobId(jobId);
+  const response = await api.get(ENDPOINTS.jobs.locationLatest(safeJobId));
+  return response.data;
+};
+
 export const getSingleJob = getCarOwnerJob;
 export const updateJob = updateCarOwnerJob;
 export const getAvailableJobs = getMechanicAssignedJobs;
@@ -346,4 +373,6 @@ export default {
   getMechanicPendingJobRequests,
   getConversationByJobId,
   getMechanicJobStats,
+  updateJobLocation,
+  getLatestJobLocation,
 };

@@ -20,8 +20,9 @@ import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { confirmJob, updateJobStatus } from '../../../services/jobs.service';
+import { confirmJob, getLatestJobLocation, updateJobStatus } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
+import { closeScoped, connectScoped } from '../../../services/ws.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getWATGreeting, ROUTES } from '../../../utils';
 
@@ -144,7 +145,7 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
 );
 
 const DashboardScreen = ({ navigation, route }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { unreadTick } = useNotifications();
   const { location, permissionStatus, loading, requestPermission, refreshOnce } = useUserLocation();
   const [activeSession, setActiveSession] = useState(null);
@@ -155,7 +156,8 @@ const DashboardScreen = ({ navigation, route }) => {
   const panelY = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
-  const trackerAngleRef = useRef(0);
+  const lastLocationUpdateRef = useRef(0);
+  const locationPollRef = useRef(null);
 
   useEffect(() => {
     const id = panelY.addListener(({ value }) => {
@@ -235,33 +237,90 @@ const DashboardScreen = ({ navigation, route }) => {
   );
 
   useEffect(() => {
-    if (!activeSession || !location) {
+    const jobId = String(activeSession?.jobId || '').trim();
+    const safeToken = String(token || '').trim();
+    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+    const trackingAllowed = ['accepted', 'en_route', 'arrived', 'repairing'].includes(progressStatus);
+
+    if (!jobId || !safeToken || !trackingAllowed) {
       setTrackedLocation(null);
+      closeScoped('job_location');
       return undefined;
     }
 
-    const radius = 0.0024;
-    const centerLat = location.latitude;
-    const centerLng = location.longitude;
     let mounted = true;
+    lastLocationUpdateRef.current = 0;
 
-    const tick = () => {
-      trackerAngleRef.current = (trackerAngleRef.current + 0.18) % (Math.PI * 2);
-      const nextLat = centerLat + radius * Math.cos(trackerAngleRef.current);
-      const nextLng = centerLng + radius * Math.sin(trackerAngleRef.current);
-      if (mounted) {
-        setTrackedLocation({ latitude: nextLat, longitude: nextLng });
+    const handleMessage = (event) => {
+      if (!event?.data) {
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload?.type !== 'job_location_update') {
+          return;
+        }
+
+        const payloadJobId = String(payload?.job_id || '').trim();
+        if (!payloadJobId || payloadJobId !== jobId) {
+          return;
+        }
+
+        const lat = Number(payload?.lat);
+        const lng = Number(payload?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return;
+        }
+
+        lastLocationUpdateRef.current = Date.now();
+        if (mounted) {
+          setTrackedLocation({ latitude: lat, longitude: lng });
+        }
+      } catch {
+        // ignore invalid payloads
       }
     };
 
-    tick();
-    const interval = setInterval(tick, 1400);
+    connectScoped('job_location', safeToken, handleMessage);
+
+    const pollLatest = async () => {
+      try {
+        const response = await getLatestJobLocation(jobId);
+        const payload = response?.data || response || {};
+        const lat = Number(payload?.lat ?? payload?.latitude);
+        const lng = Number(payload?.lng ?? payload?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return;
+        }
+
+        lastLocationUpdateRef.current = Date.now();
+        if (mounted) {
+          setTrackedLocation({ latitude: lat, longitude: lng });
+        }
+      } catch {
+        // ignore polling errors
+      }
+    };
+
+    const interval = setInterval(() => {
+      const lastUpdate = lastLocationUpdateRef.current || 0;
+      if (!lastUpdate || Date.now() - lastUpdate > 5000) {
+        pollLatest();
+      }
+    }, 3000);
+
+    locationPollRef.current = interval;
 
     return () => {
       mounted = false;
-      clearInterval(interval);
+      if (locationPollRef.current) {
+        clearInterval(locationPollRef.current);
+        locationPollRef.current = null;
+      }
+      closeScoped('job_location');
     };
-  }, [activeSession, location]);
+  }, [activeSession?.jobId, activeSession?.progressStatus, token]);
 
   const locationBadgeText = useMemo(() => {
     if (!location) {

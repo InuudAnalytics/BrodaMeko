@@ -1,6 +1,6 @@
 # BrodaMeko Endpoint Integration Audit
 
-Updated on 2026-03-02.
+Updated on 2026-03-03.
 
 This audit groups endpoints by **current app readiness**:
 1) Fully integrated (service + UI flow wired)
@@ -47,15 +47,16 @@ This audit groups endpoints by **current app readiness**:
 - `DELETE /api/v1/me/mechanic/:serviceId/delete`
 - `POST /api/v1/me/mechanic/bank`
 - `POST /api/v1/me/mechanic/bank/verify`
-- `POST /api/v1/me/mechanic/bank/:bankId/primary`
+- `PATCH /api/v1/me/mechanic/bank/:bankId/primary`
 - `DELETE /api/v1/me/mechanic/bank/:bankId/delete`
 - `GET /api/v1/me/mechanic/bank/list`
+- `GET /api/v1/me/mechanic/bank`
 - `GET /api/v1/me/mechanic/address`
 - `POST /api/v1/me/mechanic/address`
 - `PATCH /api/v1/me/mechanic/address/:addressId`
 - `DELETE /api/v1/me/mechanic/address/:addressId`
-- `POST /api/v1/me/mechanic/address/:addressId/primary`
-- `POST /api/v1/me/mechanic/online-status`
+- `PATCH /api/v1/me/mechanic/address/:addressId/primary`
+- `PATCH /api/v1/me/mechanic/online-status`
 
 ### Car owner profile/settings
 - `POST /api/v1/me/car-owner/bank`
@@ -77,7 +78,7 @@ This audit groups endpoints by **current app readiness**:
 - `DELETE /api/v1/jobs/:jobId`
 - `GET /api/v1/jobs/mechanic/assigned`
 - `GET /api/v1/jobs/mechanic/assigned/:jobId`
-- `POST /api/v1/jobs/:jobId/status`
+- `PATCH /api/v1/jobs/:jobId/status`
 - `POST /api/v1/chat/jobs/:jobId/payment/initiate`
 - `POST /api/v1/jobs/:jobId/confirm`
 - `GET /api/v1/jobs/:jobId/mechanics/for-job`
@@ -111,6 +112,11 @@ This audit groups endpoints by **current app readiness**:
 
 ### WebSocket
 - `wss://.../api/v1/chat/ws` (connect/send/receive implemented in `ws.service` + `ChatContext` + chat screens)
+- `job_location_update` payload supported for live tracking (mechanic -> car owner)
+
+### Live location fallback
+- `POST /api/v1/jobs/:jobId/location/update`
+- `GET /api/v1/jobs/:jobId/location/latest`
 
 ### Marketplace (car owner + mechanic)
 - `GET /api/v1/marketplace/parts`
@@ -190,4 +196,3 @@ This audit groups endpoints by **current app readiness**:
 
 ## Notes
 - App contains a Google auth endpoint (`POST /api/v1/auth/google`) that is assumed and may not exist on backend.
-- Bank details are read from `/api/v1/auth/me` (no dedicated GET bank endpoint documented).

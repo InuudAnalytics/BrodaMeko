@@ -238,6 +238,16 @@ export const getMechanicBankList = async () => {
   return response.data;
 };
 
+export const getMechanicBankDetails = async () => {
+  const response = await api.get(ENDPOINTS.me.mechanic.bankGet);
+  return response.data;
+};
+
+export const getMechanicEarnings = async () => {
+  const response = await api.get(ENDPOINTS.me.mechanic.earnings);
+  return response.data;
+};
+
 export const setMechanicOnlineStatus = async isOnline => {
   const response = await api.patch(ENDPOINTS.me.mechanic.onlineStatus, {
     is_online: Boolean(isOnline),
@@ -261,5 +271,7 @@ export default {
   deleteMechanicBank,
   setPrimaryMechanicBank,
   getMechanicBankList,
+  getMechanicBankDetails,
+  getMechanicEarnings,
   setMechanicOnlineStatus,
 };

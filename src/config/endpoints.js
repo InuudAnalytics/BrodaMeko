@@ -42,9 +42,11 @@ export const ENDPOINTS = {
         `/api/v1/me/mechanic/address/${encodeURIComponent(String(addressId || ''))}/primary`,
       bankAdd: '/api/v1/me/mechanic/bank',
       bankVerify: '/api/v1/me/mechanic/bank/verify',
+      bankList: '/api/v1/me/mechanic/bank/list',
+      bankGet: '/api/v1/me/mechanic/bank',
       bankDelete: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
       bankSetPrimary: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
-      bankList: '/api/v1/me/mechanic/bank/list',
+      earnings: '/api/v1/me/mechanic/earnings',
       onlineStatus: '/api/v1/me/mechanic/online-status',
     },
     carOwner: {
@@ -85,6 +87,8 @@ export const ENDPOINTS = {
     requestStatus: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/request/status`,
     getConversation: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/get/conversation`,
     mechanicStats: (mechanicId) => `/api/v1/jobs/mechanics/${encodeURIComponent(String(mechanicId || ''))}/stats`,
+    locationUpdate: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/location/update`,
+    locationLatest: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/location/latest`,
   },
   mechanic: {
     jobRequests: '/api/v1/jobs/mechanic/job-requests',

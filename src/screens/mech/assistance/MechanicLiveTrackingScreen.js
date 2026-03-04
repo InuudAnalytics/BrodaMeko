@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { CallIcon, CancelCircleIcon, Location01Icon, Mail01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
+import { useAuth } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
+import { updateJobLocation } from '../../../services/jobs.service';
+import { closeScoped, connectScoped, sendScoped } from '../../../services/ws.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -59,9 +62,11 @@ const StatusStepper = ({ currentIndex }) => {
 };
 
 const MechanicLiveTrackingScreen = ({ navigation, route }) => {
-  const { location } = useUserLocation();
-  const [trackedLocation, setTrackedLocation] = useState(null);
-  const trackerAngleRef = useRef(0);
+  const { token } = useAuth();
+  const { location, refreshOnce } = useUserLocation();
+  const locationRef = useRef(null);
+  const jobId = String(route?.params?.jobId || '').trim();
+  const carOwnerLocation = route?.params?.customerLocation || null;
 
   const customer = route?.params?.customer || {
     id: route?.params?.carOwnerId || '',
@@ -82,33 +87,63 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
   const statusIndex = toStatusIndex(route?.params?.trackingStatus || route?.params?.progressStatus);
 
   useEffect(() => {
-    if (!location) {
-      setTrackedLocation(null);
+    locationRef.current = location;
+  }, [location]);
+
+  useEffect(() => {
+    if (!jobId) {
       return undefined;
     }
 
-    const radius = 0.002;
-    const centerLat = location.latitude;
-    const centerLng = location.longitude;
     let mounted = true;
+    const safeToken = String(token || '').trim();
 
-    const tick = () => {
-      trackerAngleRef.current = (trackerAngleRef.current + 0.16) % (Math.PI * 2);
-      const nextLat = centerLat + radius * Math.cos(trackerAngleRef.current);
-      const nextLng = centerLng + radius * Math.sin(trackerAngleRef.current);
-      if (mounted) {
-        setTrackedLocation({ latitude: nextLat, longitude: nextLng });
+    if (safeToken) {
+      connectScoped('job_location', safeToken);
+    }
+
+    const sendLocation = async () => {
+      const current = locationRef.current;
+      if (!current) {
+        await refreshOnce?.();
+        return;
       }
+
+      const payload = {
+        type: 'job_location_update',
+        job_id: jobId,
+        lat: current.latitude,
+        lng: current.longitude,
+        heading: 0,
+        speed: 0,
+      };
+
+      if (safeToken) {
+        sendScoped('job_location', payload);
+      }
+
+      try {
+        await updateJobLocation(jobId, {
+          lat: current.latitude,
+          lng: current.longitude,
+          heading: 0,
+          speed: 0,
+        });
+      } catch {
+        // ignore fallback errors
+      }
+
     };
 
-    tick();
-    const interval = setInterval(tick, 1500);
+    const interval = setInterval(sendLocation, 5000);
+    sendLocation();
 
     return () => {
       mounted = false;
       clearInterval(interval);
+      closeScoped('job_location');
     };
-  }, [location]);
+  }, [jobId, refreshOnce, token]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -116,8 +151,8 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
         <OpenStreetMapView
           latitude={location?.latitude}
           longitude={location?.longitude}
-          otherLatitude={trackedLocation?.latitude}
-          otherLongitude={trackedLocation?.longitude}
+          otherLatitude={carOwnerLocation?.latitude}
+          otherLongitude={carOwnerLocation?.longitude}
         />
         <TouchableOpacity
           style={styles.closeButton}
