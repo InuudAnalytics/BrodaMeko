@@ -17,6 +17,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../../services/notifications.service';
+import { getConversationByJobId } from '../../services/jobs.service';
+import { getMessages as getConversationMessages } from '../../services/chat.service';
 import { darkTheme, withAlpha } from '../../theme';
 import { ROLES, ROUTES } from '../../utils';
 
@@ -134,15 +136,51 @@ const NotificationsScreen = ({ navigation }) => {
     }, [fetchNotifications])
   );
 
-  const handleNavigateFromNotification = (item) => {
+  const handleNavigateFromNotification = async (item) => {
     const payloadData = item?.data && typeof item.data === 'object' ? item.data : {};
     const actionRequired = String(payloadData?.action_required || '').trim().toLowerCase();
     const conversationId = String(payloadData?.conversation_id || '').trim();
     const jobId = String(payloadData?.job_id || '').trim();
 
-    if (actionRequired === 'open_conversation' && conversationId) {
+    if (actionRequired === 'open_conversation') {
+      let resolvedConversationId = conversationId;
+
+      try {
+        if (jobId) {
+          const response = await getConversationByJobId(jobId);
+          const payload = response?.data || response || {};
+          const data = payload?.data || payload;
+          const conversation = data?.conversation || null;
+          resolvedConversationId = String(
+            conversation?.id ||
+            conversation?._id ||
+            conversation?.conversation_id ||
+            conversation?.conversationId ||
+            ''
+          ).trim();
+        } else if (resolvedConversationId) {
+          const messagesResponse = await getConversationMessages(resolvedConversationId, { limit: 1, offset: 0 });
+          if (!messagesResponse) {
+            resolvedConversationId = '';
+          }
+        }
+      } catch (navigationError) {
+        const statusCode = Number(navigationError?.statusCode || navigationError?.response?.status || 0);
+        if (statusCode === 404) {
+          resolvedConversationId = '';
+        } else {
+          Alert.alert('Unable to open chat', navigationError?.message || 'Please try again.');
+          return;
+        }
+      }
+
+      if (!resolvedConversationId) {
+        Alert.alert('Chat unavailable', 'This chat is no longer available for this job.');
+        return;
+      }
+
       navigation.navigate(role === ROLES.MECH ? ROUTES.MECH_CHAT : ROUTES.CAR_OWNER_CHAT, {
-        conversationId,
+        conversationId: resolvedConversationId,
         jobId,
       });
       return;
@@ -172,7 +210,7 @@ const NotificationsScreen = ({ navigation }) => {
       // Ignore mark-read failures to preserve navigation.
     }
 
-    handleNavigateFromNotification(item);
+    await handleNavigateFromNotification(item);
   };
 
   const handleDeleteNotification = async (item) => {

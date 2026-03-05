@@ -191,6 +191,7 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
     ),
     [navigation],
   );
+  const handleBack = useCallback(() => navigation.goBack(), [navigation]);
 
   if (!hasValidParams) {
     return null;
@@ -204,7 +205,7 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
       currentUserRole={ROLES.CAR_OWNER}
       renderBottomNav={renderBottomNav}
       renderExtraContent={renderExtraContent}
-      onBackPress={() => navigation.goBack()}
+      onBackPress={handleBack}
     />
   );
 };

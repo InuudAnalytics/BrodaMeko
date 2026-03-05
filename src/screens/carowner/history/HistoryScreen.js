@@ -96,29 +96,60 @@ const normalizeJob = (job, index) => {
   const rawStatus = String(job?.status || 'pending').toLowerCase();
   const safeStatus = rawStatus === 'canceled' ? 'cancelled' : rawStatus;
 
-  // TODO(BE): Include `mechanic.id` (or `mechanic_id`) in assigned/completed
-  // job payloads returned to car owner history so job cards can reliably load
-  // mechanic profile/rating data without placeholder fallbacks.
+  const mechanicId = String(
+    job?.mechanic?.id ||
+    job?.mechanic?._id ||
+    job?.mechanic?.mechanic_id ||
+    job?.mechanic_id ||
+    job?.assigned_mechanic?.id ||
+    job?.assigned_mechanic?._id ||
+    job?.assigned_mechanic?.mechanic_id ||
+    '',
+  ).trim();
+
   const mechanicName =
     job?.mechanic?.name ||
     job?.mechanic_name ||
+    job?.mech_name ||
+    job?.assigned_mechanic?.name ||
     job?.provider?.name ||
     (safeStatus === 'pending' ? 'Awaiting assignment' : 'Assigned mechanic');
 
-  const rating = Number(job?.rating || job?.mechanic?.rating || job?.provider?.rating || 4.6);
+  const rating = Number(
+    job?.mechanic?.rating_summary?.avg_rating ??
+    job?.mechanic?.avg_rating ??
+    job?.mechanic?.rating ??
+    job?.rating ??
+    job?.provider?.rating ??
+    0
+  );
   const jobId = String(job?.id || job?._id || job?.job_id || `job-${index}`);
-  const avatarUrl = job?.mechanic?.avatar || job?.mechanic_avatar || job?.provider?.avatar || null;
+  const avatarUrl =
+    job?.mechanic?.avatar ||
+    job?.mechanic?.avatar_url ||
+    job?.mechanic?.image ||
+    job?.mechanic_avatar ||
+    job?.mech_avatar ||
+    job?.mechanic_image ||
+    job?.assigned_mechanic?.avatar ||
+    job?.provider?.avatar ||
+    null;
+  const safeRating = Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
+  const hasMechanicIdentity = Boolean(mechanicId || String(mechanicName || '').trim());
+  const canRate = safeStatus !== 'pending' && hasMechanicIdentity;
 
   return {
     id: jobId,
     jobId,
-    mechanicName,
+    mechanicId,
+    mechanicName: mechanicName || (safeStatus === 'pending' ? 'Awaiting assignment' : 'Assigned mechanic'),
     issueSummary: normalizeIssueType(issue),
-    rating: Number.isFinite(rating) ? rating : 4.6,
+    rating: safeRating,
     amount,
     hasAmount,
     status: safeStatus,
     avatarUrl,
+    canRate,
   };
 };
 
@@ -176,8 +207,10 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cance
   const isCompleted = item.status === 'completed';
   const isPending = item.status === 'pending';
   const canDelete = isPending;
+  const canRate = !isPending && Boolean(item?.canRate);
   const statusLabel = isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : 'Pending';
   const statusTextColor = isCancelled ? '#E85578' : isCompleted ? '#4CC968' : '#C8CCD8';
+  const filledStars = Math.round(Number(item?.rating || 0));
 
   return (
     <View style={styles.card}>
@@ -196,10 +229,16 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cance
             </AppText>
 
             <View style={styles.ratingRow}>
-              {[1, 2, 3, 4].map((star) => (
-                <HugeiconsIcon key={star} icon={StarIcon} size={12} color="#FFB800" strokeWidth={2} />
+              {[1, 2, 3, 4, 5].map((star) => (
+                <HugeiconsIcon
+                  key={star}
+                  icon={StarIcon}
+                  size={12}
+                  color={star <= filledStars ? '#FFB800' : 'rgba(255,255,255,0.28)'}
+                  strokeWidth={2}
+                />
               ))}
-              <AppText style={styles.ratingText}>{item.rating.toFixed(1)}</AppText>
+              <AppText style={styles.ratingText}>{Number(item.rating || 0).toFixed(1)}</AppText>
             </View>
           </View>
         </View>
@@ -228,11 +267,11 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cance
 
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[styles.actionBtn, isPending ? styles.actionBtnCancel : styles.actionBtnRate]}
+          style={[styles.actionBtn, isPending ? styles.actionBtnCancel : styles.actionBtnRate, !isPending && !canRate ? styles.actionBtnDisabled : null]}
           onPress={isPending ? onCancel : onRate}
-          disabled={isPending && (cancelling || deleting)}
+          disabled={(isPending && (cancelling || deleting)) || (!isPending && !canRate)}
         >
-          <AppText style={isPending ? styles.actionBtnCancelText : styles.actionBtnRateText}>
+          <AppText style={[isPending ? styles.actionBtnCancelText : styles.actionBtnRateText, !isPending && !canRate ? styles.actionBtnDisabledText : null]}>
             {isPending ? (cancelling ? 'Cancelling...' : 'Cancel') : 'Rate'}
           </AppText>
         </TouchableOpacity>
@@ -422,7 +461,9 @@ const HistoryScreen = ({ navigation }) => {
       onRate={() =>
         navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DETAILS, {
           jobId: item.jobId,
+          mechanicId: item.mechanicId,
           preview: {
+            mechanicId: item.mechanicId,
             mechanicName: item.mechanicName,
             rating: item.rating,
             avatarUrl: item.avatarUrl,
@@ -719,6 +760,12 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
     fontSize: 15,
     fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  actionBtnDisabled: {
+    opacity: 0.45,
+  },
+  actionBtnDisabledText: {
+    color: 'rgba(255,255,255,0.65)',
   },
   actionBtnCancel: {
     borderWidth: 0.5,

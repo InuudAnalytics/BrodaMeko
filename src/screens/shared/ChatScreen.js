@@ -342,6 +342,34 @@ const SharedChatScreen = ({
   const [quotationDecisions, setQuotationDecisions] = useState({});
   const [busyQuotationId, setBusyQuotationId] = useState('');
   const typingLastSentAtRef = useRef(0);
+  const conversationUnavailableNotifiedRef = useRef(false);
+  const onBackPressRef = useRef(onBackPress);
+
+  useEffect(() => {
+    onBackPressRef.current = onBackPress;
+  }, [onBackPress]);
+
+  const handleConversationUnavailable = useCallback(() => {
+    if (conversationUnavailableNotifiedRef.current) {
+      return;
+    }
+    conversationUnavailableNotifiedRef.current = true;
+    disconnectChatSocket('conversation-ended');
+    Alert.alert('Chat unavailable', 'This conversation has ended for this job.', [
+      {
+        text: 'OK',
+        onPress: () => {
+          if (onBackPressRef.current) {
+            onBackPressRef.current();
+            return;
+          }
+          if (navigation?.canGoBack?.()) {
+            navigation.goBack();
+          }
+        },
+      },
+    ]);
+  }, [disconnectChatSocket, navigation]);
 
   const syncReadState = useCallback(async () => {
     if (!hasRealConversation) {
@@ -365,7 +393,16 @@ const SharedChatScreen = ({
         return;
       }
 
-      await fetchMessages(conversationId, { limit: 50, offset: 0 });
+      const response = await fetchMessages(conversationId, { limit: 50, offset: 0 });
+      if (response?.__ended) {
+        if (mounted) {
+          handleConversationUnavailable();
+        }
+        return;
+      }
+      if (!response) {
+        return;
+      }
 
       if (mounted) {
         await syncReadState();
@@ -384,6 +421,7 @@ const SharedChatScreen = ({
     conversationId,
     disconnectChatSocket,
     fetchMessages,
+    handleConversationUnavailable,
     hasRealConversation,
     syncReadState,
   ]);
@@ -395,7 +433,14 @@ const SharedChatScreen = ({
 
     const sub = AppState.addEventListener('change', async nextState => {
       if (nextState === 'active') {
-        await fetchMessages(conversationId, { limit: 50, offset: 0 });
+        const response = await fetchMessages(conversationId, { limit: 50, offset: 0 });
+        if (response?.__ended) {
+          handleConversationUnavailable();
+          return;
+        }
+        if (!response) {
+          return;
+        }
         await syncReadState();
         connectChatSocket(conversationId);
       }
@@ -406,6 +451,7 @@ const SharedChatScreen = ({
     connectChatSocket,
     conversationId,
     fetchMessages,
+    handleConversationUnavailable,
     hasRealConversation,
     syncReadState,
   ]);
@@ -597,7 +643,10 @@ const SharedChatScreen = ({
   };
 
   const isSendEnabled = inputValue.trim().length > 0;
-  const handleBack = () => (onBackPress ? onBackPress() : navigation.goBack());
+  const handleBack = useCallback(
+    () => (onBackPressRef.current ? onBackPressRef.current() : navigation.goBack()),
+    [navigation],
+  );
 
   return (
     <ScreenContainer
@@ -705,7 +754,7 @@ const SharedChatScreen = ({
                   quotationDecisions[getQuotationKey(item)] ||
                   normalizeQuotationDecision(item?.quotation_status)
                 }
-                quotationBusy={busyQuotationId && busyQuotationId === getQuotationKey(item)}
+                quotationBusy={busyQuotationId === getQuotationKey(item)}
                 onRetryPending={() =>
                   retryPendingMessage(conversationId, item?.id)
                 }

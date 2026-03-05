@@ -306,8 +306,36 @@ export const getMechanicPendingJobRequests = async () => {
 
 export const getConversationByJobId = async (jobId) => {
   const safeJobId = assertJobId(jobId);
-  const response = await api.get(ENDPOINTS.jobs.getConversation(safeJobId));
-  return response.data;
+  try {
+    const response = await api.get(ENDPOINTS.jobs.getConversation(safeJobId));
+    const payload = response?.data || response || {};
+    const root = payload?.data || payload;
+
+    // Backend may return { conversation }, a bare conversation object,
+    // or an array (including []) while conversation-service is stabilizing.
+    let conversation = null;
+    if (Array.isArray(root)) {
+      conversation = root[0] || null;
+    } else if (Array.isArray(root?.conversation)) {
+      conversation = root.conversation[0] || null;
+    } else {
+      conversation = root?.conversation || root?.data?.conversation || null;
+    }
+
+    return {
+      ...payload,
+      data: {
+        ...(typeof root === 'object' && root !== null && !Array.isArray(root) ? root : {}),
+        conversation,
+      },
+    };
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || error?.response?.status || 0);
+    if (statusCode === 404) {
+      return { data: { conversation: null } };
+    }
+    throw error;
+  }
 };
 
 export const getMechanicJobStats = async (mechanicId) => {

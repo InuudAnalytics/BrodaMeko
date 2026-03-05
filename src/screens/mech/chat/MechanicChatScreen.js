@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppText } from '../../../components';
@@ -20,6 +20,7 @@ const hexToRgba = (hex, alpha) => {
 const MechanicChatScreen = ({ navigation, route }) => {
     const { latestJobStatusUpdate } = useChat();
     const cancellationShownRef = useRef(false);
+    const handleBack = useCallback(() => navigation.goBack(), [navigation]);
     const jobId = route?.params?.jobId;
     const mechanicId = route?.params?.mechanicId;
     const conversationId = String(route?.params?.conversationId || '').trim();
@@ -159,7 +160,7 @@ const MechanicChatScreen = ({ navigation, route }) => {
             recipient={recipient}
             currentUserRole={ROLES.MECH}
             renderExtraContent={renderIssueSummary}
-            onBackPress={() => navigation.goBack()}
+            onBackPress={handleBack}
         />
     );
 };

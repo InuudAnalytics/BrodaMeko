@@ -697,6 +697,15 @@ export const ChatProvider = ({ children }) => {
 
       return response;
     } catch (fetchError) {
+      const statusCode = Number(fetchError?.statusCode || fetchError?.response?.status || 0);
+      if (statusCode === 404) {
+        setMessagesByConversationId((prev) => ({
+          ...prev,
+          [safeConversationId]: [],
+        }));
+        setError('This conversation is no longer available.');
+        return { __ended: true };
+      }
       setError(fetchError?.message || 'Failed to load messages.');
       return null;
     } finally {
