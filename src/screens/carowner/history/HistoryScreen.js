@@ -96,6 +96,9 @@ const normalizeJob = (job, index) => {
   const rawStatus = String(job?.status || 'pending').toLowerCase();
   const safeStatus = rawStatus === 'canceled' ? 'cancelled' : rawStatus;
 
+  // TODO(BE): Include `mechanic.id` (or `mechanic_id`) in assigned/completed
+  // job payloads returned to car owner history so job cards can reliably load
+  // mechanic profile/rating data without placeholder fallbacks.
   const mechanicName =
     job?.mechanic?.name ||
     job?.mechanic_name ||

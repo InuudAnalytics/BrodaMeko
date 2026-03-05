@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppBottomNav, AppText } from '../../../components';
@@ -98,11 +98,15 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
     }
   }, [hasValidParams, navigation]);
 
-  const mechanic = route?.params?.mechanic || {
-    name: 'Assigned mechanic',
-    initials: 'M',
-    distanceKm: null,
-  };
+  const mechanic = useMemo(
+    () =>
+      route?.params?.mechanic || {
+        name: 'Assigned mechanic',
+        initials: 'M',
+        distanceKm: null,
+      },
+    [route?.params?.mechanic],
+  );
 
   const recipient = {
     name: mechanic.name || mechanic.full_name || 'Assigned mechanic',
@@ -112,7 +116,10 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
     metaText: mechanic.distanceKm ? `${mechanic.distanceKm}km away` : null,
   };
 
-  const issueSummary = route?.params?.issueSummary || {};
+  const issueSummary = useMemo(
+    () => route?.params?.issueSummary || {},
+    [route?.params?.issueSummary],
+  );
   const summaryLines = [
     issueSummary?.issueType ? `Issue: ${issueSummary.issueType}` : '',
     issueSummary?.description ? `Description: ${issueSummary.description}` : '',
