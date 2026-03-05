@@ -127,3 +127,62 @@
 
 21. **docs: update endpoint integration audit** (`234fe0c`)
     - Updated endpoint integration audit to reflect new wiring.
+
+## March 3, 2026
+
+### Commits
+
+1. **chore(logs): update daily logs for Mar 2** (`a754db6`)
+   - Synced daily log records after marketplace/profile integration work.
+
+2. **feat(mech): add active job card and live tracking exit** (`0ef5861`)
+   - Added active job card behavior and exit path in mechanic live-tracking flow.
+
+3. **fix(map): show user location pin and reduce firebase warnings** (`8a880b6`)
+   - Improved map marker rendering and reduced noisy firebase warnings.
+
+4. **feat: notifications wiring, marketplace fixes, and image normalization** (`e3ac7dc`)
+   - Expanded notification wiring and fixed marketplace/image handling issues.
+
+5. **chore(config): add env-backed maps key and places helpers** (`e73efaa`)
+   - Added env-driven maps setup and helper utilities for places features.
+
+6. **feat(address): add autocomplete, location fill, and edit flow** (`d8a3783`)
+   - Added address autocomplete, location autofill, and edit support.
+
+7. **fix(mechanic): use dynamic rating on dashboard** (`e0f19f9`)
+   - Replaced static rating usage with backend-driven values on mechanic dashboard.
+
+8. **fix(mechanic): patch primary address endpoint** (`f48f914`)
+   - Corrected primary-address API usage and update behavior.
+
+## March 4, 2026
+
+### Commits
+
+1. **feat(marketplace): cart UX fixes and add-to-cart pulse** (`e34b8f5`)
+   - Improved cart interactions and add-to-cart feedback animation.
+
+2. **feat(live-tracking): wire ws + fallback endpoints (unfinished)** (`60393e3`)
+   - Added websocket wiring and fallback endpoint plumbing for live tracking.
+
+3. **fix(mechanic): accept jobs + earnings wiring (unfinished)** (`02fd260`)
+   - Wired mechanic accept-job and earnings paths; marked incomplete.
+
+4. **feat(assistance): show current city/state in find mechanics** (`52ce529`)
+   - Added city/state visibility in car owner find-mechanics flow.
+
+5. **feat: chat stability and wallet/marketplace updates** (`9f48e52`)
+   - Improved chat stability and related wallet/marketplace behavior.
+
+## March 5, 2026
+
+### Commits
+
+1. **feat: integrate history, chat, profile, notifications, and marketplace updates** (`3cb520e`)
+   - Added history infinite scroll pagination (`onEndReached`) and pending-job action guards.
+   - Synced cancel/delete job behavior with shared chat state and cancellation handling.
+   - Updated quotation accept/decline flow with lock state and server reconciliation.
+   - Fixed contact update payload handling for add-contact/confirm-contact OTP flow.
+   - Updated bank details UX: primary badge behavior, add-account flow, and non-primary-only delete actions.
+   - Swapped profile logout/delete icons per updated UI requirement.
