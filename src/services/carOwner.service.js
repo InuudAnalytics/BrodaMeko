@@ -22,6 +22,11 @@ export const addCarOwnerBank = async ({ account_name, account_number, bank_code,
   return response.data;
 };
 
+export const getCarOwnerBankDetails = async () => {
+  const response = await api.get(ENDPOINTS.me.carOwner.bankGet);
+  return response.data;
+};
+
 export const verifyCarOwnerBank = async ({ account_number, bank_name }) => {
   const response = await api.post(ENDPOINTS.me.carOwner.bankVerify, {
     account_number: String(account_number || '').trim(),
@@ -44,6 +49,7 @@ export const setPrimaryCarOwnerBank = async (bankId) => {
 
 export default {
   addCarOwnerBank,
+  getCarOwnerBankDetails,
   verifyCarOwnerBank,
   deleteCarOwnerBank,
   setPrimaryCarOwnerBank,

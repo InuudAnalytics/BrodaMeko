@@ -7,6 +7,7 @@ import {
   Image,
   InteractionManager,
   PanResponder,
+  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -15,7 +16,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Location06Icon, Mail01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
-import { AppBottomNav, AppButton, AppText, OpenStreetMapView, PersonalInfoAlert, ScreenContainer } from '../../../components';
+import {
+  AppBottomNav,
+  AppButton,
+  AppText,
+  NotificationPermissionChip,
+  OpenStreetMapView,
+  PersonalInfoAlert,
+  PullToRefreshIndicator,
+  ScreenContainer,
+} from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useNotifications } from '../../../context';
@@ -153,7 +163,9 @@ const DashboardScreen = ({ navigation, route }) => {
   const [cancelling, setCancelling] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [trackedLocation, setTrackedLocation] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const panelY = useRef(new Animated.Value(0)).current;
+  const pullDistance = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
   const lastLocationUpdateRef = useRef(0);
@@ -228,7 +240,7 @@ const DashboardScreen = ({ navigation, route }) => {
         }
       };
 
-      fetchUnread();
+      fetchUnread(unreadTick);
 
       return () => {
         active = false;
@@ -345,6 +357,41 @@ const DashboardScreen = ({ navigation, route }) => {
       await refreshOnce();
     }
   }, [refreshOnce, requestPermission]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const jobId = String(activeSession?.jobId || '').trim();
+      const notificationsPromise = getNotifications({ page: 1, limit: 1 }).catch(() => null);
+      const locationPromise =
+        LOCATION_ENABLED && hasLocationPermission ? refreshOnce().catch(() => null) : Promise.resolve(null);
+      const latestLocationPromise = jobId ? getLatestJobLocation(jobId).catch(() => null) : Promise.resolve(null);
+
+      const [notificationsRes, , latestLocationRes] = await Promise.all([
+        notificationsPromise,
+        locationPromise,
+        latestLocationPromise,
+      ]);
+
+      if (notificationsRes) {
+        const payload = notificationsRes?.data || notificationsRes || {};
+        const count = Number(payload?.unread_count || 0);
+        setUnreadCount(Number.isFinite(count) ? count : 0);
+      }
+
+      if (latestLocationRes) {
+        const latestPayload = latestLocationRes?.data || latestLocationRes || {};
+        const lat = Number(latestPayload?.lat ?? latestPayload?.latitude);
+        const lng = Number(latestPayload?.lng ?? latestPayload?.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          lastLocationUpdateRef.current = Date.now();
+          setTrackedLocation({ latitude: lat, longitude: lng });
+        }
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [activeSession?.jobId, hasLocationPermission, refreshOnce]);
 
   const animatePanelTo = useCallback(
     (toValue) => {
@@ -570,7 +617,28 @@ const DashboardScreen = ({ navigation, route }) => {
     <View style={styles.root}>
       <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
       <PersonalInfoAlert />
-      <View style={styles.mapBackdrop}>
+      <View style={styles.listWrap}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
+        <Animated.ScrollView
+          style={styles.mapBackdrop}
+          contentContainerStyle={styles.mapBackdropContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => {
+            const offsetY = event.nativeEvent?.contentOffset?.y || 0;
+            const pullValue = offsetY < 0 ? Math.min(120, -offsetY) : 0;
+            pullDistance.setValue(pullValue);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={darkTheme.colors.accent}
+              colors={[darkTheme.colors.accent]}
+              progressBackgroundColor={darkTheme.colors.background}
+            />
+          }
+        >
         {hasLocationPermission ? (
           <>
             <OpenStreetMapView
@@ -602,30 +670,36 @@ const DashboardScreen = ({ navigation, route }) => {
           />
         )}
 
-        <View style={styles.topBar}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} /> : <AppText style={styles.avatarText}>{avatarInitial}</AppText>}
-            </View>
-            <View>
-              <AppText variant="body" style={styles.greeting}>
-                {greetingText}
-              </AppText>
-              <AppText variant="muted" style={styles.greetingSub}>
-                Ready for the road?
-              </AppText>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
-            <HugeiconsIcon icon={Notification01Icon} size={22} color={darkTheme.colors.text} strokeWidth={1.8} />
-            {unreadCount > 0 ? (
-              <View style={styles.bellBadge}>
-                <AppText style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
+        <View style={styles.topOverlayGlass}>
+          <View style={styles.topBar}>
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}>
+                {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} /> : <AppText style={styles.avatarText}>{avatarInitial}</AppText>}
               </View>
-            ) : null}
-          </TouchableOpacity>
+              <View>
+                <AppText variant="body" style={styles.greeting}>
+                  {greetingText}
+                </AppText>
+                <AppText variant="muted" style={styles.greetingSub}>
+                  Ready for the road?
+                </AppText>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
+              <HugeiconsIcon icon={Notification01Icon} size={22} color={darkTheme.colors.text} strokeWidth={1.8} />
+              {unreadCount > 0 ? (
+                <View style={styles.bellBadge}>
+                  <AppText style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.notificationChipWrap}>
+            <NotificationPermissionChip />
+          </View>
         </View>
+        </Animated.ScrollView>
       </View>
 
       <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]} {...panResponder.panHandlers}>
@@ -650,13 +724,33 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   screen: { flex: 1, backgroundColor: darkTheme.colors.background },
+  listWrap: { flex: 1 },
   mapBackdrop: { flex: 1, backgroundColor: '#2B2B31', overflow: 'hidden' },
-  topBar: {
+  mapBackdropContent: { flexGrow: 1 },
+  topOverlayGlass: {
     marginTop: darkTheme.spacing.xl,
-    paddingHorizontal: darkTheme.spacing.lg,
+    marginHorizontal: darkTheme.spacing.lg,
+    borderRadius: 18,
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  topBar: {
+    paddingHorizontal: darkTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  notificationChipWrap: {
+    marginTop: 10,
+    paddingHorizontal: darkTheme.spacing.md,
   },
   locationLoadingOverlay: {
     position: 'absolute',
@@ -746,8 +840,20 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   avatarText: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.bold },
-  greeting: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.semibold },
-  greetingSub: { color: darkTheme.colors.muted, marginTop: darkTheme.spacing.xxs },
+  greeting: {
+    color: '#FFFFFF',
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  greetingSub: {
+    color: 'rgba(255,255,255,0.86)',
+    marginTop: darkTheme.spacing.xxs,
+    textShadowColor: 'rgba(0,0,0,0.28)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   bellButton: {
     width: 44,
     height: 44,

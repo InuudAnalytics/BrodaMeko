@@ -18,6 +18,62 @@ const ChatContext = createContext(undefined);
 const MAX_RECONNECT_ATTEMPTS = 3;
 const RECONNECT_BASE_DELAY_MS = 800;
 const AUTH_CLOSE_CODES = new Set([1008, 4001, 4003, 4401, 4403]);
+const QUOTE_MESSAGE_TYPES = new Set([
+  'price_quote',
+  'quotation',
+  'quote',
+  'quotation_created',
+  'quotation_sent',
+  'quotation_received',
+]);
+
+const normalizeMessageType = (value) => {
+  const raw = String(value || 'text').trim().toLowerCase();
+  return QUOTE_MESSAGE_TYPES.has(raw) ? 'price_quote' : raw || 'text';
+};
+
+const normalizeQuotationDecision = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'accept' || raw === 'accepted') {
+    return 'accepted';
+  }
+  if (raw === 'reject' || raw === 'decline' || raw === 'declined') {
+    return 'declined';
+  }
+  return '';
+};
+
+const readSenderRole = (item) => {
+  const direct = String(
+    item?.sender_role || item?.sender_type || item?.role || item?.sender || ''
+  )
+    .trim()
+    .toLowerCase();
+  if (direct && direct !== '[object object]') {
+    return direct;
+  }
+
+  const senderObj = item?.sender && typeof item.sender === 'object' ? item.sender : null;
+  return String(
+    senderObj?.role || senderObj?.type || senderObj?.sender_role || senderObj?.sender_type || ''
+  )
+    .trim()
+    .toLowerCase();
+};
+
+const readQuotationPayload = (item) => {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const quoted =
+    (item?.quotation && typeof item.quotation === 'object' && item.quotation) ||
+    (item?.quote && typeof item.quote === 'object' && item.quote) ||
+    (item?.quotation_data && typeof item.quotation_data === 'object' && item.quotation_data) ||
+    null;
+
+  return quoted;
+};
 
 const getConversationId = (conversation) => {
   if (!conversation || typeof conversation !== 'object') {
@@ -86,20 +142,64 @@ const extractMessages = (payload) => {
 };
 
 const normalizeApiMessage = (item, fallbackConversationId = '') => {
-  const msgType = String(item?.msg_type || item?.message_type || item?.type || 'text').toLowerCase();
-  const senderRole = String(item?.sender_role || item?.sender || item?.sender_type || item?.role || '').toLowerCase();
+  const quotation = readQuotationPayload(item);
+  const msgType = normalizeMessageType(
+    item?.msg_type || item?.message_type || item?.type || quotation?.type || ''
+  );
+  const senderRole = readSenderRole(item);
+  const contentText = String(
+    item?.content ||
+      item?.message ||
+      item?.text ||
+      quotation?.content ||
+      quotation?.message ||
+      quotation?.text ||
+      ''
+  ).trim();
+  const amountValue = Number(
+    item?.amount ??
+      item?.quoted_amount ??
+      item?.quote_amount ??
+      item?.price ??
+      quotation?.amount ??
+      quotation?.quoted_amount ??
+      quotation?.quote_amount ??
+      quotation?.price ??
+      0
+  );
+  const quotationId = String(
+    item?.quotation_id ||
+      item?.quote_id ||
+      quotation?.quotation_id ||
+      quotation?.quote_id ||
+      quotation?.id ||
+      quotation?._id ||
+      ''
+  ).trim();
+  const safeConversationId = String(
+    item?.conversation_id ||
+      item?.conversationId ||
+      item?.conversation ||
+      quotation?.conversation_id ||
+      quotation?.conversationId ||
+      quotation?.conversation ||
+      fallbackConversationId ||
+      ''
+  ).trim();
 
   return {
     id: String(item?.id || item?._id || item?.message_id || `msg-${Date.now()}`),
-    conversation_id: String(
-      item?.conversation_id || item?.conversationId || item?.conversation || fallbackConversationId || ''
-    ).trim(),
+    conversation_id: safeConversationId,
     type: msgType,
     msg_type: msgType,
-    text: String(item?.content || item?.message || item?.text || '').trim(),
-    content: String(item?.content || item?.message || item?.text || '').trim(),
+    text: contentText,
+    content: contentText,
     sender: senderRole,
     sender_role: senderRole,
+    amount: Number.isFinite(amountValue) ? amountValue : 0,
+    quotation_id: quotationId || undefined,
+    quotation_status:
+      normalizeQuotationDecision(item?.quotation_status || quotation?.status || item?.status) || undefined,
     is_read: Boolean(item?.is_read),
     created_at: item?.created_at || item?.createdAt || new Date().toISOString(),
     status: item?.status || 'sent',
@@ -107,12 +207,37 @@ const normalizeApiMessage = (item, fallbackConversationId = '') => {
 };
 
 const normalizeIncomingMessage = (raw, fallbackConversationId) => {
+  const eventType = String(raw?.type || '').trim().toLowerCase();
   const payloadRoot = raw?.payload && typeof raw.payload === 'object' ? raw.payload : raw;
-  const payload = payloadRoot?.message && typeof payloadRoot.message === 'object' ? payloadRoot.message : payloadRoot;
+  const embeddedQuotation =
+    payloadRoot?.quotation && typeof payloadRoot.quotation === 'object' ? payloadRoot.quotation : null;
+  const messagePayload =
+    payloadRoot?.message && typeof payloadRoot.message === 'object' ? payloadRoot.message : null;
+
+  const payload = messagePayload || payloadRoot;
+  const shouldUseQuotation =
+    Boolean(embeddedQuotation) &&
+    (eventType.includes('quotation') ||
+      String(payload?.type || payload?.msg_type || '').trim().length === 0);
+
+  const mergedPayload = shouldUseQuotation
+    ? {
+        ...payload,
+        ...embeddedQuotation,
+        quotation: embeddedQuotation,
+        type: payload?.type || payload?.msg_type || embeddedQuotation?.type || 'price_quote',
+        msg_type: payload?.msg_type || payload?.type || embeddedQuotation?.type || 'price_quote',
+      }
+    : payload;
+
   const conversationId = String(
-    payload?.conversation_id || payload?.conversationId || payload?.conversation || fallbackConversationId || ''
+    mergedPayload?.conversation_id ||
+      mergedPayload?.conversationId ||
+      mergedPayload?.conversation ||
+      fallbackConversationId ||
+      ''
   ).trim();
-  return normalizeApiMessage(payload, conversationId);
+  return normalizeApiMessage(mergedPayload, conversationId);
 };
 
 const isDuplicateMessage = (lastMessage, nextMessage) => {
@@ -385,6 +510,10 @@ export const ChatProvider = ({ children }) => {
 
           if (eventType === 'job_request_updated') {
             setLatestJobRequestUpdate(payload);
+            const requestStatus = String(payload?.status || payload?.new_status || '').trim().toLowerCase();
+            if (requestStatus === 'cancelled' || requestStatus === 'canceled') {
+              handleJobStatusChange(requestStatus);
+            }
             return;
           }
 
@@ -395,11 +524,41 @@ export const ChatProvider = ({ children }) => {
           }
 
           if (eventType === 'quotation_response') {
+            const safeConversationIdForQuote = activeConversationIdRef.current || safeConversationId;
+            const quotationId = String(
+              payload?.quotation_id || payload?.quote_id || payload?.id || payload?._id || ''
+            ).trim();
+            const nextDecision = normalizeQuotationDecision(payload?.status || payload?.action);
+
+            if (safeConversationIdForQuote && (quotationId || nextDecision)) {
+              setMessagesByConversationId((prev) => {
+                const current = prev[safeConversationIdForQuote] || [];
+                const next = current.map((message) => {
+                  const messageQuoteId = String(
+                    message?.quotation_id || message?.quote_id || message?.id || message?._id || ''
+                  ).trim();
+                  const matches = quotationId && messageQuoteId && messageQuoteId === quotationId;
+                  if (!matches) {
+                    return message;
+                  }
+                  return {
+                    ...message,
+                    quotation_status: nextDecision || message?.quotation_status,
+                  };
+                });
+
+                return {
+                  ...prev,
+                  [safeConversationIdForQuote]: next,
+                };
+              });
+            }
+
             appendMessage(activeConversationIdRef.current || safeConversationId, {
               id: `quotation-response-${Date.now()}`,
               conversation_id: activeConversationIdRef.current || safeConversationId,
               type: 'system',
-              text: `Quotation ${String(payload?.status || payload?.action || 'updated')}.`,
+              text: `Quotation ${nextDecision || String(payload?.status || payload?.action || 'updated')}.`,
               created_at: new Date().toISOString(),
               status: 'sent',
             });

@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -12,7 +14,7 @@ import {
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Search01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useSellerStore } from '../../../context';
 import { deleteSellerPart, deleteSellerPartImage, updateSellerPart } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
@@ -30,11 +32,12 @@ const normalizeCategory = (value) => {
 };
 
 const SellerStoreScreen = ({ navigation, onBack }) => {
-  const { products, isHydrated, loading, error, removeProduct, updateProduct } = useSellerStore();
+  const { products, isHydrated, loading, error, removeProduct, updateProduct, refreshStore } = useSellerStore();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState(CATEGORY_FILTERS[0]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const pullDistance = useRef(new Animated.Value(0)).current;
 
   const filteredProducts = useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
@@ -175,11 +178,27 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
         ) : null}
 
         {!loading && isHydrated && products.length > 0 ? (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            style={styles.listScroll}
-            contentContainerStyle={styles.list}
-          >
+          <View style={styles.listWrap}>
+            <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
+            <Animated.ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.listScroll}
+              contentContainerStyle={styles.list}
+              onScroll={event => {
+                const offsetY = event.nativeEvent.contentOffset.y;
+                const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+                pullDistance.setValue(pullValue);
+              }}
+              scrollEventThrottle={16}
+              refreshControl={
+                <RefreshControl
+                  refreshing={loading}
+                  onRefresh={refreshStore}
+                  tintColor="transparent"
+                  colors={['transparent']}
+                />
+              }
+            >
             {filteredProducts.map((product) => {
               const quantity = Number(product?.quantity ?? product?.stock_quantity ?? 0);
               const outOfStock = quantity <= 0;
@@ -218,7 +237,8 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
                 </View>
               );
             })}
-          </ScrollView>
+            </Animated.ScrollView>
+          </View>
         ) : null}
       </View>
 
@@ -363,6 +383,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     rowGap: 14,
     justifyContent: 'flex-start',
+  },
+  listWrap: {
+    flex: 1,
   },
   listScroll: {
     flex: 1,

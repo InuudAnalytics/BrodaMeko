@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppText } from '../../../components';
+import { useChat } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
 
@@ -17,6 +18,8 @@ const hexToRgba = (hex, alpha) => {
 };
 
 const MechanicChatScreen = ({ navigation, route }) => {
+    const { latestJobStatusUpdate } = useChat();
+    const cancellationShownRef = useRef(false);
     const jobId = route?.params?.jobId;
     const mechanicId = route?.params?.mechanicId;
     const conversationId = String(route?.params?.conversationId || '').trim();
@@ -33,6 +36,34 @@ const MechanicChatScreen = ({ navigation, route }) => {
             navigation.navigate(ROUTES.MECH_DASHBOARD_TABS);
         }
     }, [hasValidParams, navigation]);
+
+    useEffect(() => {
+        if (!latestJobStatusUpdate || cancellationShownRef.current) {
+            return;
+        }
+        const incomingJobId = String(
+            latestJobStatusUpdate?.job_id || latestJobStatusUpdate?.jobId || '',
+        ).trim();
+        if (!incomingJobId || String(jobId || '').trim() !== incomingJobId) {
+            return;
+        }
+        const nextStatus = String(
+            latestJobStatusUpdate?.new_status || latestJobStatusUpdate?.status || '',
+        )
+            .trim()
+            .toLowerCase();
+        if (nextStatus !== 'cancelled' && nextStatus !== 'canceled') {
+            return;
+        }
+
+        cancellationShownRef.current = true;
+        Alert.alert('Job cancelled', 'Customer cancelled this job. Chat has been closed.', [
+            {
+                text: 'OK',
+                onPress: () => navigation.replace(ROUTES.MECH_DASHBOARD_TABS),
+            },
+        ]);
+    }, [jobId, latestJobStatusUpdate, navigation]);
 
     if (!hasValidParams) {
         return null;

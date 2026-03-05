@@ -12,6 +12,7 @@ import {
   SparePartsProfileProvider,
   ThemeProvider,
 } from './context';
+import { NotificationsGlobalGate } from './components';
 import { RootNavigator } from './navigation';
 import { darkTheme } from './theme';
 
@@ -30,6 +31,7 @@ export default function App() {
                       <MechanicServicesProvider>
                         <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
                         <RootNavigator />
+                        <NotificationsGlobalGate />
                       </MechanicServicesProvider>
                     </CartProvider>
                   </FavoritesProvider>

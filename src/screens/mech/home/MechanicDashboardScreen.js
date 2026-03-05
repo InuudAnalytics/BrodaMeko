@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, RefreshControl, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { openSettings } from 'react-native-permissions';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Mail01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, PersonalInfoAlert, ScrollableTabs } from '../../../components';
+import { AppButton, AppText, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScrollableTabs } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useNotifications } from '../../../context';
@@ -129,6 +129,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const [isOnline, setIsOnline] = useState(Boolean(user?.is_online ?? user?.isOnline));
   const [activeJob, setActiveJob] = useState(null);
   const [activeConversationId, setActiveConversationId] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const pullDistance = React.useRef(new Animated.Value(0)).current;
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
   const avatarUri = readAvatarUri(user);
@@ -220,7 +222,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
         setLoading(false);
       }
     },
-    [ensureLocationPermission],
+    [ensureLocationPermission, navigation, user?._id, user?.id],
   );
 
   const handleDeclineJob = useCallback(async (job) => {
@@ -375,7 +377,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
         }
       };
 
-      fetchUnread();
+      fetchUnread(unreadTick);
 
       return () => {
         active = false;
@@ -383,10 +385,112 @@ const MechanicDashboardScreen = ({ navigation }) => {
     }, [unreadTick])
   );
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setError('');
+    try {
+      const [walletRes, jobsRes, pendingRes, earningsRes, unreadRes] = await Promise.all([
+        getWalletBalance().catch(() => null),
+        getAvailableJobs({ page: 1, limit: 100 }).catch(() => null),
+        getMechanicPendingJobRequests().catch(() => null),
+        getMechanicEarnings().catch(() => null),
+        getNotifications({ page: 1, limit: 1 }).catch(() => null),
+      ]);
+
+      if (walletRes) {
+        const walletPayload = walletRes?.data || walletRes;
+        setWalletBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
+      }
+
+      if (earningsRes) {
+        const earningsPayload = earningsRes?.data || earningsRes || {};
+        const earningsData = earningsPayload?.data || earningsPayload;
+        const earningsInfo = earningsData?.earnings || {};
+        const jobsInfo = earningsData?.jobs || {};
+        setEarnings({
+          today: Number(earningsInfo?.today || 0),
+          thisWeek: Number(earningsInfo?.this_week || earningsInfo?.thisWeek || 0),
+          thisMonth: Number(earningsInfo?.this_month || earningsInfo?.thisMonth || 0),
+          allTime: Number(earningsInfo?.all_time || earningsInfo?.allTime || 0),
+          pendingRelease: Number(earningsInfo?.pending_release || earningsInfo?.pendingRelease || 0),
+        });
+        if (Number.isFinite(Number(earningsData?.wallet_balance))) {
+          setWalletBalance(Number(earningsData?.wallet_balance || 0));
+        }
+        if (Number.isFinite(Number(jobsInfo?.total))) {
+          setTotalJobs(Number(jobsInfo?.total || 0));
+        }
+      }
+
+      if (jobsRes) {
+        const jobsPayload = jobsRes?.data || jobsRes;
+        const rawJobs = Array.isArray(jobsPayload)
+          ? jobsPayload
+          : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
+        const mappedAssigned = rawJobs.map((job) => normalizeJob(job));
+        const pendingPayload = pendingRes?.data || pendingRes;
+        const pendingRaw = Array.isArray(pendingPayload)
+          ? pendingPayload
+          : (pendingPayload?.jobs || pendingPayload?.items || pendingPayload?.results || pendingPayload?.data || []);
+        const mappedPending = pendingRaw.map((job) => normalizeJob(job, 'pending'));
+        const mergedJobs = [...mappedPending, ...mappedAssigned];
+        setJobs(mergedJobs);
+        setTotalJobs(Number(jobsPayload?.total || rawJobs.length || 0));
+        const currentActive = resolveActiveJob(mergedJobs);
+        setActiveJob(currentActive || null);
+        if (currentActive?.jobId) {
+          try {
+            const convoRes = await getConversationByJobId(currentActive.jobId);
+            const payload = convoRes?.data || convoRes || {};
+            const data = payload?.data || payload;
+            const convo = data?.conversation || data;
+            const conversationId = String(convo?.id || convo?._id || '').trim();
+            setActiveConversationId(conversationId);
+          } catch {
+            setActiveConversationId('');
+          }
+        } else {
+          setActiveConversationId('');
+        }
+      }
+
+      if (unreadRes) {
+        const unreadPayload = unreadRes?.data || unreadRes || {};
+        const count = Number(unreadPayload?.unread_count || 0);
+        setUnreadCount(Number.isFinite(count) ? count : 0);
+      }
+    } catch {
+      setError('Could not refresh dashboard.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [resolveActiveJob]);
+
   return (
     <View style={styles.root}>
       <PersonalInfoAlert />
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.listWrap}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
+        <Animated.ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => {
+            const offsetY = event.nativeEvent?.contentOffset?.y || 0;
+            const pullValue = offsetY < 0 ? Math.min(120, -offsetY) : 0;
+            pullDistance.setValue(pullValue);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={darkTheme.colors.accent}
+              colors={[darkTheme.colors.accent]}
+              progressBackgroundColor={darkTheme.colors.background}
+            />
+          }
+        >
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
@@ -410,6 +514,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
           ) : null}
         </TouchableOpacity>
       </View>
+      <NotificationPermissionChip style={styles.notificationChip} />
 
       <View style={styles.earningsCard}>
         <View style={styles.earningsHeader}>
@@ -573,13 +678,17 @@ const MechanicDashboardScreen = ({ navigation }) => {
           ))
         )}
       </View>
-      </ScrollView>
+        </Animated.ScrollView>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
+    flex: 1,
+  },
+  listWrap: {
     flex: 1,
   },
   screen: {
@@ -596,6 +705,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  notificationChip: {
+    marginBottom: 12,
   },
   headerLeft: {
     flexDirection: 'row',

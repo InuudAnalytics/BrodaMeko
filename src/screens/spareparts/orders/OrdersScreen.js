@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
-import { AppText, CenteredHeader, ScreenContainer, ScrollableTabs } from '../../../components';
+import { AppText, CenteredHeader, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
 import { confirmMarketplaceOrderItem } from '../../../services/marketplace.service';
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
@@ -79,6 +79,7 @@ const OrdersScreen = () => {
   const [orders, setOrders] = useState(ORDERS);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
+  const pullDistance = useRef(new Animated.Value(0)).current;
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -178,7 +179,26 @@ const OrdersScreen = () => {
           <ScrollableTabs tabs={tabsWithCounts} activeKey={activeTab} onChange={setActiveTab} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.listWrap}>
+          <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
+          <Animated.ScrollView
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={event => {
+              const offsetY = event.nativeEvent.contentOffset.y;
+              const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+              pullDistance.setValue(pullValue);
+            }}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={loading}
+                onRefresh={fetchOrders}
+                tintColor="transparent"
+                colors={['transparent']}
+              />
+            }
+          >
           {loading ? (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color={darkTheme.colors.accent} />
@@ -261,7 +281,8 @@ const OrdersScreen = () => {
               </View>
             );
           })}
-        </ScrollView>
+          </Animated.ScrollView>
+        </View>
       </ScreenContainer>
     </View>
   );
@@ -318,6 +339,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 24,
     rowGap: 12,
+  },
+  listWrap: {
+    flex: 1,
   },
   loadingRow: {
     paddingVertical: 12,

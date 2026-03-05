@@ -11,7 +11,6 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, CenteredHeader, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
-import { getCurrentUser } from '../../../services/auth.service';
 import {
   addMechanicBank,
   deleteMechanicBank,
@@ -23,12 +22,14 @@ import {
 import {
   addCarOwnerBank,
   deleteCarOwnerBank,
+  getCarOwnerBankDetails,
   setPrimaryCarOwnerBank,
   verifyCarOwnerBank,
 } from '../../../services/carOwner.service';
 import {
   addSellerBank,
   deleteSellerBank,
+  getSellerBankDetails,
   setPrimarySellerBank,
   verifySellerBank,
 } from '../../../services/spareParts.service';
@@ -45,6 +46,14 @@ const normalizeBankItems = (payload) => {
 };
 
 const sanitizeDigits = (value) => String(value || '').replace(/\D/g, '');
+const toPrimaryFlag = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+};
 
 const extractBanks = (user) => {
   const rawList = user?.bank_details || user?.bankDetails;
@@ -61,7 +70,7 @@ const extractBanks = (user) => {
     bankName: String(raw?.bank_name || raw?.bankName || raw?.name || '').trim(),
     accountNumber: String(raw?.account_number || raw?.accountNumber || '').trim(),
     accountName: String(raw?.account_name || raw?.accountName || '').trim(),
-    isPrimary: Boolean(raw?.is_primary || raw?.isPrimary),
+    isPrimary: toPrimaryFlag(raw?.is_primary ?? raw?.isPrimary ?? raw?.primary),
   }));
 };
 
@@ -106,11 +115,20 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
           ...(prev || {}),
           bank_details: normalizeBankItems(payload),
         }));
-      } else {
-        const response = await getCurrentUser();
+      } else if (role === ROLES.CAR_OWNER) {
+        const response = await getCarOwnerBankDetails();
         const payload = response?.data || response || {};
-        const resolved = payload?.data || payload;
-        setProfile(resolved);
+        setProfile((prev) => ({
+          ...(prev || {}),
+          bank_details: normalizeBankItems(payload),
+        }));
+      } else {
+        const response = await getSellerBankDetails();
+        const payload = response?.data || response || {};
+        setProfile((prev) => ({
+          ...(prev || {}),
+          bank_details: normalizeBankItems(payload),
+        }));
       }
     } catch (error) {
       setFetchError(error?.message || 'Could not load profile.');
@@ -352,9 +370,13 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
                 <View key={bank.id || `${bank.bankName}-${index}`} style={styles.card}>
                   <View style={styles.cardTop}>
                     <AppText style={styles.cardTitle}>{bank.bankName || 'Bank'}</AppText>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(bank.id)} activeOpacity={0.85}>
-                      <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
-                    </TouchableOpacity>
+                    {isPrimary ? (
+                      <AppText style={styles.primaryBadge}>Primary</AppText>
+                    ) : bank.id ? (
+                      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(bank.id)} activeOpacity={0.85}>
+                        <HugeiconsIcon icon={Delete02Icon} size={18} color="#F87171" strokeWidth={2} />
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                   <View style={styles.cardRow}>
                     <AppText style={styles.cardLabel}>Account number</AppText>
@@ -364,16 +386,15 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
                     <AppText style={styles.cardLabel}>Account name</AppText>
                     <AppText style={styles.cardValue}>{bank.accountName || '—'}</AppText>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.primaryButton, isPrimary ? styles.primaryButtonActive : null]}
-                    onPress={() => handleSetPrimary(bank.id)}
-                    disabled={isPrimary}
-                    activeOpacity={0.85}
-                  >
-                    <AppText style={[styles.primaryButtonText, isPrimary ? styles.primaryButtonTextActive : null]}>
-                      {isPrimary ? 'Primary account' : 'Set as primary'}
-                    </AppText>
-                  </TouchableOpacity>
+                  {!isPrimary ? (
+                    <TouchableOpacity
+                      style={styles.primaryButton}
+                      onPress={() => handleSetPrimary(bank.id)}
+                      activeOpacity={0.85}
+                    >
+                      <AppText style={styles.primaryButtonText}>Set as primary</AppText>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               );
             })
@@ -384,8 +405,8 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
             </View>
           )}
 
-          {!hasBank && !showForm ? (
-            <AppButton label="Add bank details" onPress={() => setShowForm(true)} style={styles.addButton} />
+          {!showForm ? (
+            <AppButton label={hasBank ? 'Add account' : 'Add bank details'} onPress={() => setShowForm(true)} style={styles.addButton} />
           ) : null}
 
           {showForm ? (
@@ -502,6 +523,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
+  primaryBadge: {
+    color: '#000000',
+    backgroundColor: '#E6C714',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    textAlign: 'center',
+    overflow: 'hidden',
+  },
   deleteBtn: {
     width: 36,
     height: 36,
@@ -531,17 +564,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonActive: {
-    backgroundColor: '#E6C714',
-    borderColor: '#E6C714',
-  },
   primaryButtonText: {
-    color: '#E5E7EB',
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  primaryButtonTextActive: {
-    color: '#1A1A1A',
   },
   emptyCard: {
     marginTop: 12,

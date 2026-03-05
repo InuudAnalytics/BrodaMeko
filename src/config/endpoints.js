@@ -51,6 +51,7 @@ export const ENDPOINTS = {
     },
     carOwner: {
       bankAdd: '/api/v1/me/car-owner/bank',
+      bankGet: '/api/v1/me/car-owner/bank',
       bankVerify: '/api/v1/me/car-owner/bank/verify',
       bankDelete: (bankId) => `/api/v1/me/car-owner/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
       bankSetPrimary: (bankId) => `/api/v1/me/car-owner/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
@@ -66,6 +67,7 @@ export const ENDPOINTS = {
       addressUpdateLegacy: (addressId) =>
         `/api/v1/me/spare-parts/address/${encodeURIComponent(String(addressId || ''))}`,
       bankAdd: '/api/v1/seller/me/bank',
+      bankGet: '/api/v1/seller/me/bank',
       bankVerify: '/api/v1/seller/me/bank/verify',
       bankDelete: (bankId) => `/api/v1/seller/me/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
       bankSetPrimary: (bankId) => `/api/v1/seller/me/bank/${encodeURIComponent(String(bankId || ''))}/primary`,

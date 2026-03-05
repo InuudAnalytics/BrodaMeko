@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Image, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, RefreshControl, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -9,7 +9,7 @@ import {
   PackageIcon,
   PlusSignIcon,
 } from '@hugeicons/core-free-icons';
-import { AppText, PersonalInfoAlert, ScreenContainer } from '../../../components';
+import { AppText, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useAuth, useNotifications } from '../../../context';
 import { getNotifications } from '../../../services/notifications.service';
 import { darkTheme } from '../../../theme';
@@ -32,6 +32,8 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const { user } = useAuth();
   const { unreadTick } = useNotifications();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullDistance = React.useRef(new Animated.Value(0)).current;
   const firstName = getFirstName(user);
   const avatarUri =
     user?.avatar ||
@@ -60,28 +62,32 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
     []
   );
 
+  const fetchUnread = useCallback(async () => {
+    try {
+      const response = await getNotifications({ page: 1, limit: 1 });
+      const payload = response?.data || response || {};
+      const count = Number(payload?.unread_count || 0);
+      setUnreadCount(Number.isFinite(count) ? count : 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-
-      const fetchUnread = async () => {
-        try {
-          const response = await getNotifications({ page: 1, limit: 1 });
-          const payload = response?.data || response || {};
-          const count = Number(payload?.unread_count || 0);
-          if (active) setUnreadCount(Number.isFinite(count) ? count : 0);
-        } catch {
-          if (active) setUnreadCount(0);
-        }
-      };
-
-      fetchUnread();
-
-      return () => {
-        active = false;
-      };
-    }, [unreadTick])
+      fetchUnread(unreadTick);
+      return undefined;
+    }, [fetchUnread, unreadTick])
   );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchUnread();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchUnread]);
 
   const handleSeeMore = () => {
     if (typeof onTabPress === 'function') {
@@ -95,7 +101,27 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={SCREEN_BG} />
       <PersonalInfoAlert />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.listWrap}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
+        <Animated.ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => {
+            const offsetY = event.nativeEvent?.contentOffset?.y || 0;
+            const pullValue = offsetY < 0 ? Math.min(120, -offsetY) : 0;
+            pullDistance.setValue(pullValue);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={darkTheme.colors.accent}
+              colors={[darkTheme.colors.accent]}
+              progressBackgroundColor={darkTheme.colors.background}
+            />
+          }
+        >
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <View style={styles.avatarWrap}>
@@ -121,6 +147,7 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
             ) : null}
           </TouchableOpacity>
         </View>
+        <NotificationPermissionChip style={styles.notificationChip} />
 
         <View style={styles.statsRow}>
           {stats.map((stat) => (
@@ -194,7 +221,8 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
             );
           })}
         </View>
-      </ScrollView>
+        </Animated.ScrollView>
+      </View>
     </ScreenContainer>
   );
 };
@@ -209,11 +237,17 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 24,
   },
+  listWrap: {
+    flex: 1,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
     justifyContent: 'space-between',
+  },
+  notificationChip: {
+    marginTop: 10,
   },
   headerLeft: {
     flexDirection: 'row',

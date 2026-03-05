@@ -198,13 +198,15 @@ const PersonalInfoScreen = ({ navigation }) => {
                           style={styles.secondaryActionBtn}
                           textStyle={styles.secondaryActionText}
                         />
-                        <AppButton
-                          label={busy && busyAction === 'delete' ? 'Deleting...' : 'Delete'}
-                          onPress={() => handleDelete(bank.id)}
-                          disabled={!canRunActions || busy}
-                          style={styles.deleteBtn}
-                          textStyle={styles.deleteText}
-                        />
+                        {!bank.isPrimary ? (
+                          <AppButton
+                            label={busy && busyAction === 'delete' ? 'Deleting...' : 'Delete'}
+                            onPress={() => handleDelete(bank.id)}
+                            disabled={!canRunActions || busy}
+                            style={styles.deleteBtn}
+                            textStyle={styles.deleteText}
+                          />
+                        ) : null}
                       </View>
                     ) : null}
 

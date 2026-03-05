@@ -1,10 +1,18 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
-import { AppBottomNav, AppButton, AppText, ScreenContainer, ScrollableTabs } from '../../../components';
-import { getCarOwnerJobs } from '../../../services/jobs.service';
+import { ArrowLeft01Icon, Delete02Icon, StarIcon } from '@hugeicons/core-free-icons';
+import {
+  AppBottomNav,
+  AppButton,
+  AppText,
+  PullToRefreshIndicator,
+  ScreenContainer,
+  ScrollableTabs,
+} from '../../../components';
+import { useChat } from '../../../context';
+import { deleteJob, getCarOwnerJobs, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -85,7 +93,8 @@ const normalizeJob = (job, index) => {
     job?.title ||
     'Car service';
 
-  const safeStatus = String(job?.status || 'pending').toLowerCase();
+  const rawStatus = String(job?.status || 'pending').toLowerCase();
+  const safeStatus = rawStatus === 'canceled' ? 'cancelled' : rawStatus;
 
   const mechanicName =
     job?.mechanic?.name ||
@@ -116,6 +125,7 @@ const HISTORY_TABS = [
   { key: 'pending', label: 'Pending' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
+const PAGE_LIMIT = 10;
 
 const pickJobsFromResponse = (responseData) => {
   if (Array.isArray(responseData)) {
@@ -158,9 +168,11 @@ const HistorySkeleton = () => {
   );
 };
 
-const JobHistoryCard = ({ item, onViewDetails, onRate }) => {
+const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cancelling, deleting }) => {
   const isCancelled = item.status === 'cancelled';
   const isCompleted = item.status === 'completed';
+  const isPending = item.status === 'pending';
+  const canDelete = isPending;
   const statusLabel = isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : 'Pending';
   const statusTextColor = isCancelled ? '#E85578' : isCompleted ? '#4CC968' : '#C8CCD8';
 
@@ -213,52 +225,174 @@ const JobHistoryCard = ({ item, onViewDetails, onRate }) => {
 
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[styles.actionBtn, styles.actionBtnRate]}
-          onPress={onRate}
+          style={[styles.actionBtn, isPending ? styles.actionBtnCancel : styles.actionBtnRate]}
+          onPress={isPending ? onCancel : onRate}
+          disabled={isPending && (cancelling || deleting)}
         >
-          <AppText style={styles.actionBtnRateText}>Rate</AppText>
+          <AppText style={isPending ? styles.actionBtnCancelText : styles.actionBtnRateText}>
+            {isPending ? (cancelling ? 'Cancelling...' : 'Cancel') : 'Rate'}
+          </AppText>
         </TouchableOpacity>
       </View>
+
+      {canDelete ? (
+        <View style={styles.pendingMetaRow}>
+          <TouchableOpacity
+            style={styles.deleteIconBtn}
+            activeOpacity={0.85}
+            onPress={onDelete}
+            disabled={deleting || (isPending && cancelling)}
+          >
+            <HugeiconsIcon icon={Delete02Icon} size={18} color={deleting ? '#B75A6F' : '#F87171'} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 };
 
 const HistoryScreen = ({ navigation }) => {
+  const { clearActiveConversation } = useChat();
   const [jobs, setJobs] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState('');
   const [usingFallback, setUsingFallback] = useState(false);
+  const [cancellingJobId, setCancellingJobId] = useState('');
+  const [deletingJobId, setDeletingJobId] = useState('');
+  const pullDistance = useRef(new Animated.Value(0)).current;
+  const fetchHistoryRef = useRef(null);
 
-  const fetchHistory = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    setUsingFallback(false);
+  const mergeUniqueJobs = useCallback((existing, incoming) => {
+    const next = [...existing];
+    const seen = new Set(existing.map((item) => String(item?.jobId || item?.id || '').trim()));
+
+    incoming.forEach((item) => {
+      const key = String(item?.jobId || item?.id || '').trim();
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      next.push(item);
+    });
+
+    return next;
+  }, []);
+
+  const fetchHistory = useCallback(async ({ reset = false } = {}) => {
+    if (!reset && (loadingMore || loading || !hasMore || usingFallback)) {
+      return;
+    }
+
+    const targetPage = reset ? 1 : page + 1;
+    if (reset) {
+      setLoading(true);
+      setError('');
+      setUsingFallback(false);
+      setHasMore(true);
+      setPage(1);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
-      const response = await getCarOwnerJobs({ limit: 10, page: 1 });
+      const response = await getCarOwnerJobs({ limit: PAGE_LIMIT, page: targetPage });
       const rawJobs = pickJobsFromResponse(response?.data);
-      setJobs(rawJobs.map(normalizeJob));
+      const normalized = rawJobs.map(normalizeJob);
+      setJobs((prev) => (reset ? normalized : mergeUniqueJobs(prev, normalized)));
+      setPage(targetPage);
+      setHasMore(normalized.length >= PAGE_LIMIT);
     } catch (requestError) {
       const statusCode = Number(requestError?.statusCode || 0);
       const shouldUseMockFallback = statusCode === 0 || statusCode === 401;
 
-      if (shouldUseMockFallback) {
+      if (reset && shouldUseMockFallback) {
         setUsingFallback(true);
         setJobs(MOCK_COMPLETED_JOBS);
+        setHasMore(false);
+        setPage(1);
       } else {
-        setError('Could not load your history right now. Please try again.');
+        if (reset) {
+          setError('Could not load your history right now. Please try again.');
+        }
       }
     } finally {
-      setLoading(false);
+      if (reset) {
+        setLoading(false);
+      } else {
+        setLoadingMore(false);
+      }
     }
-  }, []);
+  }, [hasMore, loading, loadingMore, mergeUniqueJobs, page, usingFallback]);
+
+  fetchHistoryRef.current = fetchHistory;
 
   useFocusEffect(
     useCallback(() => {
-      fetchHistory();
-    }, [fetchHistory])
+      fetchHistoryRef.current?.({ reset: true });
+    }, [])
   );
+
+  const handleCancelJob = useCallback(async (jobId) => {
+    const safeJobId = String(jobId || '').trim();
+    if (!safeJobId) {
+      return;
+    }
+
+    Alert.alert('Cancel job', 'Are you sure you want to cancel this job?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, cancel',
+        style: 'destructive',
+        onPress: async () => {
+          setCancellingJobId(safeJobId);
+          try {
+            await updateJobStatus(safeJobId, 'cancelled');
+            clearActiveConversation();
+            setJobs((prev) =>
+              prev.map((entry) => (entry.jobId === safeJobId ? { ...entry, status: 'cancelled' } : entry))
+            );
+            Alert.alert('Cancelled', 'Job has been cancelled.');
+          } catch (requestError) {
+            Alert.alert('Cancel failed', requestError?.message || 'Could not cancel this job.');
+          } finally {
+            setCancellingJobId('');
+          }
+        },
+      },
+    ]);
+  }, [clearActiveConversation]);
+
+  const handleDeleteJob = useCallback((jobId) => {
+    const safeJobId = String(jobId || '').trim();
+    if (!safeJobId) {
+      return;
+    }
+
+    Alert.alert('Delete job', 'Are you sure you want to delete this job?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingJobId(safeJobId);
+          try {
+            await deleteJob(safeJobId);
+            clearActiveConversation();
+            setJobs((prev) => prev.filter((entry) => entry.jobId !== safeJobId));
+            Alert.alert('Deleted', 'Job deleted successfully.');
+          } catch (requestError) {
+            Alert.alert('Delete failed', requestError?.message || 'Could not delete this job.');
+          } finally {
+            setDeletingJobId('');
+          }
+        },
+      },
+    ]);
+  }, [clearActiveConversation]);
 
   const filteredJobs = useMemo(() => {
     if (activeTab === 'all') {
@@ -267,7 +401,64 @@ const HistoryScreen = ({ navigation }) => {
     return jobs.filter((item) => String(item?.status || '').toLowerCase() === activeTab);
   }, [activeTab, jobs]);
 
-  const content = useMemo(() => {
+  const handleEndReached = useCallback(() => {
+    if (loading || loadingMore || !hasMore || usingFallback) {
+      return;
+    }
+    fetchHistory({ reset: false });
+  }, [fetchHistory, hasMore, loading, loadingMore, usingFallback]);
+
+  const renderItem = useCallback(({ item }) => (
+    <JobHistoryCard
+      item={item}
+      onViewDetails={() => navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, { jobId: item.jobId })}
+      onCancel={() => handleCancelJob(item.jobId)}
+      onDelete={() => handleDeleteJob(item.jobId)}
+      cancelling={cancellingJobId === item.jobId}
+      deleting={deletingJobId === item.jobId}
+      onRate={() =>
+        navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DETAILS, {
+          jobId: item.jobId,
+          preview: {
+            mechanicName: item.mechanicName,
+            rating: item.rating,
+            avatarUrl: item.avatarUrl,
+          },
+        })
+      }
+    />
+  ), [navigation, handleCancelJob, handleDeleteJob, cancellingJobId, deletingJobId]);
+
+  const listHeader = useMemo(() => (
+    <View style={styles.tabsWrap}>
+      <ScrollableTabs tabs={HISTORY_TABS} activeKey={activeTab} onChange={setActiveTab} />
+      {usingFallback ? (
+        <AppText style={styles.fallbackHint}>Showing recent mock history while connection is unavailable.</AppText>
+      ) : null}
+    </View>
+  ), [activeTab, usingFallback]);
+
+  const listFooter = useMemo(() => {
+    if (loadingMore) {
+      return (
+        <View style={styles.footerWrap}>
+          <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+        </View>
+      );
+    }
+
+    if (!hasMore && filteredJobs.length > 0) {
+      return (
+        <View style={styles.footerWrap}>
+          <AppText style={styles.footerText}>You’ve reached the end.</AppText>
+        </View>
+      );
+    }
+
+    return null;
+  }, [filteredJobs.length, hasMore, loadingMore]);
+
+  const listEmpty = useMemo(() => {
     if (loading) {
       return <HistorySkeleton />;
     }
@@ -277,45 +468,18 @@ const HistoryScreen = ({ navigation }) => {
         <View style={styles.stateWrap}>
           <AppText style={styles.stateTitle}>Unable to load history</AppText>
           <AppText style={styles.stateText}>{error}</AppText>
-          <AppButton label="Retry" onPress={fetchHistory} style={styles.retryBtn} />
-        </View>
-      );
-    }
-
-    if (!filteredJobs.length) {
-      return (
-        <View style={styles.stateWrap}>
-          <AppText style={styles.stateTitle}>No history yet</AppText>
-          <AppText style={styles.stateText}>Your completed, pending, or cancelled bookings will appear here.</AppText>
+          <AppButton label="Retry" onPress={() => fetchHistory({ reset: true })} style={styles.retryBtn} />
         </View>
       );
     }
 
     return (
-      <View style={styles.list}>
-        {usingFallback ? (
-          <AppText style={styles.fallbackHint}>Showing recent mock history while connection is unavailable.</AppText>
-        ) : null}
-        {filteredJobs.map((item) => (
-          <JobHistoryCard
-            key={item.id}
-            item={item}
-            onViewDetails={() => navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, { jobId: item.jobId })}
-            onRate={() =>
-              navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DETAILS, {
-                jobId: item.jobId,
-                preview: {
-                  mechanicName: item.mechanicName,
-                  rating: item.rating,
-                  avatarUrl: item.avatarUrl,
-                },
-              })
-            }
-          />
-        ))}
+      <View style={styles.stateWrap}>
+        <AppText style={styles.stateTitle}>No history yet</AppText>
+        <AppText style={styles.stateText}>Your completed, pending, or cancelled bookings will appear here.</AppText>
       </View>
     );
-  }, [loading, error, filteredJobs, usingFallback, fetchHistory, navigation]);
+  }, [loading, error, fetchHistory]);
 
   return (
     <View style={styles.root}>
@@ -329,12 +493,35 @@ const HistoryScreen = ({ navigation }) => {
           <View style={styles.backButtonSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.tabsWrap}>
-            <ScrollableTabs tabs={HISTORY_TABS} activeKey={activeTab} onChange={setActiveTab} />
-          </View>
-          {content}
-        </ScrollView>
+        <View style={styles.listWrap}>
+          <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
+          <Animated.FlatList
+            data={filteredJobs}
+            keyExtractor={(item, index) => String(item?.id || item?.jobId || `history-${index}`)}
+            renderItem={renderItem}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={listEmpty}
+            ListFooterComponent={listFooter}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.35}
+            onScroll={event => {
+              const offsetY = event.nativeEvent.contentOffset.y;
+              const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+              pullDistance.setValue(pullValue);
+            }}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={loading}
+                onRefresh={() => fetchHistory({ reset: true })}
+                tintColor="transparent"
+                colors={['transparent']}
+              />
+            }
+          />
+        </View>
         </View>
       </ScreenContainer>
 
@@ -383,10 +570,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   content: {
-    paddingBottom: 20,
+    flexGrow: 1,
+    paddingBottom: 108,
+  },
+  listWrap: {
+    flex: 1,
   },
   tabsWrap: {
     marginBottom: 10,
+  },
+  footerWrap: {
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
   },
   list: {
     rowGap: 12,
@@ -515,6 +716,29 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.accent,
     fontSize: 15,
     fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  actionBtnCancel: {
+    borderWidth: 0.5,
+    borderRadius: 18,
+    borderColor: 'rgba(232,85,120,0.85)',
+    backgroundColor: 'rgba(232,85,120,0.12)',
+  },
+  actionBtnCancelText: {
+    color: '#E85578',
+    fontSize: 15,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  pendingMetaRow: {
+    marginTop: 10,
+    alignItems: 'flex-end',
+  },
+  deleteIconBtn: {
+    minWidth: 28,
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(248,113,113,0.08)',
   },
   stateWrap: {
     marginTop: 40,

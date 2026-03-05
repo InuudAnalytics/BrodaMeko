@@ -177,42 +177,19 @@ export const verifyAddContact = async ({ email, phoneNumber }) => {
   const normalizedEmail = String(email || '').trim();
   const normalizedPhone = String(phoneNumber || '').trim();
 
-  const payloads = [];
-
-  if (normalizedEmail) {
-    payloads.push({ email: normalizedEmail });
-  }
-
-  if (normalizedPhone) {
-    payloads.push({ phone_number: normalizedPhone });
-    payloads.push({ 'phone-number': normalizedPhone });
-    payloads.push({ phoneNumber: normalizedPhone });
-  }
-
-  if (!payloads.length) {
+  if (!normalizedEmail && !normalizedPhone) {
     const error = new Error('email or phone number is required.');
     error.statusCode = 400;
     error.data = null;
     throw error;
   }
 
-  let lastError = null;
+  const payload = normalizedEmail
+    ? { email: normalizedEmail }
+    : { phone_number: normalizedPhone };
 
-  for (let index = 0; index < payloads.length; index += 1) {
-    try {
-      const response = await api.post(endpoint, payloads[index]);
-      return response.data;
-    } catch (requestError) {
-      lastError = requestError;
-
-      const statusCode = Number(requestError?.statusCode || 0);
-      if (statusCode !== 404 && statusCode !== 400) {
-        throw requestError;
-      }
-    }
-  }
-
-  throw lastError || new Error('Could not verify contact.');
+  const response = await api.post(endpoint, payload);
+  return response.data;
 };
 
 export const verifyConfirmContact = async ({ otp }) => {

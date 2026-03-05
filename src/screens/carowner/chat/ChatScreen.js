@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppBottomNav, AppText } from '../../../components';
+import { useChat } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
 
 const hexToRgba = (hex, alpha) => {
-  const cleaned = String(hex || '').replace('#', '').trim();
+  const cleaned = String(hex || '')
+    .replace('#', '')
+    .trim();
   if (cleaned.length !== 6) {
     return `rgba(230,199,20,${alpha})`;
   }
@@ -16,17 +19,78 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
-const ChatScreen = ({ navigation, route }) => {
+// Statuses that mean the mechanic has been assigned and the job is active.
+const ACTIVE_STATUSES = new Set([
+  'accepted',
+  'en_route',
+  'arrived',
+  'repairing',
+  'in_progress',
+]);
+
+const isActiveStatus = value => {
+  const s = String(value || '')
+    .toLowerCase()
+    .trim();
+  return ACTIVE_STATUSES.has(s);
+};
+
+const CarOwnerChatScreen = ({ navigation, route }) => {
+  const { latestJobStatusUpdate } = useChat();
+
   const jobId = route?.params?.jobId;
   const mechanicId = route?.params?.mechanicId;
   const conversationId = String(route?.params?.conversationId || '').trim();
   const hasValidParams = Boolean(conversationId || (jobId && mechanicId));
 
+  // Seed the initial status from whatever was passed in route params.
+  // EscrowFundingScreen passes `progressStatus: 'accepted'` after payment.
+  // If the user navigates back to chat from elsewhere the status may already
+  // be set. Defaults to empty — tracking banner stays hidden until we know.
+  const [progressStatus, setProgressStatus] = useState(
+    String(route?.params?.progressStatus || '')
+      .toLowerCase()
+      .trim(),
+  );
+
+  // When a live job_status_updated event arrives over the socket, update local
+  // status so the tracking banner appears/updates without needing a re-navigate.
+  useEffect(() => {
+    if (!latestJobStatusUpdate) {
+      return;
+    }
+    const incomingJobId = String(
+      latestJobStatusUpdate?.job_id || latestJobStatusUpdate?.jobId || '',
+    ).trim();
+    // Only react to events for this specific job.
+    if (incomingJobId && jobId && incomingJobId !== String(jobId).trim()) {
+      return;
+    }
+    const newStatus = String(
+      latestJobStatusUpdate?.new_status || latestJobStatusUpdate?.status || '',
+    )
+      .toLowerCase()
+      .trim();
+    if (newStatus) {
+      setProgressStatus(newStatus);
+    }
+  }, [latestJobStatusUpdate, jobId]);
+
+  // Sync if the route param changes (e.g. navigated back to chat with a new
+  // progressStatus after payment).
+  useEffect(() => {
+    const fromParams = String(route?.params?.progressStatus || '')
+      .toLowerCase()
+      .trim();
+    if (fromParams) {
+      setProgressStatus(fromParams);
+    }
+  }, [route?.params?.progressStatus]);
+
   useEffect(() => {
     if (hasValidParams) {
       return;
     }
-
     if (navigation?.canGoBack?.()) {
       navigation.goBack();
     } else {
@@ -35,15 +99,16 @@ const ChatScreen = ({ navigation, route }) => {
   }, [hasValidParams, navigation]);
 
   const mechanic = route?.params?.mechanic || {
-    name: 'Samuel Olamilekan',
-    initials: 'SO',
-    distanceKm: 1.2,
+    name: 'Assigned mechanic',
+    initials: 'M',
+    distanceKm: null,
   };
 
   const recipient = {
-    name: mechanic.name,
+    name: mechanic.name || mechanic.full_name || 'Assigned mechanic',
     initials: mechanic.initials || 'M',
-    avatarUri: mechanic?.avatar?.url || mechanic?.avatarUrl || mechanic?.avatarUri || '',
+    avatarUri:
+      mechanic?.avatar?.url || mechanic?.avatarUrl || mechanic?.avatarUri || '',
     metaText: mechanic.distanceKm ? `${mechanic.distanceKm}km away` : null,
   };
 
@@ -52,28 +117,72 @@ const ChatScreen = ({ navigation, route }) => {
     issueSummary?.issueType ? `Issue: ${issueSummary.issueType}` : '',
     issueSummary?.description ? `Description: ${issueSummary.description}` : '',
     issueSummary?.carMake ? `Car make: ${issueSummary.carMake}` : '',
-    Array.isArray(issueSummary?.images) && issueSummary.images.length ? `Images: ${issueSummary.images.length}` : '',
+    Array.isArray(issueSummary?.images) && issueSummary.images.length
+      ? `Images: ${issueSummary.images.length}`
+      : '',
   ].filter(Boolean);
 
-  const renderIssueSummary = useCallback(() => {
-    if (!summaryLines.length) {
-      return null;
-    }
+  const handleOpenTracking = useCallback(() => {
+    navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD, {
+      activeSession: {
+        status: 'active',
+        progressStatus,
+        jobId,
+        conversationId,
+        mechanic,
+        mechanicId,
+        issueSummary,
+      },
+    });
+  }, [
+    navigation,
+    progressStatus,
+    jobId,
+    conversationId,
+    mechanic,
+    mechanicId,
+    issueSummary,
+  ]);
+
+  const renderExtraContent = useCallback(() => {
+    const showTrackingBanner = isActiveStatus(progressStatus);
 
     return (
-      <View style={styles.summaryCard}>
-        <AppText style={styles.summaryTitle}>Request details</AppText>
-        {summaryLines.map((line) => (
-          <AppText key={line} style={styles.summaryLine}>
-            {line}
-          </AppText>
-        ))}
+      <View>
+        {summaryLines.length ? (
+          <View style={styles.summaryCard}>
+            <AppText style={styles.summaryTitle}>Request details</AppText>
+            {summaryLines.map(line => (
+              <AppText key={line} style={styles.summaryLine}>
+                {line}
+              </AppText>
+            ))}
+          </View>
+        ) : null}
+
+        {showTrackingBanner ? (
+          <TouchableOpacity
+            style={styles.trackingBtn}
+            activeOpacity={0.85}
+            onPress={handleOpenTracking}
+          >
+            <AppText style={styles.trackingBtnText}>
+              Mechanic assigned — View live tracking
+            </AppText>
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
-  }, [summaryLines]);
+  }, [summaryLines, progressStatus, handleOpenTracking]);
 
-  const renderBottomNav = () => (
-    <AppBottomNav activeTab={ROUTES.CAR_OWNER_SETTINGS} onTabPress={(routeName) => navigation.navigate(routeName)} />
+  const renderBottomNav = useCallback(
+    () => (
+      <AppBottomNav
+        activeTab={ROUTES.CAR_OWNER_SETTINGS}
+        onTabPress={routeName => navigation.navigate(routeName)}
+      />
+    ),
+    [navigation],
   );
 
   if (!hasValidParams) {
@@ -87,7 +196,7 @@ const ChatScreen = ({ navigation, route }) => {
       recipient={recipient}
       currentUserRole={ROLES.CAR_OWNER}
       renderBottomNav={renderBottomNav}
-      renderExtraContent={renderIssueSummary}
+      renderExtraContent={renderExtraContent}
       onBackPress={() => navigation.goBack()}
     />
   );
@@ -96,7 +205,7 @@ const ChatScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   summaryCard: {
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: hexToRgba(darkTheme.colors.accent, 0.45),
     borderRadius: 12,
@@ -117,6 +226,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  trackingBtn: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: hexToRgba(darkTheme.colors.accent, 0.45),
+    borderRadius: 12,
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.08),
+  },
+  trackingBtnText: {
+    color: darkTheme.colors.accent,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
 });
 
-export default ChatScreen;
+export default CarOwnerChatScreen;

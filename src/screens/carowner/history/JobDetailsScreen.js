@@ -1,9 +1,19 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useJobs } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
@@ -61,6 +71,7 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const [job, setJob] = useState(null);
   const [error, setError] = useState('');
   const fetchJobRef = useRef(fetchJob);
+  const pullDistance = useRef(new Animated.Value(0)).current;
 
   fetchJobRef.current = fetchJob;
 
@@ -110,7 +121,26 @@ const JobDetailsScreen = ({ navigation, route }) => {
 
   return (
     <ScreenContainer style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.listWrap}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={Boolean(loading.fetchJob)} />
+        <Animated.ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={event => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+            pullDistance.setValue(pullValue);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={Boolean(loading.fetchJob)}
+              onRefresh={loadJob}
+              tintColor="transparent"
+              colors={['transparent']}
+            />
+          }
+        >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
@@ -177,7 +207,8 @@ const JobDetailsScreen = ({ navigation, route }) => {
             />
           </View>
         ) : null}
-      </ScrollView>
+        </Animated.ScrollView>
+      </View>
     </ScreenContainer>
   );
 };
@@ -191,6 +222,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 24,
+  },
+  listWrap: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',

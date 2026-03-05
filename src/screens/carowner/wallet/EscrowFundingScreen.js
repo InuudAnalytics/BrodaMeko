@@ -1,5 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
 import { useChat } from '../../../context';
@@ -8,26 +14,37 @@ import { ROUTES } from '../../../utils';
 
 const BackIcon = ({ color }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-    <Path d="M15 6L9 12L15 18" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Path
+      d="M15 6L9 12L15 18"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </Svg>
 );
 
-const formatNaira = (value) => {
+const formatNaira = value => {
   const amount = Number(value || 0);
   return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 };
 
-const RadioOption = ({ label, active, onPress }) => {
-  return (
-    <TouchableOpacity style={styles.paymentOption} activeOpacity={0.85} onPress={onPress}>
-      <View style={styles.radioOuter}>{active ? <View style={styles.radioInner} /> : null}</View>
-      <AppText style={styles.paymentLabel}>{label}</AppText>
-    </TouchableOpacity>
-  );
-};
+const RadioOption = ({ label, active, onPress }) => (
+  <TouchableOpacity
+    style={styles.paymentOption}
+    activeOpacity={0.85}
+    onPress={onPress}
+  >
+    <View style={styles.radioOuter}>
+      {active ? <View style={styles.radioInner} /> : null}
+    </View>
+    <AppText style={styles.paymentLabel}>{label}</AppText>
+  </TouchableOpacity>
+);
 
 const EscrowFundingScreen = ({ navigation, route }) => {
-  const { respondQuotation, initiatePaymentForJob, addLocalMessage } = useChat();
+  const { respondQuotation, initiatePaymentForJob, addLocalMessage } =
+    useChat();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [paying, setPaying] = useState(false);
 
@@ -37,15 +54,18 @@ const EscrowFundingScreen = ({ navigation, route }) => {
 
   const issueSummary = route?.params?.issueSummary || {};
   const mechanic = route?.params?.mechanic || {};
-  const mechanicName = mechanic?.name || mechanic?.full_name || 'Assigned mechanic';
-  const vehicleLabel = route?.params?.vehicle || issueSummary?.carMake || 'Not specified';
-  const issueLabel = issueSummary?.issueType || issueSummary?.issue || 'Issue not specified';
+  const mechanicId = String(route?.params?.mechanicId || '').trim();
+  const mechanicName =
+    mechanic?.name || mechanic?.full_name || 'Assigned mechanic';
+  const vehicleLabel =
+    route?.params?.vehicle || issueSummary?.carMake || 'Not specified';
+  const issueLabel =
+    issueSummary?.issueType || issueSummary?.issue || 'Issue not specified';
 
   const quoteAmount = Number(route?.params?.quoteAmount || 0);
   const diagnosticFee = Number(route?.params?.diagnosticFee || 0);
-  const sparkPlugs = Number(route?.params?.sparkPlugs || 0);
   const serviceFee = Math.round(quoteAmount * 0.08);
-  const totalFee = diagnosticFee + quoteAmount + sparkPlugs + serviceFee;
+  const totalFee = diagnosticFee + quoteAmount + serviceFee;
 
   const summaryRows = useMemo(
     () => [
@@ -53,17 +73,16 @@ const EscrowFundingScreen = ({ navigation, route }) => {
       { label: 'Vehicle', value: vehicleLabel },
       { label: 'Mechanic', value: mechanicName },
     ],
-    [issueLabel, mechanicName, vehicleLabel]
+    [issueLabel, mechanicName, vehicleLabel],
   );
 
   const breakdownRows = useMemo(
     () => [
       { label: 'Diagnostic fee', value: formatNaira(diagnosticFee) },
       { label: 'Labour', value: formatNaira(quoteAmount) },
-      { label: 'Spark plugs', value: formatNaira(sparkPlugs) },
       { label: 'Service fee', value: formatNaira(serviceFee) },
     ],
-    [diagnosticFee, quoteAmount, serviceFee, sparkPlugs]
+    [diagnosticFee, quoteAmount, serviceFee],
   );
 
   const handleConfirmAndPay = async () => {
@@ -74,46 +93,62 @@ const EscrowFundingScreen = ({ navigation, route }) => {
 
     setPaying(true);
     try {
+      // Step 1: Accept the quotation — this assigns the mechanic.
       await respondQuotation(conversationId, {
         quotation_id: quotationId,
         action: 'accept',
       });
 
-      // Backend currently accepts wallet/paystack/cash.
-      // UI has card/transfer; both routes are processed through paystack.
+      // Step 2: Initiate payment. Backend accepts wallet/paystack/cash.
+      // UI offers card/transfer — both go through paystack.
       await initiatePaymentForJob(jobId, 'paystack');
 
+      // Step 3: Add a local system message in the chat thread so the car
+      // owner sees confirmation when they return to chat.
       addLocalMessage(conversationId, {
         type: 'system',
-        text: 'Price accepted',
+        text: 'Price accepted. Mechanic has been assigned.',
       });
 
+      // Step 4: Navigate to payment success screen, which then redirects
+      // back to the chat with progressStatus:'accepted' so the live tracking
+      // banner appears automatically.
       navigation.replace(ROUTES.CAR_OWNER_PAYMENT_SUCCESS, {
         payeeName: mechanicName,
-        nextRoute: ROUTES.CAR_OWNER_DASHBOARD,
+        nextRoute: ROUTES.CAR_OWNER_CHAT,
         nextParams: {
-          activeSession: {
-            status: 'active',
-            jobId,
-            mechanicId: route?.params?.mechanicId || '',
-            conversationId,
-            agreedPrice: quoteAmount || null,
-            mechanic,
-            issueSummary,
-          },
+          conversationId,
+          jobId,
+          mechanic,
+          mechanicId,
+          issueSummary,
+          // This is the key addition — tells CarOwnerChatScreen to show the
+          // live tracking banner as soon as the user lands back in chat.
+          progressStatus: 'accepted',
         },
       });
     } catch (error) {
-      Alert.alert('Payment failed', error?.message || 'Could not complete payment.');
+      Alert.alert(
+        'Payment failed',
+        error?.message || 'Could not complete payment.',
+      );
     } finally {
       setPaying(false);
     }
   };
 
   return (
-    <ScreenContainer padded={false} edges={['left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer
+      padded={false}
+      edges={['left', 'right', 'bottom']}
+      style={styles.screen}
+    >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.85}
+          onPress={() => navigation.goBack()}
+        >
           <BackIcon color={darkTheme.colors.text} />
         </TouchableOpacity>
         <AppText style={styles.headerTitle}>Payment</AppText>
@@ -122,7 +157,7 @@ const EscrowFundingScreen = ({ navigation, route }) => {
 
       <View style={styles.section}>
         <AppText style={styles.sectionTitle}>Job summary</AppText>
-        {summaryRows.map((row) => (
+        {summaryRows.map(row => (
           <View key={row.label} style={styles.row}>
             <AppText style={styles.rowLabel}>{row.label}</AppText>
             <AppText style={styles.rowValue}>{row.value}</AppText>
@@ -132,7 +167,7 @@ const EscrowFundingScreen = ({ navigation, route }) => {
 
       <View style={styles.section}>
         <AppText style={styles.sectionTitle}>Cost breakdown</AppText>
-        {breakdownRows.map((row) => (
+        {breakdownRows.map(row => (
           <View key={row.label} style={styles.row}>
             <AppText style={styles.rowLabel}>{row.label}</AppText>
             <AppText style={styles.rowValue}>{row.value}</AppText>
@@ -165,8 +200,12 @@ const EscrowFundingScreen = ({ navigation, route }) => {
         onPress={handleConfirmAndPay}
         disabled={paying}
       >
-        {paying ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
-        <AppText style={styles.confirmButtonText}>{paying ? 'Processing...' : 'Confirm and pay'}</AppText>
+        {paying ? (
+          <ActivityIndicator size="small" color={darkTheme.colors.background} />
+        ) : null}
+        <AppText style={styles.confirmButtonText}>
+          {paying ? 'Processing...' : 'Confirm and pay'}
+        </AppText>
       </TouchableOpacity>
     </ScreenContainer>
   );
@@ -197,7 +236,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: darkTheme.colors.text,
-    fontSize: 24,
+    fontSize: darkTheme.typography.fontSizes.xl,
     lineHeight: 30,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
@@ -210,8 +249,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: darkTheme.colors.text,
-    fontSize: 31,
-    lineHeight: 36,
+    fontSize: darkTheme.typography.fontSizes.xl,
+    lineHeight: 28,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     marginBottom: darkTheme.spacing.sm,
   },
@@ -223,27 +262,27 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     color: 'rgba(255,255,255,0.55)',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: darkTheme.typography.fontSizes.md,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },
   rowValue: {
     color: 'rgba(255,255,255,0.85)',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: darkTheme.typography.fontSizes.md,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.regular,
     textTransform: 'capitalize',
   },
   totalLabel: {
     color: darkTheme.colors.text,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    lineHeight: 26,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   totalValue: {
     color: darkTheme.colors.accent,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    lineHeight: 26,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   paymentOption: {
@@ -252,25 +291,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   radioOuter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
   },
   radioInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: darkTheme.colors.accent,
   },
   paymentLabel: {
     color: 'rgba(255,255,255,0.82)',
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: darkTheme.typography.fontSizes.md,
+    lineHeight: 22,
   },
   spacer: {
     flex: 1,
@@ -289,8 +328,8 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: darkTheme.colors.background,
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
 });

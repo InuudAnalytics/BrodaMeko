@@ -1,6 +1,8 @@
 import React from 'react';
 import {
+  Animated,
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -14,7 +16,7 @@ import {
   PlusSignIcon,
   ShoppingCart01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { ROUTES } from '../../../utils';
 import { useCart } from '../../../context';
@@ -36,6 +38,8 @@ const resolveImageUri = (value) => {
 
 const CartScreen = ({ navigation }) => {
   const { items, removeFromCart, updateQuantity, calculateTotal } = useCart();
+  const pullDistance = React.useRef(new Animated.Value(0)).current;
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const subtotal = calculateTotal();
   const deliveryFee = subtotal > 0 ? 1500 : 0;
@@ -49,6 +53,11 @@ const CartScreen = ({ navigation }) => {
     }
 
     navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: tabKey });
+  };
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    setRefreshing(false);
   };
 
   if (!items.length) {
@@ -118,10 +127,26 @@ const CartScreen = ({ navigation }) => {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.listWrap}>
+          <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
+          <Animated.ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={event => {
+              const offsetY = event.nativeEvent.contentOffset.y;
+              const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+              pullDistance.setValue(pullValue);
+            }}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="transparent"
+                colors={['transparent']}
+              />
+            }
+          >
           {items.map(item => {
             const product = item.product || {};
             const image = resolveImageUri(product?.images?.[0]);
@@ -219,7 +244,8 @@ const CartScreen = ({ navigation }) => {
               <AppText style={styles.totalValue}>{formatNaira(total)}</AppText>
             </View>
           </View>
-        </ScrollView>
+          </Animated.ScrollView>
+        </View>
 
         <View style={styles.bottomButton}>
           <AppButton
@@ -299,6 +325,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 180,
+  },
+  listWrap: {
+    flex: 1,
   },
   itemCard: {
     backgroundColor: '#1A1A4A',

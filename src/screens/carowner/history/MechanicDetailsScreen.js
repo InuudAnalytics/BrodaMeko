@@ -1,9 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
-import { AppText, ScreenContainer } from '../../../components';
+import { AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { getCarOwnerJob, getMechanicJobStats } from '../../../services/jobs.service';
 import { getMechanicReviews } from '../../../services/mechanic-reviews.service';
 import { darkTheme } from '../../../theme';
@@ -143,6 +143,7 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
   const [statsPayload, setStatsPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const pullDistance = useRef(new Animated.Value(0)).current;
 
   const loadDetails = useCallback(async () => {
     if (!jobId) {
@@ -242,7 +243,26 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.listWrap}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
+        <Animated.ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={event => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+            pullDistance.setValue(pullValue);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={loadDetails}
+              tintColor="transparent"
+              colors={['transparent']}
+            />
+          }
+        >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
           <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
         </TouchableOpacity>
@@ -318,7 +338,8 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
             <AppText style={styles.reviewText}>{viewModel.review.text}</AppText>
           </View>
         ) : null}
-      </ScrollView>
+        </Animated.ScrollView>
+      </View>
     </ScreenContainer>
   );
 };
@@ -333,6 +354,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 28,
+  },
+  listWrap: {
+    flex: 1,
   },
   backButton: {
     width: 36,

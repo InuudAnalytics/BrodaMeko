@@ -1,6 +1,6 @@
-# BrotherMeko (React Native)
+# BrodaMeko (React Native)
 
-Initial bare React Native scaffold for BrotherMeko with role-based navigation placeholders.
+Initial bare React Native scaffold for BrodaMeko with role-based navigation placeholders.
 
 ## Prerequisites
 

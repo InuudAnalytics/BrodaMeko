@@ -4,6 +4,7 @@ import {
   Animated,
   Image,
   PanResponder,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -18,6 +19,7 @@ import {
   AppButton,
   AppText,
   OpenStreetMapView,
+  PullToRefreshIndicator,
   ScreenContainer,
 } from '../../../components';
 import {
@@ -96,6 +98,7 @@ const extractTimeline = (statusValue) => {
 
 const OrderTrackingScreen = ({ navigation, route }) => {
   const panelY = useRef(new Animated.Value(0)).current;
+  const pullDistance = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
 
@@ -301,10 +304,72 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           {...panResponder.panHandlers}
         >
           <View style={styles.handle} />
-          <ScrollView
-            contentContainerStyle={styles.sheetContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={styles.sheetListWrap}>
+            <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loadingOrder} />
+            <Animated.ScrollView
+              contentContainerStyle={styles.sheetContent}
+              showsVerticalScrollIndicator={false}
+              onScroll={event => {
+                const offsetY = event.nativeEvent.contentOffset.y;
+                const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+                pullDistance.setValue(pullValue);
+              }}
+              scrollEventThrottle={16}
+              refreshControl={
+                <RefreshControl
+                  refreshing={loadingOrder}
+                  onRefresh={async () => {
+                    if (!orderId) {
+                      return;
+                    }
+                    setLoadingOrder(true);
+                    setOrderError('');
+                    try {
+                      const response = await getMarketplaceOrder(orderId);
+                      const data = normalizeOrderPayload(response);
+                      const items = data?.items || data?.order_items || data?.products || [];
+                      const item = items?.[0] || {};
+                      const part = item?.part || item?.product || item?.spare_part || {};
+                      const store = part?.store || data?.store || data?.seller || {};
+
+                      const resolvedProduct = {
+                        name: part?.name || item?.name || fallbackProduct.name,
+                        price: part?.price || item?.price || fallbackProduct.price,
+                        shop: store?.store_name || store?.name || fallbackProduct.shop,
+                        images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
+                      };
+
+                      const resolvedSeller = {
+                        name: store?.store_name || store?.name || fallbackSeller.name,
+                        avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
+                        isActive: Boolean(store?.is_active ?? true),
+                      };
+
+                      const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
+                      const resolvedAddress =
+                        addressPayload?.street
+                          ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
+                          : data?.delivery_address_text || fallbackAddress;
+
+                      setOrderState((prev) => ({
+                        ...prev,
+                        product: resolvedProduct,
+                        seller: resolvedSeller,
+                        deliveryAddress: resolvedAddress,
+                        statusTimeline: extractTimeline(item?.status || data?.status),
+                        itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
+                      }));
+                    } catch (error) {
+                      setOrderError(error?.message || 'Could not load order details.');
+                    } finally {
+                      setLoadingOrder(false);
+                    }
+                  }}
+                  tintColor="transparent"
+                  colors={['transparent']}
+                />
+              }
+            >
             <View style={styles.timelineBlock}>
               {orderError ? (
                 <AppText style={styles.errorText}>{orderError}</AppText>
@@ -430,7 +495,8 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                 </AppText>
               </TouchableOpacity>
             </View>
-          </ScrollView>
+            </Animated.ScrollView>
+          </View>
         </Animated.View>
       </ScreenContainer>
     </View>
@@ -524,6 +590,9 @@ const styles = StyleSheet.create({
   sheetContent: {
     paddingHorizontal: darkTheme.spacing.lg,
     paddingBottom: 60,
+  },
+  sheetListWrap: {
+    width: '100%',
   },
   timelineBlock: {
     marginBottom: darkTheme.spacing.lg,

@@ -69,11 +69,17 @@ export const NotificationsProvider = ({ children }) => {
     if (!token) {
       setFcmToken('');
       tokenRef.current = '';
+      setPermissionStatus('unknown');
       return;
     }
 
     const status = await requestNotificationPermission();
     setPermissionStatus(status);
+    if (status !== 'granted') {
+      setFcmToken('');
+      tokenRef.current = '';
+      return;
+    }
 
     const tokenValue = await getFcmToken();
     const trimmed = String(tokenValue || '').trim();
@@ -123,6 +129,11 @@ export const NotificationsProvider = ({ children }) => {
     if (!isBootstrapped) {
       return undefined;
     }
+    if (!token) {
+      setFcmToken('');
+      tokenRef.current = '';
+      return undefined;
+    }
 
     syncToken();
 
@@ -143,18 +154,19 @@ export const NotificationsProvider = ({ children }) => {
       unsubscribeOpen?.();
       unsubscribeRefresh?.();
     };
-  }, [handleForegroundMessage, handleNotificationOpen, isBootstrapped, registerToken, syncToken]);
+  }, [handleForegroundMessage, handleNotificationOpen, isBootstrapped, registerToken, syncToken, token]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        syncToken();
         refreshUnreadCount();
       }
       appStateRef.current = nextState;
     });
 
     return () => subscription.remove();
-  }, [refreshUnreadCount]);
+  }, [refreshUnreadCount, syncToken]);
 
   const value = useMemo(
     () => ({

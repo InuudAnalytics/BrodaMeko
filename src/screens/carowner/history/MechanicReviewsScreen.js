@@ -1,9 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { StarIcon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
+import { AppButton, AppText, LiftableTextInput, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
 import { getCarOwnerJob, getMechanicJobStats } from '../../../services/jobs.service';
 import { getMechanicReviews, getReviewReplies, replyToMechanicReview } from '../../../services/mechanic-reviews.service';
@@ -111,6 +111,7 @@ const MechanicReviewsScreen = ({ route }) => {
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replyLoading, setReplyLoading] = useState({});
   const [replyError, setReplyError] = useState({});
+  const pullDistance = useRef(new Animated.Value(0)).current;
 
   const loadDetails = useCallback(async () => {
     if (!jobId) {
@@ -273,7 +274,26 @@ const MechanicReviewsScreen = ({ route }) => {
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.listWrap}>
+        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
+        <Animated.ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={event => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+            pullDistance.setValue(pullValue);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={loadDetails}
+              tintColor="transparent"
+              colors={['transparent']}
+            />
+          }
+        >
         {loading ? (
           <View style={styles.stateWrap}>
             <ActivityIndicator size="small" color="#D2ED24" />
@@ -377,7 +397,8 @@ const MechanicReviewsScreen = ({ route }) => {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+        </Animated.ScrollView>
+      </View>
     </ScreenContainer>
   );
 };
@@ -391,6 +412,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 56,
     paddingBottom: 28,
+  },
+  listWrap: {
+    flex: 1,
   },
   stateWrap: {
     alignItems: 'center',

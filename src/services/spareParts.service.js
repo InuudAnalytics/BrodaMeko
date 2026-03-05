@@ -81,6 +81,11 @@ export const addSellerBank = async ({ account_name, account_number, bank_code, b
   return response.data;
 };
 
+export const getSellerBankDetails = async () => {
+  const response = await api.get(ENDPOINTS.me.spareParts.bankGet);
+  return response.data;
+};
+
 export const verifySellerBank = async ({ account_number, bank_name }) => {
   const response = await api.post(ENDPOINTS.me.spareParts.bankVerify, {
     account_number: String(account_number || '').trim(),
@@ -193,6 +198,7 @@ export default {
   uploadSellerStoreBanner,
   uploadSellerStoreLogo,
   addSellerBank,
+  getSellerBankDetails,
   verifySellerBank,
   deleteSellerBank,
   setPrimarySellerBank,

@@ -116,7 +116,8 @@ const EditProfileScreen = ({ navigation }) => {
   const emailMissing = !hasEmail;
   const safeOriginalPhone = String(profile.phone || '').trim();
   const safeCurrentPhone = String(phone || '').trim();
-  const phoneChanged = safeCurrentPhone !== safeOriginalPhone;
+  const phoneMissing = !safeOriginalPhone;
+  const phoneChangedWhenMissing = phoneMissing && Boolean(safeCurrentPhone) && safeCurrentPhone !== safeOriginalPhone;
   const emailChangedWhenMissing = emailMissing && String(email || '').trim() && String(email || '').trim() !== String(profile.email || '').trim();
 
   const handlePickAvatar = async () => {
@@ -208,7 +209,7 @@ const EditProfileScreen = ({ navigation }) => {
         return;
       }
 
-      if (phoneChanged) {
+      if (phoneChangedWhenMissing) {
         if (!isValidNigerianPhoneDigits(safeCurrentPhone)) {
           Alert.alert('Invalid phone number', 'Phone number must be exactly 10 digits.');
           return;
@@ -228,6 +229,8 @@ const EditProfileScreen = ({ navigation }) => {
 
       navigation.goBack();
     } catch (updateError) {
+      setEmail(profile.email);
+      setPhone(profile.phone);
       Alert.alert('Update failed', updateError?.message || 'Could not update profile.');
     } finally {
       setIsSaving(false);
@@ -304,13 +307,21 @@ const EditProfileScreen = ({ navigation }) => {
             <LiftableTextInput
               value={phone}
               onChangeText={setPhone}
-              editable={!isSaving}
+              editable={phoneMissing && !isSaving}
               placeholder="Enter your phone number"
               placeholderTextColor={darkTheme.colors.muted}
-              style={styles.input}
+              style={[styles.input, !phoneMissing ? styles.inputDisabled : null]}
               keyboardType="phone-pad"
             />
           </View>
+          {!phoneMissing ? (
+            <AppText style={styles.helperText}>
+              Phone number cannot be changed for security reasons.{' '}
+              <AppText style={styles.helperLink} onPress={() => setShowSupportSheet(true)}>
+                Contact support
+              </AppText>
+            </AppText>
+          ) : null}
         </View>
 
         <View style={styles.field}>

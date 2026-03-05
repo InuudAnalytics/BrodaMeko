@@ -21,6 +21,7 @@ import {
   Edit01Icon,
   HelpCircleIcon,
   Location01Icon,
+  Logout02Icon,
   Notification01Icon,
   StarIcon,
   User02Icon,
@@ -48,7 +49,7 @@ const getSettingsRows = (role) => {
   rows.push(
     { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
     { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
-    { key: 'logout', label: 'Logout', icon: Alert01Icon, tone: 'danger' }
+    { key: 'logout', label: 'Logout', icon: Logout02Icon, tone: 'danger' }
   );
 
   return rows;
@@ -354,7 +355,13 @@ const UserProfileScreen = ({ navigation, onBack }) => {
             setDeleteError('');
           }}
           disabled={isDeleting || isLoading}
-          left={isDeleting ? <ActivityIndicator size="small" color="#C73B4A" /> : null}
+          left={
+            isDeleting ? (
+              <ActivityIndicator size="small" color="#C73B4A" />
+            ) : (
+              <HugeiconsIcon icon={Alert01Icon} size={16} color="#C73B4A" strokeWidth={2} />
+            )
+          }
           style={styles.logoutButton}
           textStyle={styles.logoutText}
         />
