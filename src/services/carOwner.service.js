@@ -43,7 +43,7 @@ export const deleteCarOwnerBank = async (bankId) => {
 
 export const setPrimaryCarOwnerBank = async (bankId) => {
   const safeBankId = toId(bankId, 'bankId');
-  const response = await api.post(ENDPOINTS.me.carOwner.bankSetPrimary(safeBankId), {});
+  const response = await api.patch(ENDPOINTS.me.carOwner.bankSetPrimary(safeBankId), {});
   return response.data;
 };
 

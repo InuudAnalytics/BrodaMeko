@@ -226,7 +226,7 @@ export const deleteMechanicBank = async bankId => {
 
 export const setPrimaryMechanicBank = async bankId => {
   const safeBankId = toId(bankId, 'bankId');
-  const response = await api.post(
+  const response = await api.patch(
     ENDPOINTS.me.mechanic.bankSetPrimary(safeBankId),
     {},
   );
