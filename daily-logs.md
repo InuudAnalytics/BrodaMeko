@@ -186,3 +186,26 @@
    - Fixed contact update payload handling for add-contact/confirm-contact OTP flow.
    - Updated bank details UX: primary badge behavior, add-account flow, and non-primary-only delete actions.
    - Swapped profile logout/delete icons per updated UI requirement.
+
+2. **docs(logs): backfill daily logs for Mar 3, Mar 4, and Mar 5** (`a7461dd`)
+   - Added missed records and grouped prior work by date.
+
+3. **fix(chat): memoize route fallbacks and add history mechanic-id backend TODO** (`0f7be7c`)
+   - Stabilized chat screen hook dependencies.
+   - Added backend integration note for mechanic IDs in history job payloads.
+
+4. **fix(bank): use PATCH for set-primary across mechanic and car owner** (`5689576`)
+   - Aligned set-primary bank method with backend (`PATCH`) for all roles.
+
+5. **fix(chat-history): guard ended conversations and stabilize chat navigation** (`946fd30`)
+   - Added notification-to-chat guard so ended/deleted conversations do not navigate to broken chat.
+   - Added ended-conversation handling for `404`/empty conversation payloads.
+   - Improved history mechanic/rating fallbacks and rate action gating.
+
+6. **chore(debug): add push token logs and stabilize services-offered loading** (`7a77b8f`)
+   - Added debug logs for notification permission, FCM token fetch, and device registration.
+   - Fixed services-offered loading loop by stabilizing context callback dependencies.
+
+### Release / Ops
+
+1. Published first Android build to Google Play internal testing track for QA/testing.
