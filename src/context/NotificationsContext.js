@@ -51,11 +51,20 @@ export const NotificationsProvider = ({ children }) => {
     async (nextToken) => {
       const safeToken = String(nextToken || '').trim();
       if (!safeToken || !token) {
+        if (__DEV__) {
+          console.log('[Notifications] registerToken skipped', {
+            hasToken: Boolean(token),
+            hasFcmToken: Boolean(safeToken),
+          });
+        }
         return;
       }
 
       try {
         await registerDevice({ fcm_token: safeToken, device_type: getDeviceType() });
+        if (__DEV__) {
+          console.log('[Notifications] registerDevice success');
+        }
       } catch (error) {
         if (__DEV__) {
           console.log('[Notifications] Failed to register device token:', error?.message || error);
@@ -75,6 +84,9 @@ export const NotificationsProvider = ({ children }) => {
 
     const status = await requestNotificationPermission();
     setPermissionStatus(status);
+    if (__DEV__) {
+      console.log('[Notifications] permission status', status);
+    }
     if (status !== 'granted') {
       setFcmToken('');
       tokenRef.current = '';
@@ -83,6 +95,12 @@ export const NotificationsProvider = ({ children }) => {
 
     const tokenValue = await getFcmToken();
     const trimmed = String(tokenValue || '').trim();
+    if (__DEV__) {
+      console.log('[Notifications] FCM token fetched', {
+        hasToken: Boolean(trimmed),
+        sameAsCurrent: trimmed && trimmed === tokenRef.current,
+      });
+    }
 
     if (!trimmed || trimmed === tokenRef.current) {
       return;

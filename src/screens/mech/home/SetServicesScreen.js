@@ -118,6 +118,10 @@ const ServiceSelector = ({
 const SetServicesScreen = ({ navigation }) => {
   const mechanicServicesContext = useContext(MechanicServicesContext);
   const hasContext = Boolean(mechanicServicesContext);
+  const contextFetchServices = mechanicServicesContext?.fetchServices;
+  const contextAddService = mechanicServicesContext?.addService;
+  const contextUpdateService = mechanicServicesContext?.updateService;
+  const contextDeleteService = mechanicServicesContext?.deleteService;
 
   const [localServices, setLocalServices] = useState([]);
   const [loadingAction, setLoadingAction] = useState('');
@@ -140,59 +144,76 @@ const SetServicesScreen = ({ navigation }) => {
   }, [searchText]);
 
   const fetchServices = useCallback(async () => {
-    if (hasContext) {
-      return mechanicServicesContext.fetchServices();
+    if (hasContext && typeof contextFetchServices === 'function') {
+      return contextFetchServices();
     }
 
     const response = await getMyMechanicServices();
     const nextServices = extractServices(response?.data);
     setLocalServices(nextServices);
     return response;
-  }, [hasContext, mechanicServicesContext]);
+  }, [contextFetchServices, hasContext]);
 
   const addService = useCallback(async (payload) => {
-    if (hasContext) {
-      return mechanicServicesContext.addService(payload);
+    if (hasContext && typeof contextAddService === 'function') {
+      return contextAddService(payload);
     }
 
     const response = await addMechanicService(payload);
     await fetchServices();
     return response;
-  }, [fetchServices, hasContext, mechanicServicesContext]);
+  }, [contextAddService, fetchServices, hasContext]);
 
   const updateService = useCallback(async (serviceId, payload) => {
-    if (hasContext) {
-      return mechanicServicesContext.updateService(serviceId, payload);
+    if (hasContext && typeof contextUpdateService === 'function') {
+      return contextUpdateService(serviceId, payload);
     }
 
     const response = await updateMechanicService(serviceId, payload);
     await fetchServices();
     return response;
-  }, [fetchServices, hasContext, mechanicServicesContext]);
+  }, [contextUpdateService, fetchServices, hasContext]);
 
   const removeService = useCallback(async (serviceId) => {
-    if (hasContext) {
-      return mechanicServicesContext.deleteService(serviceId);
+    if (hasContext && typeof contextDeleteService === 'function') {
+      return contextDeleteService(serviceId);
     }
 
     const response = await deleteMechanicService(serviceId);
     await fetchServices();
     return response;
-  }, [fetchServices, hasContext, mechanicServicesContext]);
+  }, [contextDeleteService, fetchServices, hasContext]);
 
   useEffect(() => {
     let isMounted = true;
 
     const bootstrap = async () => {
       setLoadingAction('fetch-services');
+      if (__DEV__) {
+        console.log('[SetServices] bootstrap fetch start');
+      }
       try {
-        await fetchServices();
+        const response = await fetchServices();
+        if (__DEV__) {
+          const payload = response?.data || response || {};
+          console.log('[SetServices] bootstrap fetch success', {
+            hasData: Boolean(payload),
+            servicesCount:
+              Array.isArray(payload) ? payload.length : Array.isArray(payload?.services) ? payload.services.length : undefined,
+          });
+        }
       } catch (error) {
         if (isMounted) {
+          if (__DEV__) {
+            console.log('[SetServices] bootstrap fetch error', error?.message || error);
+          }
           setFormError(error?.message || 'Failed to fetch services.');
         }
       } finally {
         if (isMounted) {
+          if (__DEV__) {
+            console.log('[SetServices] bootstrap fetch end');
+          }
           setLoadingAction('');
         }
       }
