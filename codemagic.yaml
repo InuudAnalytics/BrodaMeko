@@ -53,15 +53,8 @@ workflows:
           sed -i '' 's/\r$//' /tmp/AuthKey.p8 || true
           openssl pkey -in /tmp/AuthKey.p8 -noout
 
-          IPA_PATH=$(ls -1 build/ios/ipa/*.ipa | head -n 1)
-          if [ -z "$IPA_PATH" ]; then
-            echo "No IPA found in build/ios/ipa"
-            ls -la build/ios || true
-            exit 1
-          fi
-
           app-store-connect publish \
-            --path "$IPA_PATH" \
+            --path build/ios/ipa/BrodaMekoBare.ipa \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --private-key @file:/tmp/AuthKey.p8 \
