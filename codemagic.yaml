@@ -18,11 +18,24 @@ workflows:
           npm install
       - name: CocoaPods clean install
         script: |
-          cd ios
+          ENTERED_IOS_DIR="0"
+          if [ -d ios ]; then
+            cd ios
+            ENTERED_IOS_DIR="1"
+          elif [ -f Podfile ]; then
+            echo "Using current directory for iOS project"
+          else
+            echo "Could not find iOS directory or Podfile."
+            pwd
+            ls -la
+            exit 1
+          fi
           rm -rf Pods Podfile.lock
           pod repo update
           pod install --verbose
-          cd ..
+          if [ "$ENTERED_IOS_DIR" = "1" ]; then
+            cd ..
+          fi
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
@@ -30,8 +43,13 @@ workflows:
         script: |
           mkdir -p build/ios /tmp/xcodebuild_logs
           set -o pipefail
+          if [ -d ios ]; then
+            IOS_PREFIX="ios/"
+          else
+            IOS_PREFIX=""
+          fi
           xcodebuild \
-            -workspace "$XCODE_WORKSPACE" \
+            -workspace "${IOS_PREFIX}BrodaMekoBare.xcworkspace" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -sdk iphoneos \
