@@ -9,28 +9,43 @@ workflows:
       vars:
         XCODE_WORKSPACE: 'ios/BrodaMekoBare.xcworkspace'
         XCODE_SCHEME: 'BrodaMekoBare'
-      node: v18.17.0
+      node: v20.11.1
       xcode: 16.3
       cocoapods: default
     scripts:
       - name: Install npm dependencies
         script: |
           npm install
-      - name: Install CocoaPods
+      - name: CocoaPods clean install
         script: |
-          cd ios && pod install
+          cd ios
+          rm -rf Pods Podfile.lock
+          pod repo update
+          pod install --verbose
+          cd ..
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
-      - name: Build iOS release
+      - name: Debug archive and capture full logs
         script: |
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app" \
-            --export-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app"
+          mkdir -p build/ios /tmp/xcodebuild_logs
+          set -o pipefail
+          xcodebuild \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/ios/xcarchive/BrodaMekoBare_debug.xcarchive \
+            archive \
+            PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app \
+            | tee build/ios/xcodebuild_full.log
+          grep -n " error: " build/ios/xcodebuild_full.log | head -n 120 || true
+          grep -n "React-RuntimeHermes" build/ios/xcodebuild_full.log | head -n 80 || true
+          grep -n "ScanDependencies" build/ios/xcodebuild_full.log | head -n 40 || true
+          cp build/ios/xcodebuild_full.log /tmp/xcodebuild_logs/xcodebuild_full.log || true
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/xcodebuild_full.log
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
