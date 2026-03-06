@@ -264,6 +264,12 @@ const isDuplicateMessage = (lastMessage, nextMessage) => {
   return Math.abs(nextTime - lastTime) <= 1000;
 };
 
+const readMessageId = (item) =>
+  String(item?.id || item?._id || item?.message_id || '').trim();
+
+const readMessageQuotationId = (item) =>
+  String(item?.quotation_id || item?.quote_id || '').trim();
+
 export const ChatProvider = ({ children }) => {
   const { token } = useAuth();
   const [conversations, setConversations] = useState([]);
@@ -340,6 +346,28 @@ export const ChatProvider = ({ children }) => {
     setMessagesByConversationId((prev) => {
       const existing = prev[safeConversationId] || [];
       const last = existing[existing.length - 1];
+      const nextMessageId = readMessageId(message);
+      const nextQuoteId = readMessageQuotationId(message);
+      const nextType = normalizeMessageType(message?.type || message?.msg_type || '');
+
+      if (nextMessageId) {
+        const alreadyExistsById = existing.some(
+          (item) => readMessageId(item) && readMessageId(item) === nextMessageId
+        );
+        if (alreadyExistsById) {
+          return prev;
+        }
+      }
+
+      if (nextQuoteId && nextType === 'price_quote') {
+        const alreadyExistsByQuoteId = existing.some((item) => {
+          const itemType = normalizeMessageType(item?.type || item?.msg_type || '');
+          return itemType === 'price_quote' && readMessageQuotationId(item) === nextQuoteId;
+        });
+        if (alreadyExistsByQuoteId) {
+          return prev;
+        }
+      }
 
       if (isDuplicateMessage(last, message)) {
         return prev;

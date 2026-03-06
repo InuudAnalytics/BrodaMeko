@@ -6,6 +6,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.brodameko.app
+        provisioning_profile: brodameko_appstore
       vars:
         XCODE_WORKSPACE: 'ios/BrodaMeko.xcworkspace'
         XCODE_SCHEME: 'BrodaMeko'
