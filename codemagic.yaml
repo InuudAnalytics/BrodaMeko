@@ -7,8 +7,8 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.brodameko.app
       vars:
-        XCODE_WORKSPACE: 'ios/BrodaMeko.xcworkspace'
-        XCODE_SCHEME: 'BrodaMeko'
+        XCODE_WORKSPACE: 'ios/BrodaMekoBare.xcworkspace'
+        XCODE_SCHEME: 'BrodaMekoBare'
       node: v18.17.0
       xcode: latest
       cocoapods: default
