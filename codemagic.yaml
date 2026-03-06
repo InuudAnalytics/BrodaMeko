@@ -48,9 +48,14 @@ workflows:
             --export-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app"
       - name: Publish to TestFlight (manual key decode)
         script: |
-          set -e
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY_B64" | base64 --decode > /tmp/AuthKey.p8
+          set -euo pipefail
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY_B64" | tr -d '\r\n' | base64 -d > /tmp/AuthKey.p8
           sed -i '' 's/\r$//' /tmp/AuthKey.p8 || true
+
+          echo "KEY_ID=[$APP_STORE_CONNECT_KEY_IDENTIFIER]"
+          echo "ISSUER_ID=[$APP_STORE_CONNECT_ISSUER_ID]"
+          head -n 1 /tmp/AuthKey.p8
+          tail -n 1 /tmp/AuthKey.p8
           openssl pkey -in /tmp/AuthKey.p8 -noout
 
           app-store-connect publish \
@@ -58,7 +63,8 @@ workflows:
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --private-key @file:/tmp/AuthKey.p8 \
-            --testflight
+            --testflight \
+            --verbose
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
