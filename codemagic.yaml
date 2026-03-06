@@ -10,7 +10,7 @@ workflows:
         XCODE_WORKSPACE: 'ios/BrodaMekoBare.xcworkspace'
         XCODE_SCHEME: 'BrodaMekoBare'
       node: v18.17.0
-      xcode: latest
+      xcode: 16.3
       cocoapods: default
     scripts:
       - name: Install npm dependencies
@@ -26,7 +26,9 @@ workflows:
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app" \
+            --export-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
