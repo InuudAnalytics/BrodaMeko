@@ -40,6 +40,10 @@ const extractServices = (payload) => {
     return payload.results;
   }
 
+  if (payload?.data && typeof payload.data === 'object') {
+    return extractServices(payload.data);
+  }
+
   return [];
 };
 
@@ -149,7 +153,8 @@ const SetServicesScreen = ({ navigation }) => {
     }
 
     const response = await getMyMechanicServices();
-    const nextServices = extractServices(response?.data);
+    const payload = response?.data || response || {};
+    const nextServices = extractServices(payload);
     setLocalServices(nextServices);
     return response;
   }, [contextFetchServices, hasContext]);

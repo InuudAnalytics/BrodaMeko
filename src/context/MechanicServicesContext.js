@@ -39,6 +39,10 @@ const extractServicesList = (payload) => {
     return payload.results;
   }
 
+  if (payload.data && typeof payload.data === 'object') {
+    return extractServicesList(payload.data);
+  }
+
   return [];
 };
 
@@ -57,7 +61,8 @@ export const MechanicServicesProvider = ({ children }) => {
 
     try {
       const response = await getMyMechanicServices();
-      const nextServices = extractServicesList(response?.data);
+      const payload = response?.data || response || {};
+      const nextServices = extractServicesList(payload);
       setServices(nextServices);
       return response;
     } catch (fetchError) {
