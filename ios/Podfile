@@ -6,7 +6,6 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
 
 platform :ios, min_ios_version_supported
-use_modular_headers!
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -17,6 +16,16 @@ end
 
 target 'BrodaMekoBare' do
   config = use_native_modules!
+
+  # Avoid global modular headers, which can cause React/Hermes modulemap collisions
+  # (e.g. redefinition of `react_runtime` on Xcode 16).
+  # Keep modular headers only for Firebase dependency chain when needed.
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseInstallations', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],

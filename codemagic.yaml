@@ -39,31 +39,15 @@ workflows:
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
-      - name: Debug archive and capture full logs
+      - name: Build iOS release
         script: |
-          mkdir -p build/ios /tmp/xcodebuild_logs
-          set -o pipefail
-          if [ -d ios ]; then
-            IOS_PREFIX="ios/"
-          else
-            IOS_PREFIX=""
-          fi
-          xcodebuild \
-            -workspace "${IOS_PREFIX}BrodaMekoBare.xcworkspace" \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath build/ios/xcarchive/BrodaMekoBare_debug.xcarchive \
-            archive \
-            PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app \
-            | tee build/ios/xcodebuild_full.log
-          grep -n " error: " build/ios/xcodebuild_full.log | head -n 120 || true
-          grep -n "React-RuntimeHermes" build/ios/xcodebuild_full.log | head -n 80 || true
-          grep -n "ScanDependencies" build/ios/xcodebuild_full.log | head -n 40 || true
-          cp build/ios/xcodebuild_full.log /tmp/xcodebuild_logs/xcodebuild_full.log || true
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app" \
+            --export-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app"
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/xcodebuild_full.log
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
