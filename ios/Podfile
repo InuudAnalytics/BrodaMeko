@@ -32,5 +32,16 @@ target 'BrodaMekoBare' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix deployment target warnings and React-RuntimeHermes scan failure
+    # on Xcode 16 with React Native 0.81.x
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if current.to_f < 12.0
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        end
+      end
+    end
   end
 end
