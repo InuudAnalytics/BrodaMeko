@@ -92,6 +92,7 @@ const SignUpScreen = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isTermsVisible, setIsTermsVisible] = useState(false);
   const termsTranslateY = useState(
     new Animated.Value(screenHeight * TERMS_SHEET_HEIGHT_RATIO),
@@ -164,6 +165,10 @@ const SignUpScreen = ({ navigation, route }) => {
       return setLocalError('Password does not meet all requirements.');
     if (password !== confirmPassword)
       return setLocalError('Passwords do not match.');
+    if (!acceptedTerms)
+      return setLocalError(
+        'Please accept our terms and conditions to continue.',
+      );
 
     setLocalError('');
     const result = await signUp({
@@ -382,6 +387,44 @@ const SignUpScreen = ({ navigation, route }) => {
                   }
                 />
 
+                <View style={styles.acceptTermsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={styles.acceptTermsCheckbox}
+                    onPress={() => {
+                      setAcceptedTerms(prev => !prev);
+                      resetError();
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.acceptTermsCheckboxBox,
+                        acceptedTerms
+                          ? styles.acceptTermsCheckboxBoxActive
+                          : null,
+                      ]}
+                    >
+                      {acceptedTerms ? (
+                        <HugeiconsIcon
+                          icon={CheckmarkCircle02Icon}
+                          size={12}
+                          color={darkTheme.colors.background}
+                          strokeWidth={2.2}
+                        />
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                  <AppText variant="muted">I accept our </AppText>
+                  <TouchableOpacity
+                    onPress={openTermsSheet}
+                    activeOpacity={0.85}
+                  >
+                    <AppText variant="muted" style={styles.termsLink}>
+                      terms and conditions
+                    </AppText>
+                  </TouchableOpacity>
+                </View>
+
                 {mergedError ? (
                   <AppText style={styles.errorText}>{mergedError}</AppText>
                 ) : null}
@@ -427,15 +470,6 @@ const SignUpScreen = ({ navigation, route }) => {
                     Sign up with Apple
                   </AppText>
                 </TouchableOpacity>
-
-                <View style={styles.termsRow}>
-                  <AppText variant="muted">Read our </AppText>
-                  <TouchableOpacity onPress={openTermsSheet}>
-                    <AppText variant="muted" style={styles.termsLink}>
-                      terms and conditions
-                    </AppText>
-                  </TouchableOpacity>
-                </View>
 
                 <View style={styles.footer}>
                   <AppText variant="muted">Have an account? </AppText>
@@ -563,11 +597,29 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.md,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
-  termsRow: {
+  acceptTermsRow: {
     marginTop: darkTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  acceptTermsCheckbox: {
+    marginRight: darkTheme.spacing.xs,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  acceptTermsCheckboxBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptTermsCheckboxBoxActive: {
+    backgroundColor: darkTheme.colors.accent,
+    borderColor: darkTheme.colors.accent,
   },
   termsLink: {
     color: darkTheme.colors.accent,

@@ -48,6 +48,7 @@ const getSettingsRows = (role) => {
 
   rows.push(
     { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
+    { key: 'legal_documents', label: 'Legal documents', icon: Briefcase01Icon },
     { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
     { key: 'logout', label: 'Logout', icon: Logout02Icon, tone: 'danger' }
   );
@@ -335,6 +336,13 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                 }
                 if (row.key === 'notifications') {
                   navigation.navigate('Notifications');
+                  return;
+                }
+                if (row.key === 'legal_documents') {
+                  navigation.navigate('Placeholder', {
+                    title: 'Legal Documents',
+                    subtitle: 'Legal documents will be available soon.',
+                  });
                   return;
                 }
                 if (row.key === 'logout') {
