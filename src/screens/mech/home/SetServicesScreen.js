@@ -1,5 +1,12 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
@@ -21,7 +28,15 @@ const formatIssueType = (value) =>
     .join(' ');
 
 const getServiceId = (service) =>
-  String(service?.id || service?._id || service?.service_id || service?.serviceId || '').trim();
+  String(
+    service?.id ||
+      service?._id ||
+      service?.service_id ||
+      service?.serviceId ||
+      service?.uuid ||
+      service?.service_uuid ||
+      '',
+  ).trim();
 
 const extractServices = (payload) => {
   if (Array.isArray(payload)) {
@@ -133,6 +148,7 @@ const SetServicesScreen = ({ navigation }) => {
   const [rows, setRows] = useState([]);
   const [openRowId, setOpenRowId] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const services = hasContext ? mechanicServicesContext.services : localServices;
   const contextError = hasContext ? mechanicServicesContext.error : '';
@@ -295,7 +311,7 @@ const SetServicesScreen = ({ navigation }) => {
         max_price: Number(draft.maxPrice),
       });
 
-      if (!response?.success && response?.message) {
+      if (response?.success === false && response?.message) {
         setFormError(response.message);
         return;
       }
@@ -328,7 +344,7 @@ const SetServicesScreen = ({ navigation }) => {
         max_price: Number(row.maxPrice),
       });
 
-      if (!response?.success && response?.message) {
+      if (response?.success === false && response?.message) {
         setFormError(response.message);
         return;
       }
@@ -391,13 +407,36 @@ const SetServicesScreen = ({ navigation }) => {
     }
   };
 
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setFormError('');
+    try {
+      await fetchServices();
+    } catch (error) {
+      setFormError(error?.message || 'Failed to refresh services.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchServices]);
+
   const inlineError = useMemo(() => formError || contextError || '', [formError, contextError]);
   const lastRow = rows[rows.length - 1];
   const canAddMore = Boolean(lastRow && lastRow.issueType && lastRow.minPrice && lastRow.maxPrice);
 
   return (
     <ScreenContainer padded={false} style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={darkTheme.colors.accent}
+            colors={[darkTheme.colors.accent]}
+          />
+        }
+      >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
