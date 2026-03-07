@@ -46,8 +46,8 @@ workflows:
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app" \
-            --export-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app"
+            --archive-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app CURRENT_PROJECT_VERSION=$CM_BUILD_ID" \
+            --export-xcargs "PRODUCT_BUNDLE_IDENTIFIER=com.brodameko.app CURRENT_PROJECT_VERSION=$CM_BUILD_ID"
       - name: Publish to TestFlight (manual key decode)
         script: |
           set -euo pipefail
