@@ -5,6 +5,7 @@ import { getNotifications } from '../services/notifications.service';
 import { useAuth } from './AuthContext';
 import { navigationRef } from '../navigation/navigationRef';
 import {
+  checkNotificationPermission,
   getDeviceType,
   getFcmToken,
   listenForForegroundMessages,
@@ -74,25 +75,7 @@ export const NotificationsProvider = ({ children }) => {
     [token]
   );
 
-  const syncToken = useCallback(async () => {
-    if (!token) {
-      setFcmToken('');
-      tokenRef.current = '';
-      setPermissionStatus('unknown');
-      return;
-    }
-
-    const status = await requestNotificationPermission();
-    setPermissionStatus(status);
-    if (__DEV__) {
-      console.log('[Notifications] permission status', status);
-    }
-    if (status !== 'granted') {
-      setFcmToken('');
-      tokenRef.current = '';
-      return;
-    }
-
+  const syncGrantedToken = useCallback(async () => {
     const tokenValue = await getFcmToken();
     const trimmed = String(tokenValue || '').trim();
     if (__DEV__) {
@@ -102,6 +85,12 @@ export const NotificationsProvider = ({ children }) => {
       });
     }
 
+    if (!trimmed && __DEV__) {
+      console.warn(
+        '[Notifications] Permission granted but no FCM token returned. Check Firebase/APNs configuration.'
+      );
+    }
+
     if (!trimmed || trimmed === tokenRef.current) {
       return;
     }
@@ -109,7 +98,48 @@ export const NotificationsProvider = ({ children }) => {
     tokenRef.current = trimmed;
     setFcmToken(trimmed);
     await registerToken(trimmed);
-  }, [registerToken, token]);
+  }, [registerToken]);
+
+  const checkAndSyncToken = useCallback(async () => {
+    if (!token) {
+      setFcmToken('');
+      tokenRef.current = '';
+      setPermissionStatus('unknown');
+      return;
+    }
+
+    const status = await checkNotificationPermission();
+    setPermissionStatus(status);
+    if (__DEV__) {
+      console.log('[Notifications] permission status (check)', status);
+    }
+    if (status !== 'granted') {
+      setFcmToken('');
+      tokenRef.current = '';
+      return;
+    }
+
+    await syncGrantedToken();
+  }, [syncGrantedToken, token]);
+
+  const requestAndSyncToken = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    const status = await requestNotificationPermission();
+    setPermissionStatus(status);
+    if (__DEV__) {
+      console.log('[Notifications] permission status (request)', status);
+    }
+    if (status !== 'granted') {
+      setFcmToken('');
+      tokenRef.current = '';
+      return;
+    }
+
+    await syncGrantedToken();
+  }, [syncGrantedToken, token]);
 
   const refreshUnreadCount = useCallback(async () => {
     try {
@@ -153,7 +183,7 @@ export const NotificationsProvider = ({ children }) => {
       return undefined;
     }
 
-    syncToken();
+    checkAndSyncToken();
 
     const unsubscribeMessage = listenForForegroundMessages(handleForegroundMessage);
     const unsubscribeOpen = listenForNotificationOpen(handleNotificationOpen);
@@ -172,19 +202,19 @@ export const NotificationsProvider = ({ children }) => {
       unsubscribeOpen?.();
       unsubscribeRefresh?.();
     };
-  }, [handleForegroundMessage, handleNotificationOpen, isBootstrapped, registerToken, syncToken, token]);
+  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, registerToken, token]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        syncToken();
+        checkAndSyncToken();
         refreshUnreadCount();
       }
       appStateRef.current = nextState;
     });
 
     return () => subscription.remove();
-  }, [refreshUnreadCount, syncToken]);
+  }, [checkAndSyncToken, refreshUnreadCount]);
 
   const value = useMemo(
     () => ({
@@ -192,10 +222,10 @@ export const NotificationsProvider = ({ children }) => {
       permissionStatus,
       lastNotification,
       unreadTick,
-      requestPermission: requestNotificationPermission,
+      requestPermission: requestAndSyncToken,
       refreshUnreadCount,
     }),
-    [fcmToken, lastNotification, permissionStatus, refreshUnreadCount, unreadTick]
+    [fcmToken, lastNotification, permissionStatus, refreshUnreadCount, requestAndSyncToken, unreadTick]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import { MOCK_FCM_TOKEN, getMockDeviceType } from '../config/mockDevice';
 
 const loadMessagingModules = () => {
   try {
@@ -30,6 +29,42 @@ const normalizePermissionStatus = (status) => {
   return normalized;
 };
 
+const normalizeMessagingAuthorizationStatus = (status) => {
+  if (typeof status !== 'number') {
+    return normalizePermissionStatus(status);
+  }
+
+  if (status === 1 || status === 2 || status === 3) {
+    return 'granted';
+  }
+  if (status === 0) {
+    return 'denied';
+  }
+  if (status === -1) {
+    return 'unknown';
+  }
+
+  return 'unknown';
+};
+
+const checkAndroidNotificationPermission = async () => {
+  try {
+    if (Platform.Version < 33) {
+      return 'granted';
+    }
+
+    const permission = PERMISSIONS.ANDROID.POST_NOTIFICATIONS;
+    if (!permission) {
+      return 'granted';
+    }
+
+    const result = await check(permission);
+    return normalizePermissionStatus(result);
+  } catch (error) {
+    return 'unknown';
+  }
+};
+
 const requestAndroidNotificationPermission = async () => {
   try {
     if (Platform.Version < 33) {
@@ -56,6 +91,23 @@ const requestAndroidNotificationPermission = async () => {
   }
 };
 
+const checkIosNotificationPermission = async (messagingState) => {
+  if (!messagingState) {
+    return 'unknown';
+  }
+
+  try {
+    const { type, messaging, messagingModule } = messagingState;
+    const status =
+      type === 'modular' && messagingModule?.hasPermission
+        ? await messagingModule.hasPermission(messaging)
+        : await messaging().hasPermission();
+    return normalizeMessagingAuthorizationStatus(status);
+  } catch (error) {
+    return 'unknown';
+  }
+};
+
 const requestIosNotificationPermission = async (messagingState) => {
   if (!messagingState) {
     return 'unknown';
@@ -73,6 +125,16 @@ const requestIosNotificationPermission = async (messagingState) => {
   }
 };
 
+export const checkNotificationPermission = async () => {
+  const messagingState = getMessagingState();
+
+  if (Platform.OS === 'android') {
+    return checkAndroidNotificationPermission();
+  }
+
+  return checkIosNotificationPermission(messagingState);
+};
+
 export const requestNotificationPermission = async () => {
   const messagingState = getMessagingState();
 
@@ -87,7 +149,7 @@ export const getFcmToken = async () => {
   const messagingState = getMessagingState();
 
   if (!messagingState) {
-    return __DEV__ ? MOCK_FCM_TOKEN : '';
+    return '';
   }
 
   try {
@@ -98,11 +160,11 @@ export const getFcmToken = async () => {
         : await messaging().getToken();
     return String(token || '').trim();
   } catch (error) {
-    return __DEV__ ? MOCK_FCM_TOKEN : '';
+    return '';
   }
 };
 
-export const getDeviceType = () => getMockDeviceType();
+export const getDeviceType = () => (Platform.OS === 'ios' ? 'ios' : 'android');
 
 export const listenForForegroundMessages = (handler) => {
   const messagingState = getMessagingState();
@@ -178,17 +240,24 @@ export const registerBackgroundMessageHandler = () => {
     return;
   }
 
+  const backgroundHandler = async (remoteMessage) => {
+    if (__DEV__) {
+      const messageId = String(remoteMessage?.messageId || '').trim();
+      const dataKeys = Object.keys(remoteMessage?.data || {});
+      console.log('[Notifications] Background message received', {
+        hasMessageId: Boolean(messageId),
+        dataKeys,
+      });
+    }
+  };
+
   const { type, messaging, messagingModule } = messagingState;
   if (type === 'modular' && messagingModule?.setBackgroundMessageHandler) {
-    messagingModule.setBackgroundMessageHandler(messaging, async () => {
-      // TODO: Add background notification handling (local notifications) if needed.
-    });
+    messagingModule.setBackgroundMessageHandler(messaging, backgroundHandler);
     return;
   }
 
-  messaging().setBackgroundMessageHandler(async () => {
-    // TODO: Add background notification handling (local notifications) if needed.
-  });
+  messaging().setBackgroundMessageHandler(backgroundHandler);
 };
 
 const buildMessagingState = () => {
