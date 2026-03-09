@@ -4,12 +4,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { openSettings } from 'react-native-permissions';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Mail01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScrollableTabs } from '../../../components';
+import { AppButton, AppText, MechanicJobCard, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScrollableTabs } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { getAvailableJobs, getConversationByJobId, getMechanicPendingJobRequests, respondToJobRequest } from '../../../services/jobs.service';
+import { getAvailableJobs, getConversationByJobId, getMechanicPendingJobRequests, respondToJobRequest, updateJobStatus } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
 import { getMechanicEarnings, setMechanicOnlineStatus } from '../../../services/mechanic.service';
 import { getWalletBalance } from '../../../services/wallet.service';
@@ -54,6 +54,46 @@ const normalizeJob = (job, fallbackStatus = '') => {
     eta: job.eta || '',
     urgent: job.priority === 'urgent' || false,
   };
+};
+
+const normalizeStatus = (status) => {
+  const safe = String(status || '').trim().toLowerCase();
+  if (safe === 'arrived') return 'arrive';
+  if (safe === 'repairing') return 'in_progress';
+  return safe;
+};
+
+const formatStatus = value =>
+  String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+
+const getNextAction = status => {
+  const normalized = normalizeStatus(status);
+  const flow = ['accepted', 'en_route', 'arrive', 'in_progress', 'completed'];
+  const currentIndex = flow.indexOf(normalized);
+
+  if (currentIndex === -1) {
+    return { status: 'en_route', label: 'On my way' };
+  }
+
+  if (normalized === 'completed') {
+    return null;
+  }
+
+  const nextStatus = flow[currentIndex + 1];
+  if (!nextStatus) {
+    return null;
+  }
+
+  const labels = {
+    en_route: 'On my way',
+    arrive: 'Arrive',
+    in_progress: 'Start work',
+    completed: 'Complete',
+  };
+
+  return { status: nextStatus, label: labels[nextStatus] || 'Update' };
 };
 
 const readMechanicName = (user) => {
@@ -130,6 +170,10 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const [activeJob, setActiveJob] = useState(null);
   const [activeConversationId, setActiveConversationId] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [busyRequestId, setBusyRequestId] = useState('');
+  const [busyAction, setBusyAction] = useState('');
+  const [busyStatusJobId, setBusyStatusJobId] = useState('');
+  const [busyStatusAction, setBusyStatusAction] = useState('');
   const pullDistance = React.useRef(new Animated.Value(0)).current;
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
@@ -182,12 +226,21 @@ const MechanicDashboardScreen = ({ navigation }) => {
         return;
       }
 
-      setLoading(true);
       setError('');
+      setBusyRequestId(String(job?.id || safeJobId));
+      setBusyAction('accept');
       try {
         const response = await respondToJobRequest(safeJobId, 'accept');
         const payload = response?.data || response || {};
         const conversationId = String(payload?.conversation_id || '').trim();
+        setJobs(prev =>
+          prev.map(item =>
+            item.id === job.id || item.jobId === safeJobId
+              ? { ...item, status: 'accepted' }
+              : item,
+          ),
+        );
+        setActiveFilter('active');
         if (conversationId) {
           setActiveConversationId(conversationId);
           navigation.navigate(ROUTES.MECH_CHAT, {
@@ -204,22 +257,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
           });
           return;
         }
-        const refreshed = await getAvailableJobs({ page: 1, limit: 100 }).catch(() => null);
-        if (refreshed) {
-          const refreshedPayload = refreshed?.data || refreshed;
-          const rawJobs = Array.isArray(refreshedPayload)
-            ? refreshedPayload
-            : (refreshedPayload?.jobs || refreshedPayload?.items || refreshedPayload?.results || []);
-          const mappedAssigned = rawJobs.map((jobItem) => normalizeJob(jobItem));
-          setJobs((prev) => {
-            const pending = prev.filter((item) => item.status === 'pending');
-            return [...pending, ...mappedAssigned];
-          });
-        }
       } catch (error) {
         setError(error?.message || 'Could not accept job.');
       } finally {
-        setLoading(false);
+        setBusyRequestId('');
+        setBusyAction('');
       }
     },
     [ensureLocationPermission, navigation, user?._id, user?.id],
@@ -232,34 +274,49 @@ const MechanicDashboardScreen = ({ navigation }) => {
       return;
     }
 
-    setLoading(true);
     setError('');
+    setBusyRequestId(String(job?.id || safeJobId));
+    setBusyAction('decline');
     try {
       await respondToJobRequest(safeJobId, 'decline');
-      const refreshed = await getAvailableJobs({ page: 1, limit: 100 }).catch(() => null);
-      if (refreshed) {
-        const refreshedPayload = refreshed?.data || refreshed;
-        const rawJobs = Array.isArray(refreshedPayload)
-          ? refreshedPayload
-          : (refreshedPayload?.jobs || refreshedPayload?.items || refreshedPayload?.results || []);
-        const mappedAssigned = rawJobs.map((jobItem) => normalizeJob(jobItem));
-        setJobs((prev) => {
-          const pending = prev.filter((item) => item.status === 'pending');
-          return [...pending, ...mappedAssigned];
-        });
-      }
+      setJobs(prev => prev.filter(item => !(item.id === job.id || item.jobId === safeJobId)));
     } catch (error) {
       setError(error?.message || 'Could not decline job.');
     } finally {
-      setLoading(false);
+      setBusyRequestId('');
+      setBusyAction('');
+    }
+  }, []);
+
+  const handleAdvanceStatus = useCallback(async (job, status) => {
+    const safeJobId = String(job?.jobId || '').trim();
+    const nextStatus = String(status || '').trim().toLowerCase();
+    if (!safeJobId || !nextStatus) {
+      setError('Missing job id or status.');
+      return;
+    }
+
+    setError('');
+    setBusyStatusJobId(safeJobId);
+    setBusyStatusAction(nextStatus);
+    try {
+      await updateJobStatus(safeJobId, nextStatus);
+      setJobs(prev =>
+        prev.map(item => (item.jobId === safeJobId ? { ...item, status: nextStatus } : item)),
+      );
+    } catch (statusError) {
+      setError(statusError?.message || 'Could not update status.');
+    } finally {
+      setBusyStatusJobId('');
+      setBusyStatusAction('');
     }
   }, []);
 
   const visibleJobs = useMemo(() => {
     const status = String(activeFilter || '').toLowerCase();
     const availableStatuses = new Set(['pending', 'available', 'open', 'request']);
-    const activeStatuses = new Set(['accepted', 'active', 'in_progress', 'repairing', 'en_route', 'arrived']);
-    const completedStatuses = new Set(['completed', 'done']);
+    const activeStatuses = new Set(['accepted', 'active', 'in_progress', 'repairing', 'en_route', 'arrive', 'arrived']);
+    const completedStatuses = new Set(['completed', 'done', 'cancelled']);
 
     if (status === 'active') {
       return jobs.filter((job) => activeStatuses.has(job?.status));
@@ -271,8 +328,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
   }, [activeFilter, jobs]);
 
   const resolveActiveJob = useCallback((jobList) => {
-    const activeStatuses = new Set(['accepted', 'active', 'in_progress', 'repairing', 'en_route', 'arrived']);
-    return jobList.find((job) => activeStatuses.has(job.status));
+    const activeStatuses = new Set(['accepted', 'active', 'in_progress', 'repairing', 'en_route', 'arrive', 'arrived']);
+    return jobList.find((job) => activeStatuses.has(normalizeStatus(job.status)));
   }, []);
 
   useFocusEffect(
@@ -631,50 +688,80 @@ const MechanicDashboardScreen = ({ navigation }) => {
           <AppText style={styles.jobsStateText}>No jobs available at the moment.</AppText>
         ) : (
           visibleJobs.map((job) => (
-            <View key={job.id} style={styles.jobCard}>
-              <View style={styles.jobTop}>
-                <View style={styles.jobTopLeft}>
-                  <View style={styles.jobAvatar}>
-                    <AppText style={styles.jobAvatarText}>{initialsFromName(job.name)}</AppText>
-                  </View>
-                  <View style={styles.jobMain}>
-                    <AppText style={styles.jobName}>{job.name}</AppText>
-                    <AppText style={styles.jobIssue}>{job.issue}</AppText>
-                  </View>
-                </View>
-                {job.urgent ? (
-                  <View style={styles.urgentPill}>
-                    <AppText style={styles.urgentText}>Urgent</AppText>
-                  </View>
-                ) : null}
-              </View>
+            <MechanicJobCard
+              key={job.id}
+              name={job.name}
+              issue={job.issue}
+              avatarUri={job.avatarUri || job.ownerAvatar || ''}
+              urgent={job.urgent}
+              distanceText={job.distance}
+              etaText={job.eta}
+              actions={(() => {
+                const normalizedStatus = normalizeStatus(job.status);
+                const isFinal = normalizedStatus === 'completed' || normalizedStatus === 'done' || normalizedStatus === 'cancelled';
+                const nextAction = getNextAction(normalizedStatus);
+                const isRequestBusy = busyRequestId === job.id && Boolean(busyAction);
+                const isStatusBusy = busyStatusJobId === job.jobId && Boolean(busyStatusAction);
+                const disableAll = isRequestBusy || isStatusBusy;
 
-              <View style={styles.metaRow}>
-                <View style={styles.metaItem}>
-                  <HugeiconsIcon icon={Location01Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-                  <AppText style={styles.metaText}>{job.distance || 'Distance unavailable'}</AppText>
-                </View>
-                <View style={styles.metaItem}>
-                  <HugeiconsIcon icon={Time04Icon} size={14} color={darkTheme.colors.muted} strokeWidth={2.1} />
-                  <AppText style={styles.metaText}>{job.eta || 'ETA unavailable'}</AppText>
-                </View>
-              </View>
+                if (activeFilter === 'available') {
+                  return (
+                    <View style={styles.jobActions}>
+                      <AppButton
+                        label={isRequestBusy && busyAction === 'accept' ? 'Accepting...' : 'Accept job'}
+                        onPress={() => handleAcceptJob(job)}
+                        disabled={disableAll}
+                        style={[styles.actionBtn, styles.acceptBtn]}
+                        textStyle={styles.acceptBtnText}
+                      />
+                      <AppButton
+                        label={isRequestBusy && busyAction === 'decline' ? 'Declining...' : 'Decline'}
+                        onPress={() => handleDeclineJob(job)}
+                        disabled={disableAll}
+                        style={[styles.actionBtn, styles.cancelBtn]}
+                        textStyle={styles.cancelBtnText}
+                      />
+                    </View>
+                  );
+                }
 
-              <View style={styles.jobActions}>
-                  <AppButton
-                    label="Accept job"
-                    onPress={() => handleAcceptJob(job)}
-                    style={[styles.actionBtn, styles.acceptBtn]}
-                    textStyle={styles.acceptBtnText}
-                  />
-                <AppButton
-                  label="Cancel"
-                  onPress={() => handleDeclineJob(job)}
-                  style={[styles.actionBtn, styles.cancelBtn]}
-                  textStyle={styles.cancelBtnText}
-                />
-              </View>
-            </View>
+                if (isFinal) {
+                  return (
+                    <View style={[styles.finalBadge, normalizedStatus === 'cancelled' ? styles.finalBadgeCancelled : null]}>
+                      <AppText
+                        style={[
+                          styles.finalBadgeText,
+                          normalizedStatus === 'cancelled'
+                            ? styles.finalBadgeTextCancelled
+                            : styles.finalBadgeTextCompleted,
+                        ]}
+                      >
+                        {formatStatus(normalizedStatus)}
+                      </AppText>
+                    </View>
+                  );
+                }
+
+                return (
+                  <View style={styles.jobActions}>
+                    <AppButton
+                      label={isStatusBusy && busyStatusAction === nextAction?.status ? 'Updating...' : (nextAction?.label || 'On my way')}
+                      onPress={() => handleAdvanceStatus(job, nextAction?.status || 'en_route')}
+                      disabled={disableAll}
+                      style={[styles.actionBtn, styles.acceptBtn]}
+                      textStyle={styles.acceptBtnText}
+                    />
+                    <AppButton
+                      label={isStatusBusy && busyStatusAction === 'cancelled' ? 'Updating...' : 'Cancel'}
+                      onPress={() => handleAdvanceStatus(job, 'cancelled')}
+                      disabled={disableAll}
+                      style={[styles.actionBtn, styles.cancelBtn]}
+                      textStyle={styles.cancelBtnText}
+                    />
+                  </View>
+                );
+              })()}
+            />
           ))
         )}
       </View>
@@ -962,83 +1049,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  jobCard: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.inputBorder,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14,
-    padding: 12,
-  },
-  jobTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    columnGap: 10,
-  },
-  jobTopLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    columnGap: 10,
-  },
-  jobAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: withAlpha(darkTheme.colors.accent, 0.22),
-    borderWidth: 1,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.45),
-  },
-  jobAvatarText: {
-    color: darkTheme.colors.accent,
-    fontSize: 12,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  jobMain: {
-    flex: 1,
-  },
-  jobName: {
-    color: darkTheme.colors.text,
-    fontSize: 14,
-    lineHeight: 17,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  jobIssue: {
-    marginTop: 2,
-    color: darkTheme.colors.muted,
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  urgentPill: {
-    backgroundColor: '#5A1B1B',
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  urgentText: {
-    color: '#F5F5F5',
-    fontSize: 10,
-    lineHeight: 12,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  metaRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 12,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 4,
-  },
-  metaText: {
-    color: darkTheme.colors.muted,
-    fontSize: 11,
-    lineHeight: 14,
-  },
   jobActions: {
     marginTop: 10,
     flexDirection: 'row',
@@ -1064,6 +1074,29 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     color: darkTheme.colors.text,
     fontSize: 13,
+  },
+  finalBadge: {
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(64,198,122,0.5)',
+    backgroundColor: 'rgba(64,198,122,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finalBadgeCancelled: {
+    borderColor: 'rgba(255,123,138,0.6)',
+    backgroundColor: 'rgba(255,123,138,0.15)',
+  },
+  finalBadgeText: {
+    fontSize: 13,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  finalBadgeTextCompleted: {
+    color: '#40C67A',
+  },
+  finalBadgeTextCancelled: {
+    color: '#FF7B8A',
   },
 });
 
