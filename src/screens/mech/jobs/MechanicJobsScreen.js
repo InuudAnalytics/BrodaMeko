@@ -2,7 +2,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -14,19 +13,20 @@ import {
   AppButton,
   AppText,
   CenteredHeader,
+  MechanicJobCard,
   PullToRefreshIndicator,
   ScreenContainer,
   ScrollableTabs,
 } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { useAuth } from '../../../context';
 import {
   getMechanicAssignedJobs,
   getMechanicPendingJobRequests,
   respondToJobRequest,
+  updateJobStatus,
 } from '../../../services/jobs.service';
-import { darkTheme, withAlpha } from '../../../theme';
+import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
 const TABS = [
@@ -36,14 +36,35 @@ const TABS = [
 ];
 
 const COMPLETED_STATUSES = new Set(['completed', 'done']);
+const FINAL_STATUSES = new Set(['completed', 'done', 'cancelled']);
 
-const initialsFromName = name =>
-  String(name || 'M')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(part => part[0].toUpperCase())
-    .join('');
+const readOwnerName = (item, fallback = 'Customer') => {
+  const firstName =
+    item?.car_owner?.first_name ||
+    item?.owner?.first_name ||
+    item?.user?.first_name ||
+    '';
+  const lastName =
+    item?.car_owner?.last_name ||
+    item?.owner?.last_name ||
+    item?.user?.last_name ||
+    '';
+  const combined = String(`${firstName} ${lastName}`).trim();
+
+  return String(
+    combined ||
+      item?.owner_name ||
+      item?.customer_name ||
+      item?.car_owner_name ||
+      item?.car_owner?.full_name ||
+      item?.car_owner?.name ||
+      item?.owner?.full_name ||
+      item?.owner?.name ||
+      item?.user?.full_name ||
+      item?.user?.name ||
+      fallback,
+  ).trim();
+};
 
 const readList = response => {
   const payload = response?.data || response || {};
@@ -68,103 +89,148 @@ const readList = response => {
 const normalizePendingRequest = (item, index) => ({
   id: String(item?.id || `pending-${index}`),
   jobId: String(item?.job_id || item?.jobId || ''),
-  ownerName: String(item?.owner_name || item?.car_owner?.name || 'Car owner'),
+  ownerName: readOwnerName(item, 'Car owner'),
   issue: String(item?.issue_type || item?.title || 'Car issue'),
   carMake: String(item?.car_make || ''),
   avatarUri: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
   ownerAvatar: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
   urgent: String(item?.priority || '').toLowerCase() === 'urgent',
   status: String(item?.status || 'pending').toLowerCase(),
+  distanceText: String(item?.distance_text || item?.distance || item?.distance_km || '').trim(),
+  etaText: String(item?.eta_text || item?.eta || item?.estimated_time || '').trim(),
 });
 
 const normalizeAssignedJob = (item, index) => ({
   id: String(item?.id || item?._id || item?.job_id || `job-${index}`),
-  ownerName: String(
-    item?.car_owner?.name ||
-      item?.owner?.name ||
-      item?.user?.name ||
-      'Customer',
-  ),
+  ownerName: readOwnerName(item, 'Customer'),
   issue: String(item?.issue_type || item?.title || 'Car issue'),
   carMake: String(item?.car_make || ''),
   status: String(item?.status || '').toLowerCase(),
+  urgent: String(item?.priority || '').toLowerCase() === 'urgent',
+  distanceText: String(item?.distance_text || item?.distance || item?.distance_km || '').trim(),
+  etaText: String(item?.eta_text || item?.eta || item?.estimated_time || '').trim(),
 });
 
-const RequestCard = ({ item, busyAction, onAccept, onDecline }) => {
-  const initials = initialsFromName(item.ownerName);
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardTop}>
-        <View style={styles.avatar}>
-          {item.avatarUri ? (
-            <Image
-              source={{ uri: item.avatarUri }}
-              style={styles.avatarImage}
-            />
-          ) : (
-            <AppText style={styles.avatarText}>{initials}</AppText>
-          )}
-        </View>
-        <View style={styles.info}>
-          <AppText style={styles.name}>{item.ownerName}</AppText>
-          <AppText style={styles.issue}>
-            {item.issue}
-            {item.carMake ? ` - ${item.carMake}` : ''}
-          </AppText>
-        </View>
-        {item.urgent ? (
-          <View style={styles.urgentBadge}>
-            <AppText style={styles.urgentText}>Urgent</AppText>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.actions}>
-        <AppButton
-          label={busyAction === 'accept' ? 'Accepting...' : 'Accept job'}
-          onPress={() => onAccept(item)}
-          disabled={Boolean(busyAction)}
-          style={styles.acceptBtn}
-        />
-        <AppButton
-          label={busyAction === 'decline' ? 'Declining...' : 'Decline'}
-          onPress={() => onDecline(item)}
-          disabled={Boolean(busyAction)}
-          style={styles.declineBtn}
-          textStyle={styles.declineBtnText}
-        />
-      </View>
-    </View>
-  );
+const normalizeStatus = status => {
+  const safe = String(status || '').trim().toLowerCase();
+  if (safe === 'arrived') return 'arrive';
+  if (safe === 'repairing') return 'in_progress';
+  return safe;
 };
 
-const AssignedCard = ({ item, onOpen }) => (
-  <TouchableOpacity
-    activeOpacity={0.9}
-    style={styles.card}
-    onPress={() => onOpen(item)}
-  >
-    <View style={styles.cardTop}>
-      <View style={styles.avatar}>
-        <AppText style={styles.avatarText}>
-          {initialsFromName(item.ownerName)}
-        </AppText>
-      </View>
-      <View style={styles.info}>
-        <AppText style={styles.name}>{item.ownerName}</AppText>
-        <AppText style={styles.issue}>
-          {item.issue}
-          {item.carMake ? ` - ${item.carMake}` : ''}
-        </AppText>
-      </View>
-    </View>
-    <AppButton
-      label="View details"
-      onPress={() => onOpen(item)}
-      style={styles.acceptBtn}
+const formatStatus = value =>
+  String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+
+const getNextAction = status => {
+  const normalized = normalizeStatus(status);
+  const flow = ['accepted', 'en_route', 'arrive', 'in_progress', 'completed'];
+  const currentIndex = flow.indexOf(normalized);
+
+  if (currentIndex === -1) {
+    return { status: 'en_route', label: 'On my way' };
+  }
+
+  if (normalized === 'completed') {
+    return null;
+  }
+
+  const nextStatus = flow[currentIndex + 1];
+  if (!nextStatus) {
+    return null;
+  }
+
+  const labels = {
+    en_route: 'On my way',
+    arrive: 'Arrive',
+    in_progress: 'Start work',
+    completed: 'Complete',
+  };
+
+  return { status: nextStatus, label: labels[nextStatus] || 'Update' };
+};
+
+const JobCard = ({
+  item,
+  tab,
+  busyAction,
+  onAccept,
+  onDecline,
+  onAdvance,
+  onCancel,
+}) => {
+  const normalizedStatus = normalizeStatus(item.status);
+  const nextAction = getNextAction(normalizedStatus);
+  const isFinal = FINAL_STATUSES.has(normalizedStatus);
+  const distance = item.distanceText ? `${item.distanceText} away` : '';
+  const eta = item.etaText ? `${item.etaText}` : '';
+
+  return (
+    <MechanicJobCard
+      name={item.ownerName}
+      issue={item.issue}
+      carMake={item.carMake}
+      avatarUri={item.avatarUri}
+      urgent={item.urgent}
+      distanceText={distance}
+      etaText={eta}
+      actions={
+        tab === 'available' ? (
+          <View style={styles.buttonRow}>
+            <AppButton
+              label={busyAction === 'accept' ? 'Accepting...' : 'Accept job'}
+              onPress={() => onAccept(item)}
+              disabled={Boolean(busyAction)}
+              style={styles.acceptBtn}
+            />
+            <AppButton
+              label={busyAction === 'decline' ? 'Declining...' : 'Decline'}
+              onPress={() => onDecline(item)}
+              disabled={Boolean(busyAction)}
+              style={styles.declineBtn}
+              textStyle={styles.declineBtnText}
+            />
+          </View>
+        ) : isFinal ? (
+          <View
+            style={[
+              styles.finalBadge,
+              normalizedStatus === 'cancelled' ? styles.finalBadgeCancelled : null,
+            ]}
+          >
+            <AppText
+              style={[
+                styles.finalBadgeText,
+                normalizedStatus === 'cancelled'
+                  ? styles.finalBadgeTextCancelled
+                  : styles.finalBadgeTextCompleted,
+              ]}
+            >
+              {formatStatus(normalizedStatus)}
+            </AppText>
+          </View>
+        ) : (
+          <View style={styles.buttonRow}>
+            <AppButton
+              label={busyAction === nextAction?.status ? 'Updating...' : nextAction?.label || 'On my way'}
+              onPress={() => onAdvance(item, nextAction?.status || 'en_route')}
+              disabled={Boolean(busyAction)}
+              style={styles.acceptBtn}
+            />
+            <AppButton
+              label={busyAction === 'cancelled' ? 'Updating...' : 'Cancel'}
+              onPress={() => onCancel(item)}
+              disabled={Boolean(busyAction)}
+              style={styles.declineBtn}
+              textStyle={styles.declineBtnText}
+            />
+          </View>
+        )
+      }
     />
-  </TouchableOpacity>
-);
+  );
+};
 
 const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
   const [activeTab, setActiveTab] = useState('available');
@@ -175,9 +241,10 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
   const [completedJobs, setCompletedJobs] = useState([]);
   const [busyRequestId, setBusyRequestId] = useState('');
   const [busyAction, setBusyAction] = useState('');
+  const [busyStatusJobId, setBusyStatusJobId] = useState('');
+  const [busyStatusAction, setBusyStatusAction] = useState('');
   const pullDistance = useRef(new Animated.Value(0)).current;
   const { permissionStatus, requestPermission } = useUserLocation();
-  const { user } = useAuth();
 
   const requestedJobId = String(route?.params?.requestJobId || '').trim();
 
@@ -243,27 +310,10 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
     setBusyRequestId(item.id);
     setBusyAction(action);
     try {
-      const response = await respondToJobRequest(safeJobId, action);
+      await respondToJobRequest(safeJobId, action);
       if (action === 'accept') {
-        const payload = response?.data || response || {};
-        const conversationId = String(payload?.conversation_id || '').trim();
-        navigation.navigate(ROUTES.MECH_CHAT, {
-          conversationId,
-          jobId: safeJobId,
-          mechanicId: user?.id || user?._id,
-          customer: {
-            id: item?.ownerId || null,
-            name: item?.ownerName || 'Customer',
-            initials: initialsFromName(item?.ownerName || 'Customer'),
-            avatarUri: item?.ownerAvatar || item?.avatarUri || '',
-          },
-          issueSummary: {
-            issueType: item?.issue,
-            description: item?.issue,
-            carMake: item?.carMake,
-          },
-          tab: 'jobs',
-        });
+        setActiveTab('active');
+        await fetchData();
       } else {
         await fetchData();
       }
@@ -275,8 +325,24 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
     }
   };
 
-  const handleOpenJob = item => {
-    navigation.navigate(ROUTES.MECH_JOB_DETAILS, { jobId: item.id });
+  const handleStatusUpdate = async (item, status) => {
+    const safeJobId = String(item?.id || item?.jobId || '').trim();
+    if (!safeJobId || busyStatusJobId) {
+      return;
+    }
+
+    setBusyStatusJobId(safeJobId);
+    setBusyStatusAction(status);
+
+    try {
+      await updateJobStatus(safeJobId, status);
+      await fetchData();
+    } catch (requestError) {
+      setError(requestError?.message || 'Could not update job status.');
+    } finally {
+      setBusyStatusJobId('');
+      setBusyStatusAction('');
+    }
   };
 
   const currentItems = useMemo(() => {
@@ -360,19 +426,29 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
             >
               {activeTab === 'available'
                 ? currentItems.map(item => (
-                    <RequestCard
+                    <JobCard
                       key={item.id}
                       item={item}
+                      tab={activeTab}
                       busyAction={busyRequestId === item.id ? busyAction : ''}
                       onAccept={target => handleRespond(target, 'accept')}
                       onDecline={target => handleRespond(target, 'decline')}
                     />
                   ))
                 : currentItems.map(item => (
-                    <AssignedCard
+                    <JobCard
                       key={item.id}
                       item={item}
-                      onOpen={handleOpenJob}
+                      tab={activeTab}
+                      busyAction={
+                        busyStatusJobId === String(item.id || item.jobId || '').trim()
+                          ? busyStatusAction
+                          : ''
+                      }
+                      onAdvance={(target, nextStatus) =>
+                        handleStatusUpdate(target, nextStatus)
+                      }
+                      onCancel={target => handleStatusUpdate(target, 'cancelled')}
                     />
                   ))}
 
@@ -398,20 +474,20 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   heading: {
-    marginTop: 14,
-    color: '#F5F5F5',
-    fontSize: 16,
-    lineHeight: 20,
+    marginTop: 18,
+    color: darkTheme.colors.text,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   listContent: {
     paddingTop: 10,
     paddingBottom: 24,
-    rowGap: 12,
+    rowGap: 10,
     flexGrow: 1,
   },
   scrollView: {
@@ -421,75 +497,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tabsWrap: {
-    height: 40,
-    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 4,
   },
-  card: {
-    borderWidth: 1,
-    borderColor: withAlpha(darkTheme.colors.accent, 0.65),
-    borderRadius: 16,
-    padding: 12,
-    backgroundColor: 'rgba(0,0,51,0.6)',
-  },
-  cardTop: {
+  buttonRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     columnGap: 10,
   },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  avatarText: {
-    color: '#F5F5F5',
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  info: {
-    flex: 1,
-  },
-  name: {
-    color: '#F5F5F5',
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  issue: {
-    marginTop: 2,
-    color: 'rgba(245,245,245,0.62)',
-    fontSize: 13,
-    lineHeight: 16,
-  },
-  urgentBadge: {
-    backgroundColor: 'rgba(157,36,74,0.8)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  urgentText: {
-    color: '#F7D1E0',
-    fontSize: 12,
-    fontWeight: darkTheme.typography.fontWeights.medium,
-  },
-  actions: {
-    marginTop: 14,
-    rowGap: 8,
-  },
   acceptBtn: {
+    flex: 1,
     minHeight: 44,
     borderRadius: 12,
     backgroundColor: darkTheme.colors.accent,
   },
   declineBtn: {
+    flex: 1,
     minHeight: 40,
     borderRadius: 12,
     backgroundColor: 'transparent',
@@ -499,6 +521,29 @@ const styles = StyleSheet.create({
   declineBtnText: {
     color: '#F5F5F5',
     fontSize: 13,
+  },
+  finalBadge: {
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(64,198,122,0.5)',
+    backgroundColor: 'rgba(64,198,122,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finalBadgeCancelled: {
+    borderColor: 'rgba(255,123,138,0.6)',
+    backgroundColor: 'rgba(255,123,138,0.15)',
+  },
+  finalBadgeText: {
+    fontSize: 13,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  finalBadgeTextCompleted: {
+    color: '#40C67A',
+  },
+  finalBadgeTextCancelled: {
+    color: '#FF7B8A',
   },
   centerState: {
     alignItems: 'center',

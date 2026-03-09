@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { ArrowLeft01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { getMechanicAssignedJob, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
@@ -30,8 +32,76 @@ const toImageUri = (image) => {
   return String(image.url || image.uri || image.path || '').trim();
 };
 
+const STATUS_FLOW = ['en_route', 'arrive', 'in_progress', 'completed'];
+
+const normalizeStatus = (value) => {
+  const safe = String(value || '').trim().toLowerCase();
+  if (safe === 'arrived') return 'arrive';
+  if (safe === 'repairing') return 'in_progress';
+  return safe;
+};
+
+const formatStatus = (value) =>
+  String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const getNextAction = (status) => {
+  const normalized = normalizeStatus(status);
+  const currentIndex = STATUS_FLOW.indexOf(normalized);
+
+  if (currentIndex === -1) {
+    return { status: 'en_route', label: 'On my way' };
+  }
+
+  if (normalized === 'completed') {
+    return null;
+  }
+
+  const nextStatus = STATUS_FLOW[currentIndex + 1];
+  if (!nextStatus) {
+    return null;
+  }
+
+  const labelMap = {
+    arrive: 'Arrived',
+    in_progress: 'Start work',
+    completed: 'Complete job',
+  };
+
+  return { status: nextStatus, label: labelMap[nextStatus] || 'Update status' };
+};
+
+const readCustomerName = (job, fallback = 'N/A') => {
+  const firstName =
+    job?.car_owner?.first_name ||
+    job?.owner?.first_name ||
+    job?.user?.first_name ||
+    '';
+  const lastName =
+    job?.car_owner?.last_name ||
+    job?.owner?.last_name ||
+    job?.user?.last_name ||
+    '';
+  const combined = String(`${firstName} ${lastName}`).trim();
+
+  return String(
+    combined ||
+      job?.customer_name ||
+      job?.car_owner_name ||
+      job?.car_owner?.full_name ||
+      job?.car_owner?.name ||
+      job?.owner?.full_name ||
+      job?.owner?.name ||
+      job?.user?.full_name ||
+      job?.user?.name ||
+      fallback,
+  ).trim();
+};
+
 const MechanicJobDetailsScreen = ({ navigation, route }) => {
   const jobId = String(route?.params?.jobId || '').trim();
+  const customerNameParam = String(route?.params?.customerName || '').trim();
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,8 +134,13 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
   );
 
   const images = useMemo(() => readImages(job), [job]);
-  const customerName = job?.car_owner?.name || job?.user?.name || job?.owner?.name || 'N/A';
-  const customerPhone = job?.car_owner?.phone_number || job?.user?.phone_number || job?.owner?.phone_number || 'N/A';
+  const currentStatus = normalizeStatus(job?.status || 'pending');
+  const nextAction = getNextAction(currentStatus);
+  const isFinalStatus = currentStatus === 'completed' || currentStatus === 'cancelled';
+  const customerName =
+    customerNameParam ||
+    readCustomerName(job, 'N/A') ||
+    'N/A';
 
   const handleUpdateStatus = async (status) => {
     if (!jobId || updating) {
@@ -76,7 +151,7 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
     try {
       await updateJobStatus(jobId, status);
       await fetchDetails();
-      Alert.alert('Success', `Job updated to ${status}.`);
+      Alert.alert('Success', `Job updated to ${formatStatus(status)}.`);
     } catch (requestError) {
       Alert.alert('Error', requestError?.message || 'Could not update job status.');
     } finally {
@@ -88,8 +163,8 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
     <ScreenContainer style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.goBack()}>
-            <AppText style={styles.backText}>Back</AppText>
+          <TouchableOpacity style={styles.backBtn} activeOpacity={0.85} onPress={() => navigation.goBack()}>
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.accent} strokeWidth={2.2} />
           </TouchableOpacity>
           <AppText style={styles.title}>Job details</AppText>
         </View>
@@ -111,7 +186,7 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
           <View style={styles.card}>
             <View style={styles.row}>
               <AppText style={styles.label}>Status</AppText>
-              <AppText style={styles.value}>{String(job?.status || 'pending')}</AppText>
+              <AppText style={styles.value}>{formatStatus(currentStatus || 'pending')}</AppText>
             </View>
             <View style={styles.row}>
               <AppText style={styles.label}>Issue</AppText>
@@ -133,10 +208,6 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
               <AppText style={styles.label}>Customer</AppText>
               <AppText style={styles.value}>{customerName}</AppText>
             </View>
-            <View style={styles.row}>
-              <AppText style={styles.label}>Phone</AppText>
-              <AppText style={styles.value}>{customerPhone}</AppText>
-            </View>
 
             <AppText style={styles.imagesTitle}>Images</AppText>
             {images.length ? (
@@ -150,20 +221,36 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
               <AppText style={styles.emptyImages}>No images uploaded.</AppText>
             )}
 
-            <View style={styles.actions}>
-              <AppButton
-                label={updating === 'repairing' ? 'Updating...' : 'Mark In Progress'}
-                onPress={() => handleUpdateStatus('repairing')}
-                disabled={Boolean(updating)}
-              />
-              <AppButton
-                label={updating === 'completed' ? 'Updating...' : 'Mark Completed'}
-                onPress={() => handleUpdateStatus('completed')}
-                disabled={Boolean(updating)}
-                style={styles.secondaryBtn}
-                textStyle={styles.secondaryBtnText}
-              />
-            </View>
+            {isFinalStatus ? (
+              <View style={[styles.finalStatusBadge, currentStatus === 'cancelled' ? styles.cancelledBadge : null]}>
+                {currentStatus === 'completed' ? (
+                  <HugeiconsIcon icon={CheckmarkCircle02Icon} size={16} color="#0D3D1D" strokeWidth={2} />
+                ) : null}
+                <AppText
+                  style={[
+                    styles.finalStatusText,
+                    currentStatus === 'cancelled' ? styles.cancelledText : styles.completedText,
+                  ]}
+                >
+                  {currentStatus === 'completed' ? 'Completed' : 'Cancelled'}
+                </AppText>
+              </View>
+            ) : (
+              <View style={styles.actions}>
+                <AppButton
+                  label={updating === nextAction?.status ? 'Updating...' : nextAction?.label || 'On my way'}
+                  onPress={() => handleUpdateStatus(nextAction?.status || 'en_route')}
+                  disabled={Boolean(updating)}
+                />
+                <AppButton
+                  label={updating === 'cancelled' ? 'Updating...' : 'Cancel job'}
+                  onPress={() => handleUpdateStatus('cancelled')}
+                  disabled={Boolean(updating)}
+                  style={styles.secondaryBtn}
+                  textStyle={styles.secondaryBtnText}
+                />
+              </View>
+            )}
           </View>
         ) : null}
       </ScrollView>
@@ -177,7 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   content: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 24,
   },
@@ -187,8 +274,11 @@ const styles = StyleSheet.create({
     columnGap: 12,
     marginBottom: 12,
   },
-  backText: {
-    color: darkTheme.colors.accent,
+  backBtn: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     color: darkTheme.colors.text,
@@ -213,7 +303,7 @@ const styles = StyleSheet.create({
     borderColor: darkTheme.colors.inputBorder,
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 14,
-    padding: 12,
+    padding: 10,
   },
   row: {
     flexDirection: 'row',
@@ -265,6 +355,32 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     color: darkTheme.colors.accent,
+  },
+  finalStatusBadge: {
+    marginTop: 14,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: 'rgba(64,198,122,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(64,198,122,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    columnGap: 6,
+  },
+  cancelledBadge: {
+    backgroundColor: 'rgba(255,123,138,0.15)',
+    borderColor: 'rgba(255,123,138,0.45)',
+  },
+  finalStatusText: {
+    fontSize: 14,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  completedText: {
+    color: '#40C67A',
+  },
+  cancelledText: {
+    color: '#FF7B8A',
   },
 });
 

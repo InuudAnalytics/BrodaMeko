@@ -15,6 +15,7 @@ export { default as LogoLockup } from './LogoLockup';
 export { default as OpenStreetMapView } from './OpenStreetMapView';
 export { default as ScreenContainer } from './ScreenContainer';
 export { default as NigerianPhoneInput } from './NigerianPhoneInput';
+export { default as MechanicJobCard } from './MechanicJobCard';
 export { default as NotificationPermissionChip } from './NotificationPermissionChip';
 export { default as NotificationsGlobalGate } from './NotificationsGlobalGate';
 
