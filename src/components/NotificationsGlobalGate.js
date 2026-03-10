@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { openSettings } from 'react-native-permissions';
 import AppText from './AppText';
 import { useAuth, useNotifications } from '../context';
@@ -104,7 +104,8 @@ const NotificationsGlobalGate = () => {
   return (
     <>
       {showGate ? (
-        <View style={styles.gateWrap} pointerEvents="box-none">
+        <View style={styles.gateWrap} pointerEvents="auto">
+          <Pressable style={styles.gateBackdrop} onPress={() => {}} />
           <View style={styles.gateCard}>
             <AppText style={styles.gateTitle}>Enable notifications</AppText>
             <AppText style={styles.gateBody}>
@@ -174,6 +175,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 20,
     zIndex: 60,
+  },
+  gateBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   gateCard: {
     borderRadius: 16,
