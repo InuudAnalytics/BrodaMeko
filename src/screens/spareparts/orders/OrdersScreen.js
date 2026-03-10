@@ -1,11 +1,22 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  DeviceEventEmitter,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
 import { confirmMarketplaceOrderItem } from '../../../services/marketplace.service';
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 
 const ORDERS = [
   {
@@ -74,7 +85,7 @@ const toStatusKey = (value) => {
   return 'new';
 };
 
-const OrdersScreen = () => {
+const OrdersScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [orders, setOrders] = useState(ORDERS);
   const [loading, setLoading] = useState(false);
@@ -95,10 +106,35 @@ const OrdersScreen = () => {
           orderId: String(order?.id || order?._id || item?.order_id || item?.orderId || ''),
           itemId: String(item?.id || item?._id || ''),
           status: toStatusKey(item?.status || order?.status),
+          rawStatus: String(item?.status || order?.status || '').toLowerCase(),
           name: item?.name || item?.part?.name || order?.name || 'Product',
           qty: Number(item?.quantity || item?.qty || order?.quantity || 1),
           total: Number(item?.total || item?.amount || order?.total || order?.amount || 0),
           orderedAt: item?.created_at || order?.created_at || 'Recently',
+          buyerName:
+            order?.buyer?.name ||
+            order?.buyer?.full_name ||
+            order?.car_owner?.full_name ||
+            order?.user?.full_name ||
+            'Buyer',
+          buyerPhone:
+            order?.buyer?.phone_number ||
+            order?.buyer?.phone ||
+            order?.car_owner?.phone_number ||
+            order?.user?.phone_number ||
+            '',
+          // TODO: backend should return a normalized fulfillment_type on seller orders.
+          deliveryType: String(
+            item?.delivery_type || order?.delivery_type || order?.fulfillment_type || order?.order_type || ''
+          ).toLowerCase(),
+          // TODO: backend should issue and return pickup_code in order payload.
+          pickupCode: String(order?.pickup_code || item?.pickup_code || '').replace(/\D/g, '').slice(0, 4),
+          shopName:
+            order?.seller_store?.name ||
+            order?.store?.name ||
+            item?.seller?.store_name ||
+            item?.shop_name ||
+            'Spare parts shop',
           image:
             item?.image ||
             item?.part?.images?.[0] ||
@@ -119,6 +155,28 @@ const OrdersScreen = () => {
   React.useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  React.useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('sellerPickupConfirmed', (event) => {
+      const safeOrderId = String(event?.orderId || '').trim();
+      if (!safeOrderId) {
+        return;
+      }
+      setOrders((current) =>
+        current.map((order) =>
+          String(order.orderId || order.id) === safeOrderId
+            ? {
+                ...order,
+                status: 'completed',
+                rawStatus: 'completed',
+              }
+            : order
+        )
+      );
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const visibleOrders = useMemo(() => {
     if (activeTab === 'all') {
@@ -159,6 +217,36 @@ const OrdersScreen = () => {
       Alert.alert('Could not update order', error?.message || 'Please try again.');
     }
   };
+
+  const isPickupOrder = useCallback((order) => {
+    const mode = String(order?.deliveryType || '').toLowerCase();
+    return ['pickup', 'pick_up', 'pick-up', 'collect', 'collection'].includes(mode);
+  }, []);
+
+  const handleOpenOrder = useCallback(
+    (order) => {
+      if (!isPickupOrder(order)) {
+        return;
+      }
+      navigation.navigate(ROUTES.SPARE_PARTS_PICKUP_ORDER_DETAILS, {
+        order: {
+          id: order.orderId || order.id,
+          itemId: order.itemId,
+          buyerName: order.buyerName,
+          buyerPhone: order.buyerPhone,
+          productName: order.name,
+          quantity: order.qty,
+          amountPaid: order.total,
+          shopName: order.shopName,
+          image: order.image,
+          status: order.rawStatus || order.status,
+          pickupCode: order.pickupCode,
+          deliveryType: order.deliveryType,
+        },
+      });
+    },
+    [isPickupOrder, navigation]
+  );
 
   return (
     <View style={styles.root}>
@@ -212,7 +300,12 @@ const OrdersScreen = () => {
           {visibleOrders.map((order) => {
             const status = statusConfig[order.status] || statusConfig.new;
             return (
-              <View key={order.id} style={styles.card}>
+              <TouchableOpacity
+                key={order.id}
+                style={styles.card}
+                activeOpacity={0.95}
+                onPress={() => handleOpenOrder(order)}
+              >
                 <View style={styles.cardTop}>
                   <Image source={{ uri: order.image }} style={styles.cardImage} />
                   <View style={styles.cardInfo}>
@@ -236,6 +329,12 @@ const OrdersScreen = () => {
                     <AppText style={styles.metaValue}>{order.orderedAt}</AppText>
                   </View>
                 </View>
+
+                {isPickupOrder(order) ? (
+                  <View style={styles.pickupBadge}>
+                    <AppText style={styles.pickupBadgeText}>Pickup order</AppText>
+                  </View>
+                ) : null}
 
                 {order.status === 'new' ? (
                   <TouchableOpacity
@@ -278,7 +377,7 @@ const OrdersScreen = () => {
                     <AppText style={styles.secondaryButtonText}>View ratings</AppText>
                   </TouchableOpacity>
                 ) : null}
-              </View>
+              </TouchableOpacity>
             );
           })}
           </Animated.ScrollView>
@@ -356,6 +455,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A4A',
     borderRadius: 16,
     padding: 12,
+  },
+  pickupBadge: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(230,199,20,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(230,199,20,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  pickupBadgeText: {
+    color: '#E6C714',
+    fontSize: 11,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   cardTop: {
     flexDirection: 'row',

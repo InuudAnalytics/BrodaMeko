@@ -26,6 +26,7 @@ import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
 import AddContactSuccessScreen from '../screens/carowner/profile/AddContactSuccessScreen';
+import PickupOrderDetailsScreen from '../screens/spareparts/orders/PickupOrderDetailsScreen';
 import { useAuth, useSparePartsProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -89,6 +90,11 @@ const SparePartsStack = () => {
       />
 
       <Stack.Screen name={ROUTES.SPARE_PARTS_TABS} component={SparePartsTabs} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.SPARE_PARTS_PICKUP_ORDER_DETAILS}
+        component={PickupOrderDetailsScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name={ROUTES.SPARE_PARTS_ADD_PRODUCT} component={AddProductScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.SPARE_PARTS_DASHBOARD} component={PlaceholderScreen} options={{ headerShown: false }} />
       <Stack.Screen
