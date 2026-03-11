@@ -3,7 +3,6 @@ import {
   Animated,
   Image,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -11,19 +10,24 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
-  Delete02Icon,
+  Delete01Icon,
   MinusSignIcon,
   PlusSignIcon,
-  ShoppingCart01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
+import {
+  AppBottomNav,
+  AppButton,
+  AppText,
+  PullToRefreshIndicator,
+  ScreenContainer,
+} from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { ROUTES } from '../../../utils';
 import { useCart } from '../../../context';
 
-const formatNaira = value => `₦${Number(value || 0).toLocaleString('en-NG')}`;
+const formatNaira = value => `N${Number(value || 0).toLocaleString('en-NG')}`;
 
-const resolveImageUri = (value) => {
+const resolveImageUri = value => {
   if (!value) {
     return '';
   }
@@ -31,33 +35,56 @@ const resolveImageUri = (value) => {
     return value;
   }
   if (typeof value === 'object') {
-    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    return String(
+      value?.url || value?.secure_url || value?.uri || value?.path || '',
+    ).trim();
   }
   return '';
 };
 
-const CartScreen = ({ navigation }) => {
+const CartScreen = ({ navigation, route }) => {
   const { items, removeFromCart, updateQuantity, calculateTotal } = useCart();
   const pullDistance = React.useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = React.useState(false);
 
+  const isMechanic = route?.params?.marketplaceRole === 'mechanic';
   const subtotal = calculateTotal();
-  const deliveryFee = subtotal > 0 ? 1500 : 0;
   const serviceFee = subtotal > 0 ? 500 : 0;
-  const total = subtotal + deliveryFee + serviceFee;
+  const total = subtotal + serviceFee;
 
-  const handleTabPress = tabKey => {
+  const handleCarOwnerTabPress = routeName => {
+    navigation.navigate(routeName);
+  };
+
+  const handleMechanicTabPress = tabKey => {
     if (tabKey === 'profile') {
       navigation.navigate(ROUTES.USER_PROFILE);
       return;
     }
-
     navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: tabKey });
   };
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    await new Promise(resolve => setTimeout(resolve, 450));
     setRefreshing(false);
+  };
+
+  const renderBottomNav = () => {
+    if (isMechanic) {
+      return (
+        <MechanicTabBar
+          activeTab="marketplace"
+          onTabPress={handleMechanicTabPress}
+        />
+      );
+    }
+    return (
+      <AppBottomNav
+        activeTab={ROUTES.CAR_OWNER_MARKETPLACE}
+        onTabPress={handleCarOwnerTabPress}
+      />
+    );
   };
 
   if (!items.length) {
@@ -92,13 +119,15 @@ const CartScreen = ({ navigation }) => {
                 style={styles.emptyImage}
               />
             </View>
-          <AppText style={styles.emptyTitle} numberOfLines={1}>Your cart is empty</AppText>
+            <AppText style={styles.emptyTitle} numberOfLines={1}>
+              Your cart is empty
+            </AppText>
             <AppText style={styles.emptySubtitle}>
-              Looks like you haven't added any spare parts to your cart
+              Looks like you haven&apos;t added any spare parts to your cart
             </AppText>
           </View>
         </ScreenContainer>
-        <MechanicTabBar activeTab="marketplace" onTabPress={handleTabPress} />
+        {renderBottomNav()}
       </View>
     );
   }
@@ -128,7 +157,10 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.listWrap}>
-          <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            refreshing={refreshing}
+          />
           <Animated.ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -147,103 +179,102 @@ const CartScreen = ({ navigation }) => {
               />
             }
           >
-          {items.map(item => {
-            const product = item.product || {};
-            const image = resolveImageUri(product?.images?.[0]);
-            return (
-              <View key={item.productId} style={styles.itemCard}>
-                <View style={styles.itemRow}>
-                  {image ? (
-                    <Image source={{ uri: image }} style={styles.itemImage} />
-                  ) : (
-                    <View style={styles.itemImagePlaceholder} />
-                  )}
-                  <View style={styles.itemInfo}>
-                    <AppText style={styles.itemName} numberOfLines={1}>
-                      {product?.name || 'Product'}
-                    </AppText>
-                    <AppText style={styles.itemShop} numberOfLines={1}>
-                      {product?.shop || 'Seller'}
-                    </AppText>
-                    <AppText style={styles.itemPrice}>
-                      {formatNaira(product?.price || 0)}
-                    </AppText>
+            {items.map(item => {
+              const product = item.product || {};
+              const image = resolveImageUri(product?.images?.[0]);
+              return (
+                <View key={item.productId} style={styles.itemCard}>
+                  <View style={styles.itemRow}>
+                    {image ? (
+                      <Image source={{ uri: image }} style={styles.itemImage} />
+                    ) : (
+                      <View style={styles.itemImagePlaceholder} />
+                    )}
+                    <View style={styles.itemInfo}>
+                      <AppText style={styles.itemName} numberOfLines={1}>
+                        {product?.name || 'Product'}
+                      </AppText>
+                      <AppText style={styles.itemShop} numberOfLines={1}>
+                        {product?.shop || 'Seller'}
+                      </AppText>
+                      <AppText style={styles.itemPrice}>
+                        {formatNaira(product?.price || 0)}
+                      </AppText>
+                    </View>
+                    <View style={styles.actionCol}>
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => removeFromCart(item.productId)}
+                        activeOpacity={0.85}
+                      >
+                        <HugeiconsIcon
+                          icon={Delete01Icon}
+                          size={18}
+                          color="#9CA3AF"
+                          strokeWidth={2}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.qtyRow}>
+                        <TouchableOpacity
+                          style={styles.qtyButton}
+                          onPress={() =>
+                            updateQuantity(item.productId, item.quantity - 1)
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <HugeiconsIcon
+                            icon={MinusSignIcon}
+                            size={14}
+                            color="#E6C714"
+                            strokeWidth={2}
+                          />
+                        </TouchableOpacity>
+                        <AppText style={styles.qtyValue}>
+                          {item.quantity}
+                        </AppText>
+                        <TouchableOpacity
+                          style={styles.qtyButton}
+                          onPress={() =>
+                            updateQuantity(item.productId, item.quantity + 1)
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <HugeiconsIcon
+                            icon={PlusSignIcon}
+                            size={14}
+                            color="#E6C714"
+                            strokeWidth={2}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => removeFromCart(item.productId)}
-                    activeOpacity={0.85}
-                  >
-                    <HugeiconsIcon
-                      icon={Delete02Icon}
-                      size={18}
-                      color="#F87171"
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
                 </View>
+              );
+            })}
 
-                <View style={styles.qtyRow}>
-                  <TouchableOpacity
-                    style={styles.qtyButton}
-                    onPress={() =>
-                      updateQuantity(item.productId, item.quantity - 1)
-                    }
-                    activeOpacity={0.85}
-                  >
-                    <HugeiconsIcon
-                      icon={MinusSignIcon}
-                      size={14}
-                      color="#E6C714"
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
-                  <AppText style={styles.qtyValue}>{item.quantity}</AppText>
-                  <TouchableOpacity
-                    style={styles.qtyButton}
-                    onPress={() =>
-                      updateQuantity(item.productId, item.quantity + 1)
-                    }
-                    activeOpacity={0.85}
-                  >
-                    <HugeiconsIcon
-                      icon={PlusSignIcon}
-                      size={14}
-                      color="#E6C714"
-                      strokeWidth={2}
-                    />
-                  </TouchableOpacity>
-                </View>
+            <View style={styles.summaryCard}>
+              <AppText style={styles.summaryTitle}>Order Summary</AppText>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.summaryLabel}>Subtotal</AppText>
+                <AppText style={styles.summaryValue}>
+                  {formatNaira(subtotal)}
+                </AppText>
               </View>
-            );
-          })}
-
-          <View style={styles.summaryCard}>
-            <AppText style={styles.summaryTitle}>Order Summary</AppText>
-            <View style={styles.summaryRow}>
-              <AppText style={styles.summaryLabel}>Subtotal</AppText>
-              <AppText style={styles.summaryValue}>
-                {formatNaira(subtotal)}
-              </AppText>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.summaryLabel}>Service fee</AppText>
+                <AppText style={styles.summaryValue}>
+                  {formatNaira(serviceFee)}
+                </AppText>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <AppText style={styles.totalLabel}>Total</AppText>
+                <AppText style={styles.totalValue}>
+                  {formatNaira(total)}
+                </AppText>
+              </View>
             </View>
-            <View style={styles.summaryRow}>
-              <AppText style={styles.summaryLabel}>Delivery fee</AppText>
-              <AppText style={styles.summaryValue}>
-                {formatNaira(deliveryFee)}
-              </AppText>
-            </View>
-            <View style={styles.summaryRow}>
-              <AppText style={styles.summaryLabel}>Service fee</AppText>
-              <AppText style={styles.summaryValue}>
-                {formatNaira(serviceFee)}
-              </AppText>
-            </View>
-            <View style={styles.summaryDivider} />
-            <View style={styles.summaryRow}>
-              <AppText style={styles.totalLabel}>Total</AppText>
-              <AppText style={styles.totalValue}>{formatNaira(total)}</AppText>
-            </View>
-          </View>
           </Animated.ScrollView>
         </View>
 
@@ -254,7 +285,7 @@ const CartScreen = ({ navigation }) => {
           />
         </View>
       </ScreenContainer>
-      <MechanicTabBar activeTab="marketplace" onTabPress={handleTabPress} />
+      {renderBottomNav()}
     </View>
   );
 };
@@ -297,7 +328,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   emptyIcon: {
     alignItems: 'center',
@@ -354,6 +385,11 @@ const styles = StyleSheet.create({
   },
   itemInfo: {
     flex: 1,
+  },
+  actionCol: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    marginLeft: 'auto',
   },
   itemName: {
     color: '#FFFFFF',
@@ -444,7 +480,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
-    bottom: 90,
+    bottom: 30,
   },
 });
 

@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
+import { MARKETPLACE_DELIVERY_FEE_NGN } from '../../../config/marketplacePricing';
 import { checkoutMarketplaceOrder } from '../../../services/marketplace.service';
 import AppAlert from '../../../components/AppAlert';
 const formatNaira = value =>
@@ -20,6 +21,17 @@ const resolveImageUri = (value) => {
     return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
   }
   return '';
+};
+
+const formatAddressObject = (value) => {
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+  const street = String(value?.street || '').trim();
+  const city = String(value?.city || '').trim();
+  const state = String(value?.state || '').trim();
+  const country = String(value?.country || '').trim();
+  return [street, city, state, country].filter(Boolean).join(', ');
 };
 
 const toFiniteNumber = (value) => {
@@ -82,25 +94,22 @@ const CheckoutScreen = ({ navigation, route }) => {
     }
     return calculateTotal();
   }, [calculateTotal, directProduct, product?.price, quantity]);
-  const deliveryFee = deliveryType === 'delivery' ? 2500 : 0;
+  const deliveryFee = deliveryType === 'delivery' ? MARKETPLACE_DELIVERY_FEE_NGN : 0;
   const serviceFee = 500;
   const total = subtotal + deliveryFee + serviceFee;
   const storeName = String(product?.store?.name || product?.shop || 'Seller');
   const storeAddress = String(
     product?.store?.address ||
+      product?.storeAddress ||
+      formatAddressObject(product?.store_address) ||
       product?.location ||
-      'No 1, Onireke street, Agbabiaka'
+      'Store address unavailable'
   );
   const storeInfo = String(
     product?.store?.description ||
       product?.store?.phone ||
       'Store information unavailable.'
   );
-
-  const pickupCode = useMemo(() => {
-    // TODO: replace local pickup code generation with backend-issued pickup code
-    return String(Math.floor(1000 + Math.random() * 9000));
-  }, []);
 
   const handleCheckout = async () => {
     if (isSubmitting) {
@@ -130,12 +139,14 @@ const CheckoutScreen = ({ navigation, route }) => {
       const checkoutResponse = await checkoutMarketplaceOrder(payload);
       await clearCart();
       const responsePayload = checkoutResponse?.data || checkoutResponse || {};
+      const responseData = responsePayload?.data || responsePayload || {};
       const createdOrderId =
-        responsePayload?.order_id ||
-        responsePayload?.orderId ||
-        responsePayload?.id ||
-        responsePayload?.data?.order_id ||
-        responsePayload?.data?.id;
+        responseData?.order_id ||
+        responseData?.orderId ||
+        responseData?.id ||
+        '';
+      const pickupCode =
+        String(responseData?.pickup_code || '').replace(/\D/g, '').slice(0, 4) || undefined;
       const shopCoordinates = extractShopCoordinates(product);
       navigation.navigate('PaymentSuccessScreen', {
         orderId: createdOrderId,
@@ -251,7 +262,7 @@ const CheckoutScreen = ({ navigation, route }) => {
               >
                 <AppText style={styles.deliveryTitle}>Request delivery</AppText>
                 <AppText style={styles.deliverySubtitle}>
-                  1-3 days � ?2,500
+                  {`1-3 days - ${formatNaira(MARKETPLACE_DELIVERY_FEE_NGN)}`}
                 </AppText>
                 {deliveryType === 'delivery' ? (
                   <View style={styles.deliveryCheck} />
@@ -285,10 +296,10 @@ const CheckoutScreen = ({ navigation, route }) => {
             />
             <View style={styles.locationInfo}>
               <AppText style={styles.locationName}>
-                {product?.shop || 'Okon spare part hub'}
+                {storeName}
               </AppText>
               <AppText style={styles.locationAddress}>
-                No 1, Onireke street, Agbabiaka
+                {storeAddress}
               </AppText>
             </View>
             <TouchableOpacity activeOpacity={0.85}>
@@ -573,6 +584,7 @@ const styles = StyleSheet.create({
 });
 
 export default CheckoutScreen;
+
 
 
 

@@ -38,7 +38,7 @@ import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
 import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
 import MarketplaceScreen from '../screens/carowner/marketplace/MarketplaceScreen';
 import ProductDetailsScreen from '../screens/shared/marketplace/ProductDetailsScreen';
-import CartScreen from '../screens/carowner/marketplace/CartScreen';
+import CartScreen from '../screens/shared/marketplace/CartScreen';
 import CheckoutScreen from '../screens/shared/marketplace/CheckoutScreen';
 import MarketplacePaymentSuccessScreen from '../screens/shared/marketplace/PaymentSuccessScreen';
 import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
@@ -84,7 +84,12 @@ const CarOwnerStack = () => {
       />
       <Stack.Screen name="Favorites" component={FavoritesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="Cart"
+        component={CartScreen}
+        initialParams={{ marketplaceRole: 'carowner' }}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="PaymentSuccessScreen"

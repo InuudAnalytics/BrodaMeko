@@ -25,15 +25,32 @@ const normalizeParts = (payload) => {
   return [];
 };
 
+const formatStoreAddress = (value) => {
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+  const street = String(value?.street || '').trim();
+  const city = String(value?.city || '').trim();
+  const state = String(value?.state || '').trim();
+  const country = String(value?.country || '').trim();
+  return [street, city, state, country].filter(Boolean).join(', ');
+};
+
 const mapPartToProduct = (part) => ({
   id: String(part?.id || part?._id || ''),
   name: String(part?.name || part?.title || 'Spare part'),
   price: Number(part?.price || 0),
   shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+  location: formatStoreAddress(part?.store_address),
+  storeAddress: formatStoreAddress(part?.store_address),
   rating: Number(part?.rating ?? part?.average_rating ?? 0),
   reviews: Number(part?.reviews || part?.review_count || 0),
   images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
-  store: part?.store || null,
+  store: {
+    ...(part?.store || {}),
+    name: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+    address: String(part?.store?.address || formatStoreAddress(part?.store_address) || '').trim(),
+  },
   shopCoordinates: part?.store?.coordinates || null,
   latitude: part?.store?.coordinates?.latitude ?? part?.latitude ?? null,
   longitude: part?.store?.coordinates?.longitude ?? part?.longitude ?? null,
@@ -69,7 +86,7 @@ const MarketplaceScreen = ({ navigation }) => {
   const fetchParts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getMarketplaceParts({ title_search: search || undefined });
+      const response = await getMarketplaceParts();
       const payload = response?.data || response || {};
       const list = normalizeParts(payload);
       setProducts(list.map(mapPartToProduct));
@@ -78,7 +95,7 @@ const MarketplaceScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {

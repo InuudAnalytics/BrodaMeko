@@ -122,6 +122,21 @@ export const receivedMarketplaceOrderItem = async (orderId, itemId) => {
   return response.data;
 };
 
+export const sellerConfirmMarketplacePickup = async (orderId, pickupCode) => {
+  const safeOrderId = String(orderId || '').trim();
+  const safePickupCode = String(pickupCode || '').replace(/\D/g, '').slice(0, 4);
+  if (!safeOrderId || !safePickupCode) {
+    const error = new Error('orderId and pickupCode are required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+  const response = await api.patch(ENDPOINTS.marketplace.orderPickupConfirm(safeOrderId), {
+    pickup_code: safePickupCode,
+  });
+  return response.data;
+};
+
 export default {
   getMarketplaceParts,
   getMarketplacePart,
@@ -136,4 +151,5 @@ export default {
   cancelMarketplaceOrder,
   confirmMarketplaceOrderItem,
   receivedMarketplaceOrderItem,
+  sellerConfirmMarketplacePickup,
 };

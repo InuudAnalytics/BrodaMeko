@@ -41,6 +41,25 @@ const normalizeImages = (list) => {
   return list.map(resolveImageUri).filter(Boolean);
 };
 
+const buildStoreLocationLabel = (part) => {
+  const storeAddress = part?.store_address && typeof part.store_address === 'object' ? part.store_address : {};
+  const state = String(storeAddress?.state || '').trim();
+  const city = String(storeAddress?.city || '').trim();
+  const country = String(storeAddress?.country || '').trim();
+
+  if (state || city || country) {
+    return [city, state, country].filter(Boolean).join(', ');
+  }
+
+  return String(
+    part?.location ||
+      part?.store?.state ||
+      part?.store?.city ||
+      part?.city ||
+      'Nigeria'
+  ).trim();
+};
+
 const ProductDetailsScreen = ({ navigation, route }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -84,7 +103,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             rating: Number(part?.rating ?? part?.average_rating ?? 0),
             reviews: Number(part?.reviews || part?.review_count || 0),
             stock: Number(part?.stock_quantity || part?.stock || 0),
-            location: String(part?.location || part?.city || 'Lagos, Nigeria'),
+            location: buildStoreLocationLabel(part),
             compatibility: String(part?.compatibility || 'Compatible'),
             delivery: String(part?.delivery || 'Delivery date'),
             description: String(part?.description || ''),

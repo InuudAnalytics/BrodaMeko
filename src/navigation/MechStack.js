@@ -30,7 +30,7 @@ import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 import MarketplaceScreen from '../screens/mech/marketplace/MarketplaceScreen';
 import ProductDetailsScreen from '../screens/shared/marketplace/ProductDetailsScreen';
-import CartScreen from '../screens/mech/marketplace/CartScreen';
+import CartScreen from '../screens/shared/marketplace/CartScreen';
 import CheckoutScreen from '../screens/shared/marketplace/CheckoutScreen';
 import MarketplacePaymentSuccessScreen from '../screens/shared/marketplace/PaymentSuccessScreen';
 import OrderTrackingScreen from '../screens/shared/marketplace/OrderTrackingScreen';
@@ -115,7 +115,12 @@ const MechStack = () => {
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MechanicMarketplace" component={MarketplaceScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Cart" component={CartScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="Cart"
+        component={CartScreen}
+        initialParams={{ marketplaceRole: 'mechanic' }}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="PaymentSuccessScreen"

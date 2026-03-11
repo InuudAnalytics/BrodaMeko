@@ -3,6 +3,7 @@ import { Animated, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Message02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
+import { getMarketplaceOrder } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 import AppAlert from '../../../components/AppAlert';
 import { useUserLocation } from '../../../hooks/useUserLocation';
@@ -73,17 +74,13 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
   const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
+  const [resolvedPickupCode, setResolvedPickupCode] = React.useState('');
 
   const incomingCode = String(route?.params?.pickupCode || '')
     .replace(/\D/g, '')
     .slice(0, 4);
-  const pickupCode = useMemo(() => {
-    if (incomingCode.length === 4) {
-      return incomingCode;
-    }
-    // TODO: replace local pickup code generation with backend-issued pickup code
-    return String(Math.floor(1000 + Math.random() * 9000));
-  }, [incomingCode]);
+  const orderId = String(route?.params?.orderId || route?.params?.order_id || '').trim();
+  const pickupCode = resolvedPickupCode || incomingCode;
 
   const product = route?.params?.product || {
     name: 'LED headlights',
@@ -143,6 +140,31 @@ const PickupTrackingScreen = ({ navigation, route }) => {
       refreshOnce();
     }
   }, [permissionStatus, refreshOnce, requestPermission]);
+
+  useEffect(() => {
+    let active = true;
+    const hydratePickupCode = async () => {
+      if (incomingCode.length === 4 || !orderId) {
+        return;
+      }
+      try {
+        const response = await getMarketplaceOrder(orderId);
+        const payload = response?.data || response || {};
+        const data = payload?.data || payload || {};
+        const code = String(data?.pickup_code || '').replace(/\D/g, '').slice(0, 4);
+        if (active && code.length === 4) {
+          setResolvedPickupCode(code);
+        }
+      } catch {
+        // No-op: keep fallback display when pickup code is unavailable.
+      }
+    };
+
+    hydratePickupCode();
+    return () => {
+      active = false;
+    };
+  }, [incomingCode.length, orderId]);
 
   const panResponder = useMemo(
     () =>
@@ -207,7 +229,9 @@ const PickupTrackingScreen = ({ navigation, route }) => {
             </AppText>
 
             <View style={styles.codeWrap}>
-              <AppText style={styles.codeText}>{pickupCode.split('').join(' ')}</AppText>
+              <AppText style={styles.codeText}>
+                {pickupCode ? pickupCode.split('').join(' ') : '- - - -'}
+              </AppText>
             </View>
 
             <View style={styles.productCard}>

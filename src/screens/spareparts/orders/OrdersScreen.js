@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, DeviceEventEmitter, Image, RefreshControl,
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
-import { confirmMarketplaceOrderItem } from '../../../services/marketplace.service';
+import { confirmMarketplaceOrderItem, getMarketplaceOrder } from '../../../services/marketplace.service';
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
@@ -86,52 +86,38 @@ const OrdersScreen = ({ navigation }) => {
     setLoading(true);
     setErrorText('');
     try {
-      // TODO: Confirm seller orders payload shape.
       const response = await getSellerOrders();
       const list = normalizeOrderList(response);
-      const mapped = list.flatMap((order) => {
-        const items = order?.items || order?.order_items || order?.products || [order];
-        return items.map((item) => ({
-          id: String(item?.id || item?._id || order?.id || order?._id || Math.random()),
-          orderId: String(order?.id || order?._id || item?.order_id || item?.orderId || ''),
-          itemId: String(item?.id || item?._id || ''),
-          status: toStatusKey(item?.status || order?.status),
-          rawStatus: String(item?.status || order?.status || '').toLowerCase(),
-          name: item?.name || item?.part?.name || order?.name || 'Product',
-          qty: Number(item?.quantity || item?.qty || order?.quantity || 1),
-          total: Number(item?.total || item?.amount || order?.total || order?.amount || 0),
-          orderedAt: item?.created_at || order?.created_at || 'Recently',
-          buyerName:
-            order?.buyer?.name ||
-            order?.buyer?.full_name ||
-            order?.car_owner?.full_name ||
-            order?.user?.full_name ||
-            'Buyer',
-          buyerPhone:
-            order?.buyer?.phone_number ||
-            order?.buyer?.phone ||
-            order?.car_owner?.phone_number ||
-            order?.user?.phone_number ||
-            '',
-          // TODO: backend should return a normalized fulfillment_type on seller orders.
-          deliveryType: String(
-            item?.delivery_type || order?.delivery_type || order?.fulfillment_type || order?.order_type || ''
-          ).toLowerCase(),
-          // TODO: backend should issue and return pickup_code in order payload.
-          pickupCode: String(order?.pickup_code || item?.pickup_code || '').replace(/\D/g, '').slice(0, 4),
-          shopName:
-            order?.seller_store?.name ||
-            order?.store?.name ||
-            item?.seller?.store_name ||
-            item?.shop_name ||
-            'Spare parts shop',
-          image:
-            item?.image ||
-            item?.part?.images?.[0] ||
-            item?.part?.image ||
-            order?.image ||
-            'https://picsum.photos/120?random=90',
-        }));
+      const detailResponses = await Promise.all(
+        list.map((order) =>
+          getMarketplaceOrder(order?.id || order?._id).catch(() => null)
+        )
+      );
+
+      const mapped = list.map((order, index) => {
+        const detailPayload = detailResponses[index]?.data || detailResponses[index] || {};
+        const detail = detailPayload?.data || detailPayload || {};
+        const detailItems = Array.isArray(detail?.items) ? detail.items : [];
+        const firstItem = detailItems[0] || {};
+        const orderId = String(order?.id || order?._id || '').trim();
+
+        return {
+          id: orderId || `order-${index}`,
+          orderId,
+          itemId: String(firstItem?.id || firstItem?._id || '').trim(),
+          status: toStatusKey(order?.status || firstItem?.status),
+          rawStatus: String(order?.status || firstItem?.status || '').toLowerCase(),
+          name: firstItem?.part_name || order?.name || `Order ${orderId.slice(0, 8)}`,
+          qty: Number(firstItem?.quantity || order?.quantity || 1),
+          total: Number(order?.total_amount || firstItem?.subtotal || 0),
+          orderedAt: order?.created_at || firstItem?.created_at || 'Recently',
+          buyerName: order?.buyer_name || detail?.buyer_name || 'Buyer',
+          buyerPhone: '',
+          deliveryType: String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase(),
+          pickupCode: '',
+          shopName: firstItem?.store_name || 'Spare parts shop',
+          image: 'https://picsum.photos/120?random=90',
+        };
       });
       setOrders(mapped.length ? mapped : []);
     } catch (error) {

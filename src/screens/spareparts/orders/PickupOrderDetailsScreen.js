@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { DeviceEventEmitter, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { sellerConfirmMarketplacePickup } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 import AppAlert from '../../../components/AppAlert';
 const formatNaira = (value) => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
@@ -35,16 +36,6 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
   const imageUri = resolveImageUri(order?.image);
   const displayOrderId = orderId || 'N/A';
 
-  const expectedCode = useMemo(() => {
-    const fromPayload = String(order?.pickupCode || '').replace(/\D/g, '').slice(0, 4);
-    if (fromPayload.length === 4) {
-      return fromPayload;
-    }
-    // TODO: backend should always issue pickup_code so fallback derivation is not needed.
-    const fallbackDigits = String(orderId).replace(/\D/g, '').slice(-4);
-    return fallbackDigits.padStart(4, '0').slice(0, 4);
-  }, [order?.pickupCode, orderId]);
-
   const statusLabel = normalizeStatusLabel(order?.status);
 
   const handleConfirmPickup = async () => {
@@ -54,18 +45,21 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
       return;
     }
 
+    if (!orderId) {
+      AppAlert.alert('Missing order info', 'Order reference is missing.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // TODO: backend pickup verification endpoint required here
-      if (code !== expectedCode) {
-        AppAlert.alert('Code mismatch', 'Pickup code is incorrect. Confirm with the buyer and try again.');
-        return;
-      }
+      await sellerConfirmMarketplacePickup(orderId, code);
 
       DeviceEventEmitter.emit('sellerPickupConfirmed', { orderId });
       AppAlert.alert('Pickup confirmed', 'Order has been marked as completed.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
+    } catch (error) {
+      AppAlert.alert('Could not confirm pickup', error?.message || 'Please try again.');
     } finally {
       setIsSubmitting(false);
     }
