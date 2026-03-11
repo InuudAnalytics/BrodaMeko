@@ -80,10 +80,16 @@ const MechanicChatScreen = ({ navigation, route }) => {
 
         if (nextStatus === 'en_route' && !autoOpenedTrackingRef.current) {
             autoOpenedTrackingRef.current = true;
+            const fallbackName = String(
+                route?.params?.customerName ||
+                route?.params?.ownerName ||
+                route?.params?.name ||
+                'Customer',
+            ).trim() || 'Customer';
             const customerFromParams = route?.params?.customer || {
                 id: route?.params?.carOwnerId || null,
-                name: route?.params?.name || 'Customer',
-                initials: 'C',
+                name: fallbackName,
+                initials: String(fallbackName).trim().charAt(0).toUpperCase() || 'C',
                 avatarUri: route?.params?.avatarUri || route?.params?.avatar || '',
             };
 
@@ -121,10 +127,12 @@ const MechanicChatScreen = ({ navigation, route }) => {
         route?.params?.carOwnerId,
         route?.params?.conversationId,
         route?.params?.customer,
+        route?.params?.customerName,
         route?.params?.issueSummary,
         route?.params?.jobId,
         route?.params?.mechanicId,
         route?.params?.name,
+        route?.params?.ownerName,
     ]);
 
     if (!hasValidParams) {
@@ -136,9 +144,10 @@ const MechanicChatScreen = ({ navigation, route }) => {
     // Resolve recipient from conversation participants or interaction details
     const recipient = (() => {
         if (route?.params?.customer) {
+            const customerName = resolveDisplayName(route.params.customer, 'Customer');
             return {
-                name: route.params.customer.name || 'Customer',
-                initials: route.params.customer.initials || 'C',
+                name: customerName,
+                initials: route.params.customer.initials || String(customerName).trim().charAt(0).toUpperCase() || 'C',
                 avatarUri: route.params.customer.avatarUri || route.params.customer.avatar || '',
                 rating: route.params.customer.rating || '',
                 id: route.params.customer.id || route.params.carOwnerId || null,
@@ -147,9 +156,10 @@ const MechanicChatScreen = ({ navigation, route }) => {
 
         // If we have a direct interaction object with user details
         if (interaction?.user) {
+            const interactionName = resolveDisplayName(interaction.user, 'Customer');
             return {
-                name: interaction.user.name,
-                initials: interaction.user.initials,
+                name: interactionName,
+                initials: interaction.user.initials || String(interactionName).trim().charAt(0).toUpperCase() || 'C',
                 avatarUri: interaction.user.avatar || interaction.user.avatarUri || '',
                 // metaText: 'Customer', // Optional
             };
@@ -160,16 +170,23 @@ const MechanicChatScreen = ({ navigation, route }) => {
         const otherUser = conversation?.user || conversation?.other_user;
 
         if (otherUser) {
+            const otherName = resolveDisplayName(otherUser, 'Customer');
             return {
-                name: otherUser.name,
-                initials: otherUser.initials || 'U',
+                name: otherName,
+                initials: otherUser.initials || String(otherName).trim().charAt(0).toUpperCase() || 'C',
                 avatarUri: otherUser.avatar || otherUser.avatarUrl || '',
             };
         }
 
+        const fallbackName = String(
+            route.params?.customerName ||
+            route.params?.ownerName ||
+            route.params?.name ||
+            'Customer',
+        ).trim() || 'Customer';
         return {
-            name: route.params?.name || 'Customer',
-            initials: 'C',
+            name: fallbackName,
+            initials: String(fallbackName).trim().charAt(0).toUpperCase() || 'C',
             avatarUri: route.params?.avatarUri || route.params?.avatar || '',
         };
     })();
@@ -224,6 +241,26 @@ const MechanicChatScreen = ({ navigation, route }) => {
             onBackPress={handleBack}
         />
     );
+};
+
+const resolveDisplayName = (entity, fallback = 'Customer') => {
+    if (!entity || typeof entity !== 'object') {
+        return fallback;
+    }
+    const firstName = String(entity?.first_name || entity?.firstName || '').trim();
+    const lastName = String(entity?.last_name || entity?.lastName || '').trim();
+    const combined = String(`${firstName} ${lastName}`).trim();
+    if (combined) {
+        return combined;
+    }
+    return String(
+        entity?.name ||
+        entity?.full_name ||
+        entity?.fullName ||
+        entity?.owner_name ||
+        entity?.car_owner_name ||
+        fallback,
+    ).trim() || fallback;
 };
 
 const styles = StyleSheet.create({

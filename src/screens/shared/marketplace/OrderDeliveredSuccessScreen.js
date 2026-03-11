@@ -6,24 +6,33 @@ import { AppText, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
 import { ROUTES } from '../../../utils';
 
+const resolveImageUri = (value) => {
+  if (!value) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'object') {
+    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+  }
+  return '';
+};
+
 const OrderDeliveredSuccessScreen = ({ navigation, route }) => {
   const { role } = useAuth();
   const productName = route?.params?.productName || route?.params?.product?.name || 'LED headlights';
-  const resolveImageUri = (value) => {
-    if (!value) {
-      return '';
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-    if (typeof value === 'object') {
-      return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
-    }
-    return '';
-  };
   const productImage = resolveImageUri(route?.params?.productImage || route?.params?.product?.images?.[0]);
   const sellerName = route?.params?.sellerName || route?.params?.seller?.name || 'Okon spare part hub';
   const orderId = route?.params?.orderId || route?.params?.order_id || 'BM-98-09';
+
+  const handleBackToMarketplace = () => {
+    if (String(role || '').toLowerCase() === 'mech') {
+      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+      return;
+    }
+    navigation.navigate(ROUTES.CAR_OWNER_MARKETPLACE);
+  };
 
   const handleRateProduct = () => {
     navigation.navigate('RateProduct', {
@@ -65,7 +74,7 @@ const OrderDeliveredSuccessScreen = ({ navigation, route }) => {
             <AppText style={styles.primaryText}>Rate product</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={handleBackToMarketplace} activeOpacity={0.85}>
-            <AppText style={styles.secondaryText}>Go to marketplace</AppText>
+            <AppText style={styles.secondaryText}>Go to Spareparts</AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -174,11 +183,3 @@ const styles = StyleSheet.create({
 });
 
 export default OrderDeliveredSuccessScreen;
-  const handleBackToMarketplace = () => {
-    if (String(role || '').toLowerCase() === 'mech') {
-      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
-      return;
-    }
-
-    navigation.navigate(ROUTES.CAR_OWNER_MARKETPLACE);
-  };

@@ -41,8 +41,21 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
                       product: route?.params?.product,
                       seller: route?.params?.seller,
                       deliveryAddress: route?.params?.deliveryAddress,
+                      storeName: route?.params?.storeName,
+                      storeAddress: route?.params?.storeAddress,
+                      storeInfo: route?.params?.storeInfo,
+                      shopCoordinates: route?.params?.shopCoordinates,
                     })
-                  : navigation.navigate('OrderTracking', { orderId })
+                  : navigation.navigate('OrderTracking', {
+                      orderId,
+                      product: route?.params?.product,
+                      seller: route?.params?.seller,
+                      deliveryAddress: route?.params?.deliveryAddress,
+                      storeName: route?.params?.storeName,
+                      storeAddress: route?.params?.storeAddress,
+                      storeInfo: route?.params?.storeInfo,
+                      shopCoordinates: route?.params?.shopCoordinates,
+                    })
               }
             >
               <AppText style={styles.primaryText}>
@@ -50,7 +63,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
               </AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={handleBackToMarketplace}>
-              <AppText style={styles.secondaryText}>Go to marketplace</AppText>
+              <AppText style={styles.secondaryText}>Go to Spareparts</AppText>
             </TouchableOpacity>
           </View>
         </View>

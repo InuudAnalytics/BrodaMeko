@@ -4,6 +4,10 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Time04Icon } from '@hugeicons/core-free-icons';
 import AppText from './AppText';
 import { darkTheme, withAlpha } from '../theme';
+import { getMechanicAssignedJob } from '../services/jobs.service';
+
+const ownerNameCache = new Map();
+const ownerNameInflight = new Map();
 
 const initialsFromName = (name) =>
   String(name || 'M')
@@ -13,8 +17,63 @@ const initialsFromName = (name) =>
     .map((part) => part[0].toUpperCase())
     .join('');
 
+const readOwnerDisplayName = (job, fallback = 'Customer') => {
+  const firstName =
+    job?.car_owner?.first_name ||
+    job?.owner?.first_name ||
+    job?.user?.first_name ||
+    '';
+  const lastName =
+    job?.car_owner?.last_name ||
+    job?.owner?.last_name ||
+    job?.user?.last_name ||
+    '';
+  const combined = String(`${firstName} ${lastName}`).trim();
+  return (
+    combined ||
+    String(
+      job?.owner_name ||
+        job?.car_owner_name ||
+        job?.customer_name ||
+        job?.car_owner?.full_name ||
+        job?.car_owner?.fullName ||
+        job?.car_owner?.name ||
+        job?.owner?.full_name ||
+        job?.owner?.fullName ||
+        job?.owner?.name ||
+        job?.user?.full_name ||
+        job?.user?.fullName ||
+        job?.user?.name ||
+        fallback
+    ).trim()
+  );
+};
+
+const readOwnerNameFromAssignedJobDetails = (response) => {
+  const payload = response?.data || response || {};
+  const root = payload?.data || payload || {};
+  const owner = root?.car_owner || root?.owner || root?.user || {};
+  return readOwnerDisplayName(
+    {
+      car_owner: owner,
+      owner,
+      user: owner,
+      owner_name: owner?.full_name || owner?.fullName || owner?.name || '',
+      car_owner_name: owner?.full_name || owner?.fullName || owner?.name || '',
+      customer_name: owner?.full_name || owner?.fullName || owner?.name || '',
+    },
+    ''
+  );
+};
+
+const looksLikeFallbackName = (value) => {
+  const text = String(value || '').trim().toLowerCase();
+  return !text || text === 'customer';
+};
+
 const MechanicJobCard = ({
   name,
+  jobId,
   issue,
   carMake,
   avatarUri,
@@ -24,6 +83,65 @@ const MechanicJobCard = ({
   actions,
   style,
 }) => {
+  const safeJobId = String(jobId || '').trim();
+  const [resolvedName, setResolvedName] = React.useState(String(name || '').trim() || 'Customer');
+
+  React.useEffect(() => {
+    const incomingName = String(name || '').trim();
+    if (!looksLikeFallbackName(incomingName)) {
+      setResolvedName(incomingName);
+      if (safeJobId) {
+        ownerNameCache.set(safeJobId, incomingName);
+      }
+      return;
+    }
+
+    if (!safeJobId) {
+      setResolvedName(incomingName || 'Customer');
+      return;
+    }
+
+    const cached = ownerNameCache.get(safeJobId);
+    if (cached) {
+      setResolvedName(cached);
+      return;
+    }
+
+    let cancelled = false;
+    const existingInflight = ownerNameInflight.get(safeJobId);
+
+    const loadName = existingInflight || (async () => {
+      try {
+        const details = await getMechanicAssignedJob(safeJobId);
+        const ownerName = readOwnerNameFromAssignedJobDetails(details);
+        if (ownerName) {
+          ownerNameCache.set(safeJobId, ownerName);
+          return ownerName;
+        }
+      } catch {
+        // No-op: keep fallback.
+      } finally {
+        ownerNameInflight.delete(safeJobId);
+      }
+      return '';
+    })();
+
+    if (!existingInflight) {
+      ownerNameInflight.set(safeJobId, loadName);
+    }
+
+    loadName.then((ownerName) => {
+      if (cancelled || !ownerName) {
+        return;
+      }
+      setResolvedName(ownerName);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [name, safeJobId]);
+
   const distance = String(distanceText || '').trim() || 'Distance unavailable';
   const eta = String(etaText || '').trim() || 'ETA unavailable';
 
@@ -35,11 +153,11 @@ const MechanicJobCard = ({
             {avatarUri ? (
               <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
             ) : (
-              <AppText style={styles.jobAvatarText}>{initialsFromName(name)}</AppText>
+              <AppText style={styles.jobAvatarText}>{initialsFromName(resolvedName)}</AppText>
             )}
           </View>
           <View style={styles.jobMain}>
-            <AppText style={styles.jobName}>{String(name || 'Customer')}</AppText>
+            <AppText style={styles.jobName}>{String(resolvedName || 'Customer')}</AppText>
             <AppText style={styles.jobIssue}>
               {String(issue || 'Car issue')}
               {carMake ? ` - ${carMake}` : ''}

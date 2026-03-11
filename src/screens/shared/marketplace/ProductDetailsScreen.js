@@ -41,51 +41,36 @@ const normalizeImages = (list) => {
   return list.map(resolveImageUri).filter(Boolean);
 };
 
-const MOCK_PRODUCTS = [
-  {
-    id: '1',
-    name: 'Ceramic brake pads',
-    price: 3000,
-    shop: "Bello's benzo store",
-    rating: 4.9,
-    reviews: 98,
-    stock: 14,
-    location: 'Lagos, Nigeria',
-    compatibility: 'Toyota Camry 2018-2022',
-    delivery: 'Oct 24 - Oct 26',
-    description:
-      'High-performance ceramic brake pads designed for quieter stops and reduced dust. Built for consistent braking power and long-lasting durability across everyday and performance use cases.',
-    images: [
-      'https://picsum.photos/600/600?random=1',
-      'https://picsum.photos/600/600?random=2',
-      'https://picsum.photos/600/600?random=3',
-    ],
-  },
-];
-
 const ProductDetailsScreen = ({ navigation, route }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [expanded, setExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const listRef = useRef(null);
   const { addToCart } = useCart();
 
-  const [product, setProduct] = useState(() => {
-    if (route?.params?.product) {
-      return route.params.product;
-    }
-    const id = route?.params?.productId;
-    return MOCK_PRODUCTS.find(item => item.id === id) || MOCK_PRODUCTS[0];
-  });
+  const [product, setProduct] = useState(() => route?.params?.product || null);
 
   useEffect(() => {
     const id = route?.params?.productId;
-    if (!id || route?.params?.product) {
+    const directProduct = route?.params?.product;
+
+    if (directProduct) {
+      setProduct(directProduct);
+      setLoadError('');
+      return;
+    }
+
+    if (!id) {
+      setLoadError('Product details are unavailable.');
       return;
     }
 
     let active = true;
     const load = async () => {
+      setIsLoading(true);
+      setLoadError('');
       try {
         const response = await getMarketplacePart(id);
         const payload = response?.data || response || {};
@@ -96,7 +81,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             name: String(part?.name || part?.title || 'Spare part'),
             price: Number(part?.price || 0),
             shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
-            rating: Number(part?.rating || 4.9),
+            rating: Number(part?.rating ?? part?.average_rating ?? 0),
             reviews: Number(part?.reviews || part?.review_count || 0),
             stock: Number(part?.stock_quantity || part?.stock || 0),
             location: String(part?.location || part?.city || 'Lagos, Nigeria'),
@@ -104,10 +89,23 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             delivery: String(part?.delivery || 'Delivery date'),
             description: String(part?.description || ''),
             images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+            store: part?.store || null,
+            shopCoordinates: part?.store?.coordinates || null,
+            latitude: part?.store?.coordinates?.latitude ?? part?.latitude ?? null,
+            longitude: part?.store?.coordinates?.longitude ?? part?.longitude ?? null,
           });
+          setLoadError('');
+        } else if (active) {
+          setLoadError('Product details are unavailable.');
         }
       } catch {
-        // keep fallback
+        if (active) {
+          setLoadError('Failed to load product details.');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -118,7 +116,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
   }, [route?.params?.product, route?.params?.productId]);
 
   const images = normalizeImages(product?.images?.length ? product.images : null);
-  const displayImages = images.length ? images : ['https://picsum.photos/600/600?random=10'];
+  const displayImages = images;
   const isInStock = Number(product?.stock || 0) > 0;
 
   const handleScrollEnd = event => {
@@ -128,11 +126,17 @@ const ProductDetailsScreen = ({ navigation, route }) => {
   };
 
   const handleAddToCart = () => {
+    if (!product) {
+      return;
+    }
     addToCart(product, quantity);
     navigation?.navigate?.('Cart');
   };
 
   const handleBuyNow = () => {
+    if (!product) {
+      return;
+    }
     navigation.navigate('Checkout', {
       directProduct: { ...product, quantity },
     });
@@ -160,38 +164,52 @@ const ProductDetailsScreen = ({ navigation, route }) => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.carouselWrap}>
-          <FlatList
-            ref={listRef}
-            data={displayImages}
-            keyExtractor={(item, index) => `${item}-${index}`}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleScrollEnd}
-            renderItem={({ item }) => (
-              <Image
-                source={{ uri: item }}
-                style={styles.carouselImage}
-                resizeMode="cover"
-              />
-            )}
-          />
-          <View style={styles.dotsRow}>
-            {displayImages.map((_, index) => (
-              <View
-                key={`dot-${index}`}
-                style={[
-                  styles.dot,
-                  index === activeIndex ? styles.dotActive : null,
-                ]}
-              />
-            ))}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {isLoading ? (
+          <View style={styles.skeletonWrap}>
+            <View style={styles.skeletonHero} />
+            <View style={styles.skeletonLineLong} />
+            <View style={styles.skeletonLineMedium} />
+            <View style={styles.skeletonCard} />
+            <View style={styles.skeletonCard} />
           </View>
+        ) : null}
+        {!isLoading && loadError ? (
+          <View style={styles.errorCard}>
+            <AppText style={styles.errorText}>{loadError}</AppText>
+          </View>
+        ) : null}
+        {!isLoading && !loadError ? (
+          <>
+        <View style={styles.carouselWrap}>
+          {displayImages.length ? (
+            <>
+              <FlatList
+                ref={listRef}
+                data={displayImages}
+                keyExtractor={(item, index) => `${item}-${index}`}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={handleScrollEnd}
+                renderItem={({ item }) => (
+                  <Image source={{ uri: item }} style={styles.carouselImage} resizeMode="cover" />
+                )}
+              />
+              <View style={styles.dotsRow}>
+                {displayImages.map((_, index) => (
+                  <View
+                    key={`dot-${index}`}
+                    style={[styles.dot, index === activeIndex ? styles.dotActive : null]}
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyImageState}>
+              <AppText style={styles.emptyImageText}>No product image available.</AppText>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -206,7 +224,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
               strokeWidth={2}
             />
             <AppText style={styles.ratingText}>
-              {product?.rating?.toFixed?.(1) || product?.rating || '0.0'} (
+              {Number(product?.rating || 0).toFixed(1)} (
               {product?.reviews || 0} reviews)
             </AppText>
             <View
@@ -298,6 +316,8 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         </View>
+          </>
+        ) : null}
       </ScrollView>
 
       <View style={styles.bottomActions}>
@@ -305,6 +325,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
           style={styles.addToCart}
           onPress={handleAddToCart}
           activeOpacity={0.85}
+          disabled={isLoading || Boolean(loadError)}
         >
           <AppText style={styles.addToCartText}>Add to cart</AppText>
         </TouchableOpacity>
@@ -313,6 +334,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
           onPress={handleBuyNow}
           style={styles.buyNow}
           textStyle={styles.buyNowText}
+          disabled={isLoading || Boolean(loadError)}
         />
       </View>
     </ScreenContainer>
@@ -350,6 +372,17 @@ const styles = StyleSheet.create({
   },
   carouselWrap: {
     marginTop: 10,
+  },
+  emptyImageState: {
+    width: SCREEN_WIDTH,
+    height: 260,
+    backgroundColor: '#1A1A4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyImageText: {
+    color: '#9CA3AF',
+    fontSize: 13,
   },
   carouselImage: {
     width: SCREEN_WIDTH,
@@ -528,6 +561,48 @@ const styles = StyleSheet.create({
   },
   buyNowText: {
     fontWeight: '600',
+  },
+  skeletonWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+  },
+  skeletonHero: {
+    height: 220,
+    borderRadius: 14,
+    backgroundColor: '#1A1A4A',
+  },
+  skeletonLineLong: {
+    marginTop: 16,
+    height: 18,
+    width: '70%',
+    borderRadius: 9,
+    backgroundColor: '#1A1A4A',
+  },
+  skeletonLineMedium: {
+    marginTop: 10,
+    height: 14,
+    width: '45%',
+    borderRadius: 7,
+    backgroundColor: '#1A1A4A',
+  },
+  skeletonCard: {
+    marginTop: 14,
+    height: 86,
+    borderRadius: 12,
+    backgroundColor: '#1A1A4A',
+  },
+  errorCard: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.35)',
+  },
+  errorText: {
+    color: '#FCA5A5',
+    fontSize: 13,
   },
 });
 

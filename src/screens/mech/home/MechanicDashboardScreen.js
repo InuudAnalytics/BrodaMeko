@@ -9,7 +9,7 @@ import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useChat, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { getAvailableJobs, getConversationByJobId, getMechanicPendingJobRequests, respondToJobRequest, updateJobStatus } from '../../../services/jobs.service';
+import { getAvailableJobs, getConversationByJobId, getMechanicAssignedJob, getMechanicPendingJobRequests, respondToJobRequest, updateJobStatus } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
 import { getMechanicEarnings, setMechanicOnlineStatus } from '../../../services/mechanic.service';
 import { getWalletBalance } from '../../../services/wallet.service';
@@ -35,16 +35,67 @@ const formatCurrency = (amount) => {
   return `\u20A6${value.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const readOwnerDisplayName = (job, fallback = 'Customer') => {
+  const firstName =
+    job?.car_owner?.first_name ||
+    job?.owner?.first_name ||
+    job?.user?.first_name ||
+    '';
+  const lastName =
+    job?.car_owner?.last_name ||
+    job?.owner?.last_name ||
+    job?.user?.last_name ||
+    '';
+  const combined = String(`${firstName} ${lastName}`).trim();
+  return (
+    combined ||
+    String(
+      job?.owner_name ||
+        job?.car_owner_name ||
+        job?.customer_name ||
+        job?.car_owner?.fullName ||
+        job?.owner?.fullName ||
+        job?.user?.fullName ||
+        job?.car_owner?.full_name ||
+        job?.car_owner?.name ||
+        job?.owner?.full_name ||
+        job?.owner?.name ||
+        job?.user?.full_name ||
+        job?.user?.name ||
+        fallback
+    ).trim()
+  );
+};
+
+const readOwnerNameFromAssignedJobDetails = (response) => {
+  const payload = response?.data || response || {};
+  const root = payload?.data || payload || {};
+  const owner = root?.car_owner || root?.owner || root?.user || {};
+  return readOwnerDisplayName(
+    {
+      car_owner: owner,
+      owner,
+      user: owner,
+      owner_name: owner?.full_name || owner?.fullName || owner?.name || '',
+      car_owner_name: owner?.full_name || owner?.fullName || owner?.name || '',
+      customer_name: owner?.full_name || owner?.fullName || owner?.name || '',
+    },
+    ''
+  );
+};
+
 const normalizeJob = (job, fallbackStatus = '') => {
   const resolvedStatus = normalizeStatus(String(job.status || fallbackStatus || '').toLowerCase());
   const resolvedJobId =
     String(job.job_id || job.jobId || job.id || job._id || '').trim();
   const resolvedRequestId = String(job.id || job._id || '').trim();
+  const ownerName = readOwnerDisplayName(job, 'Customer');
   return {
     id: resolvedRequestId || resolvedJobId,
     jobId: resolvedJobId,
     requestId: resolvedRequestId,
-    name: job.car_owner?.name || job.user?.name || 'Customer',
+    ownerName,
+    name: ownerName,
     ownerAvatar: job.car_owner?.avatar || job.user?.avatar || '',
     ownerId: job.car_owner?.id || job.car_owner?._id || job.user?.id || job.user?._id || '',
     issue: job.title || job.issue_type || job.description || 'Car Issue',
@@ -174,7 +225,7 @@ const readUnreadCount = (payload) => {
 };
 
 const MechanicDashboardScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, refreshUserProfile } = useAuth();
   const { mechanicChatShortcut, setMechanicChatShortcut, clearMechanicChatShortcut } = useChat();
   const { unreadTick, permissionStatus: notificationPermissionStatus, promptPermissionIfNeeded } = useNotifications();
   const { permissionStatus, requestPermission } = useUserLocation();
@@ -202,9 +253,24 @@ const MechanicDashboardScreen = ({ navigation }) => {
   const [busyStatusAction, setBusyStatusAction] = useState('');
   const pullDistance = React.useRef(new Animated.Value(0)).current;
   const hasAutoRequestedLocationRef = React.useRef(false);
+  const refreshUserProfileRef = React.useRef(refreshUserProfile);
   const mechanicName = readMechanicName(user);
   const mechanicRating = readMechanicRating(user);
   const avatarUri = readAvatarUri(user);
+
+  React.useEffect(() => {
+    refreshUserProfileRef.current = refreshUserProfile;
+  }, [refreshUserProfile]);
+
+  React.useEffect(() => {
+    if (typeof user?.is_online === 'boolean') {
+      setIsOnline(Boolean(user?.is_online));
+      return;
+    }
+    if (typeof user?.isOnline === 'boolean') {
+      setIsOnline(Boolean(user?.isOnline));
+    }
+  }, [user?.isOnline, user?.is_online]);
 
   const handleToggleOnline = useCallback(async (value) => {
     setIsOnline(value);
@@ -281,10 +347,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
         );
         setActiveFilter('active');
         if (conversationId) {
+          const customerName = String(job?.ownerName || job?.name || 'Customer').trim() || 'Customer';
           const customer = {
             id: job?.ownerId || null,
-            name: job?.name || 'Customer',
-            initials: initialsFromName(job?.name || 'Customer'),
+            name: customerName,
+            initials: initialsFromName(customerName),
             avatarUri: job?.avatarUri || job?.ownerAvatar || '',
           };
           setMechanicChatShortcut({
@@ -383,10 +450,11 @@ const MechanicDashboardScreen = ({ navigation }) => {
           }
         }
 
+        const customerName = String(job?.ownerName || job?.name || 'Customer').trim() || 'Customer';
         const customer = {
           id: job?.ownerId || null,
-          name: job?.name || 'Customer',
-          initials: initialsFromName(job?.name || 'Customer'),
+          name: customerName,
+          initials: initialsFromName(customerName),
           avatarUri: job?.avatarUri || job?.ownerAvatar || '',
         };
 
@@ -486,6 +554,58 @@ const MechanicDashboardScreen = ({ navigation }) => {
     return jobList.find((job) => activeStatuses.has(normalizeStatus(job.status)));
   }, []);
 
+  const enrichMissingOwnerNames = useCallback(async (jobList) => {
+    const targets = (Array.isArray(jobList) ? jobList : []).filter((job) => {
+      const jobId = String(job?.jobId || '').trim();
+      const ownerName = String(job?.ownerName || job?.name || '').trim();
+      return Boolean(jobId) && (!ownerName || ownerName.toLowerCase() === 'customer');
+    });
+
+    if (!targets.length) {
+      return;
+    }
+
+    const detailResults = await Promise.all(
+      targets.map(async (job) => {
+        const jobId = String(job?.jobId || '').trim();
+        try {
+          const details = await getMechanicAssignedJob(jobId);
+          const ownerName = readOwnerNameFromAssignedJobDetails(details);
+          return { jobId, ownerName };
+        } catch {
+          return { jobId, ownerName: '' };
+        }
+      })
+    );
+
+    const nameByJobId = new Map(
+      detailResults
+        .filter((entry) => String(entry?.ownerName || '').trim())
+        .map((entry) => [String(entry.jobId).trim(), String(entry.ownerName).trim()])
+    );
+
+    if (!nameByJobId.size) {
+      return;
+    }
+
+    setJobs((prev) => {
+      const next = prev.map((job) => {
+        const jobId = String(job?.jobId || '').trim();
+        const ownerName = nameByJobId.get(jobId);
+        if (!ownerName) {
+          return job;
+        }
+        return {
+          ...job,
+          ownerName,
+          name: ownerName,
+        };
+      });
+      setActiveJob(resolveActiveJob(next) || null);
+      return next;
+    });
+  }, [resolveActiveJob]);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -539,6 +659,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
               setTotalJobs(Number(jobsPayload?.total || rawJobs.length || 0));
               const currentActive = resolveActiveJob(mergedJobs);
               setActiveJob(currentActive || null);
+              enrichMissingOwnerNames(mergedJobs);
               if (currentActive?.jobId) {
                 try {
                   const convoRes = await getConversationByJobId(currentActive.jobId);
@@ -554,6 +675,19 @@ const MechanicDashboardScreen = ({ navigation }) => {
                 setActiveConversationId('');
               }
             }
+            refreshUserProfileRef.current?.()
+              .then((profileRes) => {
+                const nextOnline =
+                  typeof profileRes?.is_online === 'boolean'
+                    ? profileRes?.is_online
+                    : typeof profileRes?.isOnline === 'boolean'
+                      ? profileRes?.isOnline
+                      : null;
+                if (typeof nextOnline === 'boolean') {
+                  setIsOnline(nextOnline);
+                }
+              })
+              .catch(() => null);
             setError('');
           }
         } catch (fetchError) {
@@ -570,7 +704,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
       return () => {
         active = false;
       };
-    }, [resolveActiveJob])
+    }, [enrichMissingOwnerNames, resolveActiveJob])
   );
 
   useFocusEffect(
@@ -674,6 +808,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
         setTotalJobs(Number(jobsPayload?.total || rawJobs.length || 0));
         const currentActive = resolveActiveJob(mergedJobs);
         setActiveJob(currentActive || null);
+        enrichMissingOwnerNames(mergedJobs);
         if (currentActive?.jobId) {
           try {
             const convoRes = await getConversationByJobId(currentActive.jobId);
@@ -694,12 +829,25 @@ const MechanicDashboardScreen = ({ navigation }) => {
         const unreadPayload = unreadRes || {};
         setUnreadCount(readUnreadCount(unreadPayload));
       }
+      refreshUserProfileRef.current?.()
+        .then((profileRes) => {
+          const nextOnline =
+            typeof profileRes?.is_online === 'boolean'
+              ? profileRes?.is_online
+              : typeof profileRes?.isOnline === 'boolean'
+                ? profileRes?.isOnline
+                : null;
+          if (typeof nextOnline === 'boolean') {
+            setIsOnline(nextOnline);
+          }
+        })
+        .catch(() => null);
     } catch {
       setError('Could not refresh dashboard.');
     } finally {
       setRefreshing(false);
     }
-  }, [resolveActiveJob]);
+  }, [enrichMissingOwnerNames, resolveActiveJob]);
 
   return (
     <View style={styles.root}>
@@ -868,6 +1016,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
           visibleJobs.map((job) => (
             <MechanicJobCard
               key={job.id}
+              jobId={job.jobId}
               name={job.name}
               issue={job.issue}
               avatarUri={job.avatarUri || job.ownerAvatar || ''}

@@ -29,14 +29,15 @@ import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
 import MarketplaceScreen from '../screens/mech/marketplace/MarketplaceScreen';
-import ProductDetailsScreen from '../screens/mech/marketplace/ProductDetailsScreen';
+import ProductDetailsScreen from '../screens/shared/marketplace/ProductDetailsScreen';
 import CartScreen from '../screens/mech/marketplace/CartScreen';
-import CheckoutScreen from '../screens/mech/marketplace/CheckoutScreen';
-import MarketplacePaymentSuccessScreen from '../screens/mech/marketplace/PaymentSuccessScreen';
-import OrderTrackingScreen from '../screens/mech/marketplace/OrderTrackingScreen';
-import RateProductScreen from '../screens/mech/marketplace/RateProductScreen';
-import OrderDeliveredSuccessScreen from '../screens/mech/marketplace/OrderDeliveredSuccessScreen';
-import ProductFeedbackSuccessScreen from '../screens/mech/marketplace/ProductFeedbackSuccessScreen';
+import CheckoutScreen from '../screens/shared/marketplace/CheckoutScreen';
+import MarketplacePaymentSuccessScreen from '../screens/shared/marketplace/PaymentSuccessScreen';
+import OrderTrackingScreen from '../screens/shared/marketplace/OrderTrackingScreen';
+import PickupTrackingScreen from '../screens/shared/marketplace/PickupTrackingScreen';
+import RateProductScreen from '../screens/shared/marketplace/RateProductScreen';
+import OrderDeliveredSuccessScreen from '../screens/shared/marketplace/OrderDeliveredSuccessScreen';
+import ProductFeedbackSuccessScreen from '../screens/shared/marketplace/ProductFeedbackSuccessScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -122,6 +123,11 @@ const MechStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.MECH_PICKUP_TRACKING}
+        component={PickupTrackingScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen
         name="SparePartsOrderTrackingScreen"
         component={OrderTrackingScreen}

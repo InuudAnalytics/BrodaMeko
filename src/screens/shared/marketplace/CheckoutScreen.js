@@ -22,11 +22,48 @@ const resolveImageUri = (value) => {
   return '';
 };
 
+const toFiniteNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const NIGERIA_FALLBACK_COORDS = { latitude: 9.0765, longitude: 7.3986 }; // Abuja
+const isWithinNigeria = (latitude, longitude) =>
+  Number.isFinite(latitude) &&
+  Number.isFinite(longitude) &&
+  latitude >= 4.0 &&
+  latitude <= 14.5 &&
+  longitude >= 2.5 &&
+  longitude <= 15.0;
+
+const extractShopCoordinates = (product) => {
+  const source = product?.shopCoordinates || product?.storeCoordinates || product?.store?.coordinates || {};
+  const latitude =
+    toFiniteNumber(source?.latitude) ??
+    toFiniteNumber(source?.lat) ??
+    toFiniteNumber(product?.latitude) ??
+    toFiniteNumber(product?.lat);
+  const longitude =
+    toFiniteNumber(source?.longitude) ??
+    toFiniteNumber(source?.lng) ??
+    toFiniteNumber(source?.lon) ??
+    toFiniteNumber(product?.longitude) ??
+    toFiniteNumber(product?.lng);
+
+  if (isWithinNigeria(latitude, longitude)) {
+    return { latitude, longitude };
+  }
+
+  // TODO: replace with backend-provided validated store coordinates.
+  return NIGERIA_FALLBACK_COORDS;
+};
+
 const CheckoutScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { items, calculateTotal, clearCart, addToCart } = useCart();
   const [deliveryType, setDeliveryType] = useState('delivery');
   const [paymentMethod, setPaymentMethod] = useState('transfer');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const directProduct = route?.params?.directProduct || null;
   const product = directProduct || items?.[0]?.product || {
@@ -48,7 +85,28 @@ const CheckoutScreen = ({ navigation, route }) => {
   const deliveryFee = deliveryType === 'delivery' ? 2500 : 0;
   const serviceFee = 500;
   const total = subtotal + deliveryFee + serviceFee;
+  const storeName = String(product?.store?.name || product?.shop || 'Seller');
+  const storeAddress = String(
+    product?.store?.address ||
+      product?.location ||
+      'No 1, Onireke street, Agbabiaka'
+  );
+  const storeInfo = String(
+    product?.store?.description ||
+      product?.store?.phone ||
+      'Store information unavailable.'
+  );
+
+  const pickupCode = useMemo(() => {
+    // TODO: replace local pickup code generation with backend-issued pickup code
+    return String(Math.floor(1000 + Math.random() * 9000));
+  }, []);
+
   const handleCheckout = async () => {
+    if (isSubmitting) {
+      return;
+    }
+    setIsSubmitting(true);
     try {
       if (directProduct) {
         await addToCart(directProduct, quantity);
@@ -57,19 +115,57 @@ const CheckoutScreen = ({ navigation, route }) => {
       const payload = {
         payment_method: paymentMethod === 'card' ? 'paystack' : 'paystack',
         fulfillment_type: deliveryType === 'pickup' ? 'pickup' : 'delivery',
-        delivery_street: 'No 1, Onireke street, Agbabiaka',
-        delivery_city: 'Lagos',
-        delivery_state: 'Lagos',
-        delivery_country: 'Nigeria',
+        ...(deliveryType === 'delivery'
+          ? {
+              delivery_street: 'No 1, Onireke street, Agbabiaka',
+              delivery_city: 'Lagos',
+              delivery_state: 'Lagos',
+              delivery_country: 'Nigeria',
+            }
+          : {}),
         contact_phone: String(user?.phone_number || user?.phone || '+2348012345678'),
         email: String(user?.email || 'buyer@example.com'),
       };
 
-      await checkoutMarketplaceOrder(payload);
+      const checkoutResponse = await checkoutMarketplaceOrder(payload);
       await clearCart();
-      navigation.navigate('PaymentSuccessScreen');
+      const responsePayload = checkoutResponse?.data || checkoutResponse || {};
+      const createdOrderId =
+        responsePayload?.order_id ||
+        responsePayload?.orderId ||
+        responsePayload?.id ||
+        responsePayload?.data?.order_id ||
+        responsePayload?.data?.id;
+      const shopCoordinates = extractShopCoordinates(product);
+      navigation.navigate('PaymentSuccessScreen', {
+        orderId: createdOrderId,
+        fulfillmentType: deliveryType === 'pickup' ? 'pickup' : 'delivery',
+        pickupCode,
+        product: {
+          name: product?.name || 'Product',
+          price: Number(product?.price || 0),
+          shop: product?.shop || 'Seller',
+          images: Array.isArray(product?.images) ? product.images : [],
+          latitude: shopCoordinates.latitude,
+          longitude: shopCoordinates.longitude,
+          shopCoordinates,
+        },
+        seller: {
+          name: storeName,
+          avatar: product?.store?.logo || product?.store?.avatar || '',
+          isActive: true,
+          coordinates: shopCoordinates,
+        },
+        storeName,
+        storeAddress,
+        storeInfo,
+        shopCoordinates,
+        deliveryAddress: 'No 1, Onireke street, Agbabiaka',
+      });
     } catch (error) {
       AppAlert.alert('Checkout failed', error?.message || 'Could not process checkout.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -248,8 +344,9 @@ const CheckoutScreen = ({ navigation, route }) => {
 
       <View style={styles.bottomAction}>
         <AppButton
-          label="Confirm and pay"
+          label={isSubmitting ? 'Processing...' : 'Confirm and pay'}
           onPress={handleCheckout}
+          disabled={isSubmitting}
         />
       </View>
     </ScreenContainer>

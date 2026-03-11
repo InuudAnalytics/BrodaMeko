@@ -205,6 +205,7 @@ const JobCard = ({
 
   return (
     <MechanicJobCard
+      jobId={item.jobId || item.id}
       name={item.ownerName}
       issue={item.issue}
       carMake={item.carMake}

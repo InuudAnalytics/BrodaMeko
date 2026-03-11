@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Animated, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Message02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
 import AppAlert from '../../../components/AppAlert';
+import { useUserLocation } from '../../../hooks/useUserLocation';
 const PANEL_MAX_DOWN = 360;
 
 const formatNaira = value => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
@@ -18,10 +19,60 @@ const resolveImageUri = value => {
   return '';
 };
 
+const toFiniteNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const NIGERIA_FALLBACK_COORDS = { latitude: 9.0765, longitude: 7.3986 }; // Abuja
+const isWithinNigeria = (latitude, longitude) =>
+  Number.isFinite(latitude) &&
+  Number.isFinite(longitude) &&
+  latitude >= 4.0 &&
+  latitude <= 14.5 &&
+  longitude >= 2.5 &&
+  longitude <= 15.0;
+
+const extractShopCoordinates = ({ route, product, seller }) => {
+  const fromRoute = route?.params?.shopCoordinates || {};
+  const fromProduct = product?.shopCoordinates || product?.storeCoordinates || product?.store?.coordinates || {};
+  const fromSeller = seller?.coordinates || {};
+
+  const latitude =
+    toFiniteNumber(fromRoute?.latitude) ??
+    toFiniteNumber(fromRoute?.lat) ??
+    toFiniteNumber(fromProduct?.latitude) ??
+    toFiniteNumber(fromProduct?.lat) ??
+    toFiniteNumber(product?.latitude) ??
+    toFiniteNumber(product?.lat) ??
+    toFiniteNumber(fromSeller?.latitude) ??
+    toFiniteNumber(fromSeller?.lat);
+
+  const longitude =
+    toFiniteNumber(fromRoute?.longitude) ??
+    toFiniteNumber(fromRoute?.lng) ??
+    toFiniteNumber(fromRoute?.lon) ??
+    toFiniteNumber(fromProduct?.longitude) ??
+    toFiniteNumber(fromProduct?.lng) ??
+    toFiniteNumber(fromProduct?.lon) ??
+    toFiniteNumber(product?.longitude) ??
+    toFiniteNumber(product?.lng) ??
+    toFiniteNumber(fromSeller?.longitude) ??
+    toFiniteNumber(fromSeller?.lng);
+
+  if (isWithinNigeria(latitude, longitude)) {
+    return { latitude, longitude };
+  }
+
+  // TODO: backend should provide validated Nigeria shop coordinates for pickup navigation
+  return NIGERIA_FALLBACK_COORDS;
+};
+
 const PickupTrackingScreen = ({ navigation, route }) => {
   const panelY = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
+  const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
 
   const incomingCode = String(route?.params?.pickupCode || '')
     .replace(/\D/g, '')
@@ -47,12 +98,22 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   };
   const pickupAddress = route?.params?.deliveryAddress || 'No 1, Onireke street, Agbabiaka';
 
-  const mapCenter = useMemo(() => {
-    const lat = Number(route?.params?.shopCoordinates?.latitude || 6.5244);
-    const lng = Number(route?.params?.shopCoordinates?.longitude || 3.3792);
+  const shopCoordinates = useMemo(() => {
     // TODO: backend should provide shop coordinates for pickup navigation
-    return { latitude: lat, longitude: lng };
-  }, [route?.params?.shopCoordinates?.latitude, route?.params?.shopCoordinates?.longitude]);
+    return extractShopCoordinates({ route, product, seller });
+  }, [product, route, seller]);
+  const liveCoordinates = useMemo(() => {
+    if (permissionStatus !== 'granted') {
+      return null;
+    }
+    const latitude = toFiniteNumber(location?.latitude);
+    const longitude = toFiniteNumber(location?.longitude);
+    if (latitude === null || longitude === null) {
+      return null;
+    }
+    return { latitude, longitude };
+  }, [location?.latitude, location?.longitude, permissionStatus]);
+  const mapOrigin = liveCoordinates || shopCoordinates;
 
   const imageUri = resolveImageUri(product?.images?.[0]);
   const avatarUri = resolveImageUri(seller?.avatar);
@@ -66,9 +127,22 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     }).start();
   }, [panelY]);
 
-  panelY.addListener(({ value }) => {
-    panelYRef.current = value;
-  });
+  useEffect(() => {
+    const id = panelY.addListener(({ value }) => {
+      panelYRef.current = value;
+    });
+    return () => panelY.removeListener(id);
+  }, [panelY]);
+
+  useEffect(() => {
+    if (permissionStatus === 'unknown') {
+      requestPermission();
+      return;
+    }
+    if (permissionStatus === 'granted') {
+      refreshOnce();
+    }
+  }, [permissionStatus, refreshOnce, requestPermission]);
 
   const panResponder = useMemo(
     () =>
@@ -105,9 +179,15 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     <View style={styles.root}>
       <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
         <View style={styles.mapBackdrop}>
-          <OpenStreetMapView latitude={mapCenter.latitude} longitude={mapCenter.longitude} />
-          <View style={styles.mockRouteLine} />
-          <View style={styles.mockPin} />
+          <OpenStreetMapView
+            latitude={mapOrigin.latitude}
+            longitude={mapOrigin.longitude}
+            otherLatitude={shopCoordinates.latitude}
+            otherLongitude={shopCoordinates.longitude}
+            showRoute={Boolean(liveCoordinates)}
+            currentPinColor={darkTheme.colors.accent}
+            targetPinColor="#FF2D2D"
+          />
 
           <View style={styles.topBar}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
@@ -213,26 +293,6 @@ const styles = StyleSheet.create({
   topSpacer: {
     width: 40,
     height: 40,
-  },
-  mockRouteLine: {
-    position: 'absolute',
-    left: '52%',
-    top: '28%',
-    width: 6,
-    height: 150,
-    borderRadius: 4,
-    backgroundColor: '#26A4FF',
-  },
-  mockPin: {
-    position: 'absolute',
-    left: '50%',
-    top: '24%',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#FF2A2A',
-    borderWidth: 2,
-    borderColor: '#FFD5D5',
   },
   bottomSheet: {
     position: 'absolute',

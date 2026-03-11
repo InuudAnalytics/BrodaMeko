@@ -97,7 +97,7 @@ const ProductCard = ({ product, onPress, onAddToCart }) => {
         <View style={styles.ratingRow}>
           <HugeiconsIcon icon={StarIcon} size={12} color="#E6C714" strokeWidth={2} />
           <AppText style={styles.ratingText}>
-            {product?.rating?.toFixed?.(1) || product?.rating || '0.0'} ({product?.reviews || 0})
+            {Number(product?.rating || 0).toFixed(1)} ({product?.reviews || 0})
           </AppText>
         </View>
 

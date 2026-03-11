@@ -3,11 +3,19 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { CheckmarkCircle01Icon } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../../components';
+import { useAuth } from '../../../context';
 import { ROUTES } from '../../../utils';
 
 const ProductFeedbackSuccessScreen = ({ navigation }) => {
+  const { role } = useAuth();
+
   const handleBackToMarketplace = () => {
-    navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+    if (String(role || '').toLowerCase() === 'mech') {
+      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+      return;
+    }
+
+    navigation.navigate(ROUTES.CAR_OWNER_MARKETPLACE);
   };
 
   return (
@@ -18,7 +26,7 @@ const ProductFeedbackSuccessScreen = ({ navigation }) => {
           <AppText style={styles.title}>Feedback submitted</AppText>
           <AppText style={styles.subtitle}>Thanks for sharing your feedback about this product.</AppText>
           <TouchableOpacity style={styles.primaryButton} onPress={handleBackToMarketplace} activeOpacity={0.85}>
-            <AppText style={styles.primaryText}>Back to marketplace</AppText>
+            <AppText style={styles.primaryText}>Back to Spareparts</AppText>
           </TouchableOpacity>
         </View>
       </View>

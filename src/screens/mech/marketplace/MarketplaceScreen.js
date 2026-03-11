@@ -29,9 +29,13 @@ const mapPartToProduct = (part) => ({
   name: String(part?.name || part?.title || 'Spare part'),
   price: Number(part?.price || 0),
   shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
-  rating: Number(part?.rating || 4.9),
+  rating: Number(part?.rating ?? part?.average_rating ?? 0),
   reviews: Number(part?.reviews || part?.review_count || 0),
   images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+  store: part?.store || null,
+  shopCoordinates: part?.store?.coordinates || null,
+  latitude: part?.store?.coordinates?.latitude ?? part?.latitude ?? null,
+  longitude: part?.store?.coordinates?.longitude ?? part?.longitude ?? null,
 });
 
 const SKELETON_ITEMS = Array.from({ length: 6 }).map((_, index) => ({

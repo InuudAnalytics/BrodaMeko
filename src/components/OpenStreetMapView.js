@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { darkTheme } from '../theme';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -14,7 +14,15 @@ const toNumber = (value, fallback) => {
 const DEFAULT_LAT = 6.5244;
 const DEFAULT_LNG = 3.3792;
 
-const OpenStreetMapView = ({ latitude, longitude, otherLatitude, otherLongitude }) => {
+const OpenStreetMapView = ({
+  latitude,
+  longitude,
+  otherLatitude,
+  otherLongitude,
+  showRoute = false,
+  currentPinColor = darkTheme.colors.accent,
+  targetPinColor = '#FF2D2D',
+}) => {
   const [hasError, setHasError] = useState(false);
   const safeLatitude = clamp(toNumber(latitude, DEFAULT_LAT), -90, 90);
   const safeLongitude = clamp(toNumber(longitude, DEFAULT_LNG), -180, 180);
@@ -34,6 +42,15 @@ const OpenStreetMapView = ({ latitude, longitude, otherLatitude, otherLongitude 
     }),
     [safeLatitude, safeLongitude]
   );
+  const routeCoordinates = useMemo(() => {
+    if (safeOtherLatitude === null || safeOtherLongitude === null) {
+      return [];
+    }
+    return [
+      { latitude: safeLatitude, longitude: safeLongitude },
+      { latitude: safeOtherLatitude, longitude: safeOtherLongitude },
+    ];
+  }, [safeLatitude, safeLongitude, safeOtherLatitude, safeOtherLongitude]);
 
   return (
     <View style={styles.wrap}>
@@ -52,12 +69,19 @@ const OpenStreetMapView = ({ latitude, longitude, otherLatitude, otherLongitude 
       >
         <Marker
           coordinate={{ latitude: safeLatitude, longitude: safeLongitude }}
-          pinColor={darkTheme.colors.accent}
+          pinColor={currentPinColor}
         />
         {safeOtherLatitude !== null && safeOtherLongitude !== null ? (
           <Marker
             coordinate={{ latitude: safeOtherLatitude, longitude: safeOtherLongitude }}
-            pinColor="#FF2D2D"
+            pinColor={targetPinColor}
+          />
+        ) : null}
+        {showRoute && routeCoordinates.length === 2 ? (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="#26A4FF"
+            strokeWidth={5}
           />
         ) : null}
       </MapView>

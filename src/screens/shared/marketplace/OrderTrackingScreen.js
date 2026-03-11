@@ -18,7 +18,8 @@ import {
 } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 import AppAlert from '../../../components/AppAlert';
-const PANEL_MAX_DOWN = 360;
+import { useUserLocation } from '../../../hooks/useUserLocation';
+const PANEL_MAX_DOWN = 520;
 
 const fallbackTimeline = [
   { id: 'confirmed', label: 'Order confirmed', eta: 'Today � 10:15 AM' },
@@ -45,9 +46,51 @@ const fallbackSeller = {
 };
 
 const fallbackAddress = 'No 1, Onireke street, Agbabiaka';
+const NIGERIA_FALLBACK_COORDS = { latitude: 9.0765, longitude: 7.3986 }; // Abuja
 
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
+
+const toFiniteNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const isWithinNigeria = (latitude, longitude) =>
+  Number.isFinite(latitude) &&
+  Number.isFinite(longitude) &&
+  latitude >= 4.0 &&
+  latitude <= 14.5 &&
+  longitude >= 2.5 &&
+  longitude <= 15.0;
+
+const buildStoreCoordinates = ({ route, orderState }) => {
+  const fromRoute = route?.params?.shopCoordinates || {};
+  const fromSeller = orderState?.seller?.coordinates || {};
+  const fromProduct = orderState?.product?.shopCoordinates || orderState?.product?.storeCoordinates || {};
+  const latitude =
+    toFiniteNumber(fromRoute?.latitude) ??
+    toFiniteNumber(fromRoute?.lat) ??
+    toFiniteNumber(fromSeller?.latitude) ??
+    toFiniteNumber(fromSeller?.lat) ??
+    toFiniteNumber(fromProduct?.latitude) ??
+    toFiniteNumber(fromProduct?.lat) ??
+    toFiniteNumber(orderState?.product?.latitude) ??
+    toFiniteNumber(route?.params?.latitude);
+  const longitude =
+    toFiniteNumber(fromRoute?.longitude) ??
+    toFiniteNumber(fromRoute?.lng) ??
+    toFiniteNumber(fromSeller?.longitude) ??
+    toFiniteNumber(fromSeller?.lng) ??
+    toFiniteNumber(fromProduct?.longitude) ??
+    toFiniteNumber(fromProduct?.lng) ??
+    toFiniteNumber(orderState?.product?.longitude) ??
+    toFiniteNumber(route?.params?.longitude);
+  if (isWithinNigeria(latitude, longitude)) {
+    return { latitude, longitude };
+  }
+  return NIGERIA_FALLBACK_COORDS;
+};
 
 const normalizeOrderPayload = (payload) => {
   if (!payload) return null;
@@ -91,12 +134,15 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   const pullDistance = useRef(new Animated.Value(0)).current;
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
+  const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
 
-  const [mapReady] = useState(true);
   const [orderState, setOrderState] = useState({
     product: route?.params?.product || fallbackProduct,
     seller: route?.params?.seller || fallbackSeller,
     deliveryAddress: route?.params?.deliveryAddress || fallbackAddress,
+    storeName: route?.params?.storeName || route?.params?.seller?.name || fallbackSeller.name,
+    storeAddress: route?.params?.storeAddress || fallbackAddress,
+    storeInfo: route?.params?.storeInfo || 'Store information unavailable.',
     statusTimeline: Array.isArray(route?.params?.statusTimeline)
       ? route.params.statusTimeline
       : fallbackTimeline,
@@ -106,13 +152,24 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [orderError, setOrderError] = useState('');
 
-  const { product, seller, deliveryAddress, statusTimeline, orderId, itemId } = orderState;
-
-  const mapCenter = useMemo(() => {
-    const lat = Number(route?.params?.latitude || 6.5244);
-    const lng = Number(route?.params?.longitude || 3.3792);
-    return { latitude: lat, longitude: lng };
-  }, [route?.params?.latitude, route?.params?.longitude]);
+  const { product, seller, deliveryAddress, storeName, storeAddress, storeInfo, statusTimeline, orderId, itemId } = orderState;
+  const shopCoordinates = useMemo(
+    () => buildStoreCoordinates({ route, orderState }),
+    [orderState, route]
+  );
+  // TODO: replace map fallback with backend-provided delivery-driver coordinates for live courier tracking.
+  const liveCoordinates = useMemo(() => {
+    if (permissionStatus !== 'granted') {
+      return null;
+    }
+    const latitude = toFiniteNumber(location?.latitude);
+    const longitude = toFiniteNumber(location?.longitude);
+    if (latitude === null || longitude === null) {
+      return null;
+    }
+    return { latitude, longitude };
+  }, [location?.latitude, location?.longitude, permissionStatus]);
+  const mapOrigin = liveCoordinates || shopCoordinates;
 
   const resolveImageUri = (value) => {
     if (!value) {
@@ -163,9 +220,22 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     [panelY],
   );
 
-  panelY.addListener(({ value }) => {
-    panelYRef.current = value;
-  });
+  useEffect(() => {
+    const id = panelY.addListener(({ value }) => {
+      panelYRef.current = value;
+    });
+    return () => panelY.removeListener(id);
+  }, [panelY]);
+
+  useEffect(() => {
+    if (permissionStatus === 'unknown') {
+      requestPermission();
+      return;
+    }
+    if (permissionStatus === 'granted') {
+      refreshOnce();
+    }
+  }, [permissionStatus, refreshOnce, requestPermission]);
 
   const handleMessageSeller = () => {
     AppAlert.alert('Coming soon', 'Seller chat is not available yet.');
@@ -215,12 +285,16 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           price: part?.price || item?.price || fallbackProduct.price,
           shop: store?.store_name || store?.name || fallbackProduct.shop,
           images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
+          latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
+          longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
+          shopCoordinates: store?.coordinates || null,
         };
 
         const resolvedSeller = {
           name: store?.store_name || store?.name || fallbackSeller.name,
           avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
           isActive: Boolean(store?.is_active ?? true),
+          coordinates: store?.coordinates || null,
         };
 
         const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
@@ -234,6 +308,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           product: resolvedProduct,
           seller: resolvedSeller,
           deliveryAddress: resolvedAddress,
+          storeName: resolvedSeller.name,
+          storeAddress: store?.address || resolvedAddress || prev.storeAddress,
+          storeInfo: store?.description || store?.phone || prev.storeInfo,
           statusTimeline: extractTimeline(item?.status || data?.status),
           itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
         }));
@@ -255,22 +332,15 @@ const OrderTrackingScreen = ({ navigation, route }) => {
         style={styles.screen}
       >
         <View style={styles.mapBackdrop}>
-          {mapReady ? (
-            <>
-              <OpenStreetMapView
-                latitude={mapCenter.latitude}
-                longitude={mapCenter.longitude}
-              />
-              <View style={styles.mockRouteLine} />
-              <View style={styles.mockPin} />
-            </>
-          ) : (
-            <View style={styles.mapFallback}>
-              <AppText style={styles.mapFallbackText}>
-                Map preview unavailable
-              </AppText>
-            </View>
-          )}
+          <OpenStreetMapView
+            latitude={mapOrigin.latitude}
+            longitude={mapOrigin.longitude}
+            otherLatitude={shopCoordinates.latitude}
+            otherLongitude={shopCoordinates.longitude}
+            showRoute={Boolean(liveCoordinates)}
+            currentPinColor={darkTheme.colors.accent}
+            targetPinColor="#FF2D2D"
+          />
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.backButton}
@@ -327,12 +397,16 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                         price: part?.price || item?.price || fallbackProduct.price,
                         shop: store?.store_name || store?.name || fallbackProduct.shop,
                         images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
+                        latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
+                        longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
+                        shopCoordinates: store?.coordinates || null,
                       };
 
                       const resolvedSeller = {
                         name: store?.store_name || store?.name || fallbackSeller.name,
                         avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
                         isActive: Boolean(store?.is_active ?? true),
+                        coordinates: store?.coordinates || null,
                       };
 
                       const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
@@ -346,6 +420,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                         product: resolvedProduct,
                         seller: resolvedSeller,
                         deliveryAddress: resolvedAddress,
+                        storeName: resolvedSeller.name,
+                        storeAddress: store?.address || resolvedAddress || prev.storeAddress,
+                        storeInfo: store?.description || store?.phone || prev.storeInfo,
                         statusTimeline: extractTimeline(item?.status || data?.status),
                         itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
                       }));
@@ -435,6 +512,17 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <AppText style={styles.addressLabel}>Delivery address</AppText>
               <AppText style={styles.addressValue}>{deliveryAddress}</AppText>
             </View>
+            <View style={styles.addressRow}>
+              <AppText style={styles.addressLabel}>Store</AppText>
+              <AppText style={styles.addressValue}>{storeName}</AppText>
+              <AppText style={styles.addressSubValue}>{storeAddress}</AppText>
+              <AppText style={styles.addressHint}>{storeInfo}</AppText>
+            </View>
+            <View style={styles.addressRow}>
+              <AppText style={styles.addressHint}>
+                You are currently seeing your live location and the store pin while delivery-driver routing is pending.
+              </AppText>
+            </View>
 
             <View style={styles.sellerCard}>
               <View style={styles.sellerAvatarWrap}>
@@ -499,37 +587,6 @@ const styles = StyleSheet.create({
   },
   screen: { flex: 1, backgroundColor: darkTheme.colors.background },
   mapBackdrop: { flex: 1, backgroundColor: '#2B2B31', overflow: 'hidden' },
-  mapFallback: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1A1A4A',
-  },
-  mapFallbackText: {
-    color: '#9CA3AF',
-    fontSize: 13,
-  },
-  mockRouteLine: {
-    position: 'absolute',
-    width: 120,
-    height: 3,
-    backgroundColor: '#E6C714',
-    opacity: 0.85,
-    borderRadius: 3,
-    left: '45%',
-    top: '45%',
-  },
-  mockPin: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E6C714',
-    left: '55%',
-    top: '42%',
-    borderWidth: 2,
-    borderColor: '#000033',
-  },
   topBar: {
     marginTop: darkTheme.spacing.xl,
     paddingHorizontal: darkTheme.spacing.lg,
@@ -558,6 +615,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    minHeight: 420,
+    maxHeight: '90%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     backgroundColor: '#000033',
@@ -700,6 +759,17 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     marginTop: 6,
+  },
+  addressSubValue: {
+    color: '#D1D5DB',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  addressHint: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    marginTop: 4,
+    lineHeight: 16,
   },
   sellerCard: {
     flexDirection: 'row',
