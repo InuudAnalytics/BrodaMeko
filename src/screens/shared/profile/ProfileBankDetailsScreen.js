@@ -1,12 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, CenteredHeader, ScreenContainer } from '../../../components';
@@ -35,7 +28,7 @@ import {
 } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { ROLES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const normalizeBankItems = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.banks)) return payload.banks;
@@ -305,7 +298,7 @@ const ProfileBankDetailsScreen = ({ navigation }) => {
       return;
     }
 
-    Alert.alert('Delete bank details', 'Are you sure you want to delete this bank account?', [
+    AppAlert.alert('Delete bank details', 'Are you sure you want to delete this bank account?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -657,3 +650,6 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileBankDetailsScreen;
+
+
+

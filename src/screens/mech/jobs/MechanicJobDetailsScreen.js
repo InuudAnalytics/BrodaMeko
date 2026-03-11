@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { getMechanicAssignedJob, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
-
+import AppAlert from '../../../components/AppAlert';
 const readJob = (response) => {
   const payload = response?.data || response || {};
   if (payload?.job && typeof payload.job === 'object') {
@@ -32,13 +32,23 @@ const toImageUri = (image) => {
   return String(image.url || image.uri || image.path || '').trim();
 };
 
-const STATUS_FLOW = ['en_route', 'arrive', 'in_progress', 'completed'];
+const STATUS_FLOW = ['accepted', 'en_route', 'arrived', 'in_progress', 'completed'];
 
 const normalizeStatus = (value) => {
   const safe = String(value || '').trim().toLowerCase();
-  if (safe === 'arrived') return 'arrive';
+  if (safe === 'arrive') return 'arrived';
+  if (safe === 'enroute' || safe === 'on_the_way') return 'en_route';
   if (safe === 'repairing') return 'in_progress';
+  if (safe === 'done') return 'completed';
   return safe;
+};
+
+const sanitizeOutgoingMechanicStatus = (status) => {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'canceled') {
+    return 'cancelled';
+  }
+  return normalized;
 };
 
 const formatStatus = (value) =>
@@ -51,10 +61,10 @@ const getNextAction = (status) => {
   const currentIndex = STATUS_FLOW.indexOf(normalized);
 
   if (currentIndex === -1) {
-    return { status: 'en_route', label: 'On my way' };
+    return null;
   }
 
-  if (normalized === 'completed') {
+  if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'disputed') {
     return null;
   }
 
@@ -64,12 +74,18 @@ const getNextAction = (status) => {
   }
 
   const labelMap = {
-    arrive: 'Arrived',
+    en_route: 'On my way',
+    arrived: 'Arrived',
     in_progress: 'Start work',
     completed: 'Complete job',
   };
 
   return { status: nextStatus, label: labelMap[nextStatus] || 'Update status' };
+};
+
+const canMechanicProgressStatus = (status) => {
+  const normalized = normalizeStatus(status);
+  return normalized === 'accepted' || normalized === 'en_route' || normalized === 'arrived' || normalized === 'in_progress';
 };
 
 const readCustomerName = (job, fallback = 'N/A') => {
@@ -136,7 +152,7 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
   const images = useMemo(() => readImages(job), [job]);
   const currentStatus = normalizeStatus(job?.status || 'pending');
   const nextAction = getNextAction(currentStatus);
-  const isFinalStatus = currentStatus === 'completed' || currentStatus === 'cancelled';
+  const isFinalStatus = currentStatus === 'completed' || currentStatus === 'cancelled' || currentStatus === 'disputed';
   const customerName =
     customerNameParam ||
     readCustomerName(job, 'N/A') ||
@@ -146,14 +162,24 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
     if (!jobId || updating) {
       return;
     }
+    if (!canMechanicProgressStatus(currentStatus)) {
+      AppAlert.alert('Blocked', 'Status update is available only after customer accepts the quotation.');
+      return;
+    }
+    const safeStatus = sanitizeOutgoingMechanicStatus(status);
+    const allowed = new Set(['en_route', 'arrived', 'in_progress', 'cancelled', 'completed']);
+    if (!allowed.has(safeStatus)) {
+      AppAlert.alert('Error', 'Invalid status transition. Refresh and try again.');
+      return;
+    }
 
-    setUpdating(status);
+    setUpdating(safeStatus);
     try {
-      await updateJobStatus(jobId, status);
+      await updateJobStatus(jobId, safeStatus);
       await fetchDetails();
-      Alert.alert('Success', `Job updated to ${formatStatus(status)}.`);
+      AppAlert.alert('Success', `Job updated to ${formatStatus(safeStatus)}.`);
     } catch (requestError) {
-      Alert.alert('Error', requestError?.message || 'Could not update job status.');
+      AppAlert.alert('Error', requestError?.message || 'Could not update job status.');
     } finally {
       setUpdating('');
     }
@@ -238,9 +264,15 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
             ) : (
               <View style={styles.actions}>
                 <AppButton
-                  label={updating === nextAction?.status ? 'Updating...' : nextAction?.label || 'On my way'}
-                  onPress={() => handleUpdateStatus(nextAction?.status || 'en_route')}
-                  disabled={Boolean(updating)}
+                  label={
+                    updating === nextAction?.status
+                      ? 'Updating...'
+                      : canMechanicProgressStatus(currentStatus)
+                      ? nextAction?.label || 'Update status'
+                      : 'Awaiting acceptance'
+                  }
+                  onPress={() => nextAction?.status && handleUpdateStatus(nextAction.status)}
+                  disabled={Boolean(updating) || !nextAction?.status || !canMechanicProgressStatus(currentStatus)}
                 />
                 <AppButton
                   label={updating === 'cancelled' ? 'Updating...' : 'Cancel job'}
@@ -385,3 +417,7 @@ const styles = StyleSheet.create({
 });
 
 export default MechanicJobDetailsScreen;
+
+
+
+

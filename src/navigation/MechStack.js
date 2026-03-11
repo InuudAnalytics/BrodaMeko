@@ -20,7 +20,6 @@ import {
   UploadProfilePhotoScreen,
 } from '../screens/mech/profile';
 import MechanicChatScreen from '../screens/mech/chat/MechanicChatScreen';
-import MechanicJobDetailsScreen from '../screens/mech/jobs/MechanicJobDetailsScreen';
 import SetServicesScreen from '../screens/mech/home/SetServicesScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
@@ -100,11 +99,6 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.MECH_CHAT}
         component={MechanicChatScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name={ROUTES.MECH_JOB_DETAILS}
-        component={MechanicJobDetailsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

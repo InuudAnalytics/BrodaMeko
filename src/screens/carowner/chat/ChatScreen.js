@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppBottomNav, AppText } from '../../../components';
@@ -36,7 +36,8 @@ const isActiveStatus = value => {
 };
 
 const CarOwnerChatScreen = ({ navigation, route }) => {
-  const { latestJobStatusUpdate } = useChat();
+  const { latestJobStatusUpdate, setCarOwnerChatShortcut } = useChat();
+  const autoOpenedTrackingRef = useRef(false);
 
   const jobId = route?.params?.jobId;
   const mechanicId = route?.params?.mechanicId;
@@ -46,7 +47,7 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
   // Seed the initial status from whatever was passed in route params.
   // EscrowFundingScreen passes `progressStatus: 'accepted'` after payment.
   // If the user navigates back to chat from elsewhere the status may already
-  // be set. Defaults to empty — tracking banner stays hidden until we know.
+  // be set. Defaults to empty - tracking banner stays hidden until we know.
   const [progressStatus, setProgressStatus] = useState(
     String(route?.params?.progressStatus || '')
       .toLowerCase()
@@ -73,8 +74,22 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
       .trim();
     if (newStatus) {
       setProgressStatus(newStatus);
+      if (newStatus === 'en_route' && !autoOpenedTrackingRef.current) {
+        autoOpenedTrackingRef.current = true;
+        navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD, {
+          activeSession: {
+            status: 'active',
+            progressStatus: newStatus,
+            jobId,
+            conversationId,
+            mechanic: route?.params?.mechanic || null,
+            mechanicId,
+            issueSummary: route?.params?.issueSummary || null,
+          },
+        });
+      }
     }
-  }, [latestJobStatusUpdate, jobId]);
+  }, [conversationId, jobId, latestJobStatusUpdate, mechanicId, navigation, route?.params?.issueSummary, route?.params?.mechanic]);
 
   // Sync if the route param changes (e.g. navigated back to chat with a new
   // progressStatus after payment).
@@ -97,6 +112,30 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
       navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD);
     }
   }, [hasValidParams, navigation]);
+
+  useEffect(() => {
+    if (!hasValidParams) {
+      return;
+    }
+
+    setCarOwnerChatShortcut({
+      conversationId,
+      jobId: String(jobId || '').trim(),
+      mechanicId,
+      mechanic: route?.params?.mechanic || null,
+      issueSummary: route?.params?.issueSummary || null,
+      progressStatus,
+    });
+  }, [
+    hasValidParams,
+    conversationId,
+    jobId,
+    mechanicId,
+    progressStatus,
+    route?.params?.issueSummary,
+    route?.params?.mechanic,
+    setCarOwnerChatShortcut,
+  ]);
 
   const mechanic = useMemo(
     () =>
@@ -174,7 +213,7 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
             onPress={handleOpenTracking}
           >
             <AppText style={styles.trackingBtnText}>
-              Mechanic assigned — View live tracking
+              Mechanic assigned - View live tracking
             </AppText>
           </TouchableOpacity>
         ) : null}

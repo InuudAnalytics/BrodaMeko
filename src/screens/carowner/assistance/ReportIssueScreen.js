@@ -1,16 +1,5 @@
 import React, { useContext, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -25,10 +14,11 @@ import {
 } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import { useNotifications } from '../../../context';
 import JobsContext from '../../../context/JobsContext';
 import { darkTheme, withAlpha } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const ISSUE_GROUPS = [
   {
     key: 'tyres_wheels',
@@ -185,7 +175,7 @@ const UploadImageGlyph = ({ color }) => {
 };
 
 const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
-  const maxReached = images.length >= 5;
+  const maxReached = images.length >= 2;
   const hasImages = images.length > 0;
 
   return (
@@ -197,7 +187,7 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
       {hasImages ? (
         <View style={styles.uploadWrap}>
           <View style={styles.previewGrid}>
-            {images.slice(0, 5).map((image) => (
+            {images.slice(0, 2).map((image) => (
               <View key={image.id} style={styles.previewTile}>
                 <Image source={{ uri: image.uri }} style={styles.previewImage} />
                 <TouchableOpacity
@@ -245,7 +235,7 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
       )}
 
       {maxReached ? (
-        <AppText style={styles.uploadMaxText}>Maximum of 5 upload is exhausted</AppText>
+        <AppText style={styles.uploadMaxText}>Maximum of 2 uploads reached</AppText>
       ) : null}
 
       {images.length ? (
@@ -259,6 +249,7 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
 
 const ReportIssueScreen = ({ navigation }) => {
   const jobsContext = useContext(JobsContext);
+  const { promptPermissionIfNeeded } = useNotifications();
   const [activeGroupKey, setActiveGroupKey] = useState(ISSUE_GROUPS[0].key);
   const [selectedIssueType, setSelectedIssueType] = useState('');
   const [description, setDescription] = useState('');
@@ -320,7 +311,7 @@ const ReportIssueScreen = ({ navigation }) => {
   };
 
   const handleAddPhotos = async () => {
-    if (images.length >= 5) {
+    if (images.length >= 2) {
       return;
     }
     setIsPickingImage(true);
@@ -333,7 +324,7 @@ const ReportIssueScreen = ({ navigation }) => {
       }
 
       if (pickerError) {
-        Alert.alert('Upload failed', pickerError);
+        AppAlert.alert('Upload failed', pickerError);
         return;
       }
 
@@ -347,11 +338,11 @@ const ReportIssueScreen = ({ navigation }) => {
               fileName: asset.fileName || '',
               type: asset.type || '',
             },
-          ].slice(0, 5)
+          ].slice(0, 2)
         );
       }
     } catch {
-      Alert.alert('Upload failed', 'Could not open gallery. Please try again.');
+      AppAlert.alert('Upload failed', 'Could not open gallery. Please try again.');
     } finally {
       setIsPickingImage(false);
     }
@@ -426,6 +417,7 @@ const ReportIssueScreen = ({ navigation }) => {
         return;
       }
 
+      await promptPermissionIfNeeded?.('car_owner_job_created_navigate_find_mechanics');
       navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
         jobId,
         job: jobPayload || undefined,
@@ -800,3 +792,6 @@ const styles = StyleSheet.create({
 });
 
 export default ReportIssueScreen;
+
+
+

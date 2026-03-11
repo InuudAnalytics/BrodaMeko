@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, pickSingleImageFromGallery, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const KycUploadScreen = ({ navigation, route }) => {
   const { mechanicProfile, setKyc, completedSteps } = useMechanicProfile();
   const [ninImages, setNinImages] = useState(mechanicProfile.ninImages?.slice(0, 1) || []);
@@ -22,7 +22,7 @@ const KycUploadScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.photo) {
-      Alert.alert('Complete previous step', 'Please upload your profile photo first.');
+      AppAlert.alert('Complete previous step', 'Please upload your profile photo first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
   }, [completedSteps.photo, isOnboarding, navigation]);
@@ -40,7 +40,7 @@ const KycUploadScreen = ({ navigation, route }) => {
       }
 
       if (error) {
-        Alert.alert('Upload failed', error);
+        AppAlert.alert('Upload failed', error);
         return;
       }
 
@@ -250,3 +250,7 @@ const styles = StyleSheet.create({
 });
 
 export default KycUploadScreen;
+
+
+
+

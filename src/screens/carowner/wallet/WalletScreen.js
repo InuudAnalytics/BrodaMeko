@@ -32,7 +32,7 @@ import { ROUTES } from '../../../utils';
 
 const toNaira = (value) => {
   const amount = Number(value || 0);
-  return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+  return `\u20A6${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 };
 
 const toAmountWithSign = (amount, forceNegative = false) => {
@@ -63,6 +63,51 @@ const readTransactions = (payload) => {
   return [];
 };
 
+const normalizeStatusText = (value) => String(value || '').trim().toLowerCase();
+
+const resolveTransactionStatusBadge = (item) => {
+  const escrow = normalizeStatusText(item?.rawEscrowStatus);
+  const payment = normalizeStatusText(item?.rawPaymentStatus);
+  const status = normalizeStatusText(item?.rawStatus);
+  const haystack = `${escrow} ${payment} ${status}`.trim();
+
+  if (['held', 'in_escrow', 'funded', 'secured'].includes(escrow)) {
+    return { label: 'In escrow', tone: 'warning' };
+  }
+
+  if (['released', 'disbursed'].includes(escrow)) {
+    return { label: 'Released', tone: 'success' };
+  }
+
+  if (['refunded', 'reversed'].includes(escrow)) {
+    return { label: 'Refunded', tone: 'neutral' };
+  }
+
+  if (haystack.includes('pending') || haystack.includes('processing')) {
+    return { label: 'Pending', tone: 'warning' };
+  }
+
+  if (
+    haystack.includes('success') ||
+    haystack.includes('successful') ||
+    haystack.includes('paid') ||
+    haystack.includes('completed')
+  ) {
+    return { label: 'Successful', tone: 'success' };
+  }
+
+  if (
+    haystack.includes('failed') ||
+    haystack.includes('cancelled') ||
+    haystack.includes('canceled') ||
+    haystack.includes('declined')
+  ) {
+    return { label: 'Failed', tone: 'danger' };
+  }
+
+  return { label: 'Processing', tone: 'neutral' };
+};
+
 const normalizeTransaction = (item, index, source) => {
   const amount = Number(item?.amount || item?.value || 0);
   const inferredType =
@@ -91,6 +136,8 @@ const normalizeTransaction = (item, index, source) => {
     rawAmount: amount,
     rawType: type,
     rawStatus: String(item?.status || '').toLowerCase(),
+    rawPaymentStatus: String(item?.payment_status || item?.paymentStatus || '').toLowerCase(),
+    rawEscrowStatus: String(item?.escrow_status || item?.escrowStatus || '').toLowerCase(),
     rawTitle: String(item?.title || item?.narration || item?.description || '').toLowerCase(),
     rawSource: source || 'transactions',
   };
@@ -170,6 +217,8 @@ const ActionButton = ({ label, icon, onPress }) => {
 };
 
 const TransactionItem = ({ item, onPress }) => {
+  const statusBadge = resolveTransactionStatusBadge(item);
+
   return (
     <TouchableOpacity
       style={styles.txnRow}
@@ -183,9 +232,30 @@ const TransactionItem = ({ item, onPress }) => {
 
       <View style={styles.txnBody}>
         <AppText style={styles.txnTitle}>{item.title}</AppText>
-        <AppText variant="muted" style={styles.txnSubtitle} numberOfLines={1}>
-          {item.subtitle}
-        </AppText>
+        <View style={styles.txnSubRow}>
+          <AppText variant="muted" style={styles.txnSubtitle} numberOfLines={1}>
+            {item.subtitle}
+          </AppText>
+          <View
+            style={[
+              styles.txnStatusBadge,
+              statusBadge.tone === 'success' ? styles.txnStatusBadgeSuccess : null,
+              statusBadge.tone === 'warning' ? styles.txnStatusBadgeWarning : null,
+              statusBadge.tone === 'danger' ? styles.txnStatusBadgeDanger : null,
+            ]}
+          >
+            <AppText
+              style={[
+                styles.txnStatusBadgeText,
+                statusBadge.tone === 'success' ? styles.txnStatusBadgeTextSuccess : null,
+                statusBadge.tone === 'warning' ? styles.txnStatusBadgeTextWarning : null,
+                statusBadge.tone === 'danger' ? styles.txnStatusBadgeTextDanger : null,
+              ]}
+            >
+              {statusBadge.label}
+            </AppText>
+          </View>
+        </View>
       </View>
 
       <View style={styles.txnMeta}>
@@ -920,6 +990,44 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.48)',
     fontSize: 14,
     lineHeight: 16,
+  },
+  txnSubRow: {
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  txnStatusBadge: {
+    marginLeft: 8,
+    minHeight: 18,
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txnStatusBadgeSuccess: {
+    backgroundColor: 'rgba(60, 200, 120, 0.18)',
+  },
+  txnStatusBadgeWarning: {
+    backgroundColor: 'rgba(230, 199, 20, 0.22)',
+  },
+  txnStatusBadgeDanger: {
+    backgroundColor: 'rgba(248, 113, 113, 0.2)',
+  },
+  txnStatusBadgeText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  txnStatusBadgeTextSuccess: {
+    color: '#7CF0A6',
+  },
+  txnStatusBadgeTextWarning: {
+    color: '#E6C714',
+  },
+  txnStatusBadgeTextDanger: {
+    color: '#F87171',
   },
   txnMeta: {
     alignItems: 'flex-end',

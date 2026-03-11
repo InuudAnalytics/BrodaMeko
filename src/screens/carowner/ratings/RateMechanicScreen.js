@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { leaveMechanicReview } from '../../../services/mechanic-reviews.service';
 import { darkTheme } from '../../../theme';
-
+import AppAlert from '../../../components/AppAlert';
 const TAGS = ['Arrived on time', 'Professional', 'Friendly', 'Resolved issue quickly'];
 
 const pad2 = (value) => String(value).padStart(2, '0');
@@ -73,12 +73,12 @@ const RateMechanicScreen = ({ navigation, route }) => {
 
   const handleSubmit = async () => {
     if (!rating) {
-      Alert.alert('Select rating', 'Please choose a star rating before submitting.');
+      AppAlert.alert('Select rating', 'Please choose a star rating before submitting.');
       return;
     }
 
     if (!mechanicId) {
-      Alert.alert('Missing mechanic', 'Could not identify mechanic for this review.');
+      AppAlert.alert('Missing mechanic', 'Could not identify mechanic for this review.');
       return;
     }
 
@@ -89,9 +89,9 @@ const RateMechanicScreen = ({ navigation, route }) => {
         rating,
         comment: commentText || 'No additional comment.',
       });
-      Alert.alert('Rating submitted', 'Thanks for your feedback.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      AppAlert.alert('Rating submitted', 'Thanks for your feedback.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (submitError) {
-      Alert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
+      AppAlert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
     } finally {
       setSubmitting(false);
     }
@@ -297,3 +297,7 @@ const styles = StyleSheet.create({
 });
 
 export default RateMechanicScreen;
+
+
+
+

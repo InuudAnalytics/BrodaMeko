@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
@@ -8,7 +8,7 @@ import { getMechanicBankList } from '../../../services/mechanic.service';
 import { addSellerBank, verifySellerBank } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getSparePartsOnboardingStepIndex, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const normalizeBankItems = (payload) => {
   if (Array.isArray(payload)) {
     return payload;
@@ -68,7 +68,7 @@ const SparePartsBankDetailsScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.address) {
-      Alert.alert('Complete previous step', 'Please add your address first.');
+      AppAlert.alert('Complete previous step', 'Please add your address first.');
       navigation.replace(ROUTES.SPARE_PARTS_PROFILE_SETUP);
     }
   }, [completedSteps.address, isOnboarding, navigation]);
@@ -552,3 +552,7 @@ const styles = StyleSheet.create({
 });
 
 export default SparePartsBankDetailsScreen;
+
+
+
+

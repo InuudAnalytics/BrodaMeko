@@ -141,6 +141,9 @@ export const useUserLocation = () => {
       }
 
       setPermissionStatus(normalized);
+      if (__DEV__) {
+        console.log('[Location][Telemetry] request_permission_result', { status: normalized });
+      }
 
       if (normalized === PERMISSION_STATE.granted) {
         await refreshOnce();
@@ -161,8 +164,36 @@ export const useUserLocation = () => {
       setPermissionStatus(PERMISSION_STATE.blocked);
       return;
     }
-    requestPermission();
-  }, [requestPermission]);
+    let mounted = true;
+
+    const hydratePermissionState = async () => {
+      try {
+        const checkedStatus = await check(LOCATION_PERMISSION);
+        const normalized = normalizePermissionStatus(checkedStatus);
+        if (!mounted) {
+          return;
+        }
+        setPermissionStatus(normalized);
+        if (__DEV__) {
+          console.log('[Location][Telemetry] check_permission_on_mount', { status: normalized });
+        }
+        if (normalized === PERMISSION_STATE.granted) {
+          await refreshOnce();
+        }
+      } catch (requestError) {
+        if (!mounted) {
+          return;
+        }
+        setPermissionStatus(PERMISSION_STATE.blocked);
+        setError(requestError?.message || 'Location permission check failed.');
+      }
+    };
+
+    hydratePermissionState();
+    return () => {
+      mounted = false;
+    };
+  }, [refreshOnce]);
 
   useEffect(() => {
     return () => {

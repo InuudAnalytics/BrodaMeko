@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppText } from '../../../components';
 import { useChat } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const hexToRgba = (hex, alpha) => {
     const cleaned = String(hex || '').replace('#', '').trim();
     if (cleaned.length !== 6) {
@@ -18,8 +18,9 @@ const hexToRgba = (hex, alpha) => {
 };
 
 const MechanicChatScreen = ({ navigation, route }) => {
-    const { latestJobStatusUpdate } = useChat();
+    const { latestJobStatusUpdate, setMechanicChatShortcut, clearMechanicChatShortcut } = useChat();
     const cancellationShownRef = useRef(false);
+    const autoOpenedTrackingRef = useRef(false);
     const handleBack = useCallback(() => navigation.goBack(), [navigation]);
     const jobId = route?.params?.jobId;
     const mechanicId = route?.params?.mechanicId;
@@ -39,6 +40,29 @@ const MechanicChatScreen = ({ navigation, route }) => {
     }, [hasValidParams, navigation]);
 
     useEffect(() => {
+        if (!hasValidParams) {
+            return;
+        }
+        setMechanicChatShortcut({
+            conversationId,
+            jobId: String(jobId || '').trim(),
+            mechanicId: mechanicId || null,
+            customer: route?.params?.customer || null,
+            issueSummary: route?.params?.issueSummary || null,
+            progressStatus: route?.params?.progressStatus || '',
+        });
+    }, [
+        hasValidParams,
+        conversationId,
+        jobId,
+        mechanicId,
+        route?.params?.customer,
+        route?.params?.issueSummary,
+        route?.params?.progressStatus,
+        setMechanicChatShortcut,
+    ]);
+
+    useEffect(() => {
         if (!latestJobStatusUpdate || cancellationShownRef.current) {
             return;
         }
@@ -53,18 +77,55 @@ const MechanicChatScreen = ({ navigation, route }) => {
         )
             .trim()
             .toLowerCase();
+
+        if (nextStatus === 'en_route' && !autoOpenedTrackingRef.current) {
+            autoOpenedTrackingRef.current = true;
+            const customerFromParams = route?.params?.customer || {
+                id: route?.params?.carOwnerId || null,
+                name: route?.params?.name || 'Customer',
+                initials: 'C',
+                avatarUri: route?.params?.avatarUri || route?.params?.avatar || '',
+            };
+
+            navigation.navigate(ROUTES.MECH_LIVE_TRACKING, {
+                jobId: route?.params?.jobId,
+                mechanicId: route?.params?.mechanicId,
+                carOwnerId: route?.params?.carOwnerId || customerFromParams?.id || null,
+                customer: customerFromParams,
+                conversationId: route?.params?.conversationId,
+                issueSummary: route?.params?.issueSummary || null,
+                trackingStatus: nextStatus,
+                progressStatus: nextStatus,
+            });
+        }
+
         if (nextStatus !== 'cancelled' && nextStatus !== 'canceled') {
             return;
         }
 
         cancellationShownRef.current = true;
-        Alert.alert('Job cancelled', 'Customer cancelled this job. Chat has been closed.', [
+        clearMechanicChatShortcut();
+        AppAlert.alert('Job cancelled', 'Customer cancelled this job. Chat has been closed.', [
             {
                 text: 'OK',
                 onPress: () => navigation.replace(ROUTES.MECH_DASHBOARD_TABS),
             },
         ]);
-    }, [jobId, latestJobStatusUpdate, navigation]);
+    }, [
+        clearMechanicChatShortcut,
+        jobId,
+        latestJobStatusUpdate,
+        navigation,
+        route?.params?.avatar,
+        route?.params?.avatarUri,
+        route?.params?.carOwnerId,
+        route?.params?.conversationId,
+        route?.params?.customer,
+        route?.params?.issueSummary,
+        route?.params?.jobId,
+        route?.params?.mechanicId,
+        route?.params?.name,
+    ]);
 
     if (!hasValidParams) {
         return null;
@@ -208,3 +269,7 @@ const styles = StyleSheet.create({
 });
 
 export default MechanicChatScreen;
+
+
+
+

@@ -15,15 +15,17 @@ import {
   CarOwnerProfileScreen,
   CarOwnerReportIssueScreen,
   CarOwnerRequestDiagnosticsScreen,
+  CarOwnerTowingCompaniesScreen,
   CarOwnerRewardsScreen,
   CarOwnerWithdrawScreen,
   CarOwnerAddContactSuccessScreen,
 } from '../screens';
 import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
 import EditJobScreen from '../screens/carowner/history/EditJobScreen';
-import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
 import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
 import EscrowFundingScreen from '../screens/carowner/wallet/EscrowFundingScreen';
+import CardPaymentScreen from '../screens/carowner/wallet/CardPaymentScreen';
+import JobPaystackCheckoutScreen from '../screens/carowner/wallet/JobPaystackCheckoutScreen';
 import PaymentSuccessScreen from '../screens/carowner/wallet/PaymentSuccessScreen';
 import WaitingMechanicScreen from '../screens/carowner/assistance/WaitingMechanicScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
@@ -41,6 +43,7 @@ import CheckoutScreen from '../screens/carowner/marketplace/CheckoutScreen';
 import MarketplacePaymentSuccessScreen from '../screens/carowner/marketplace/PaymentSuccessScreen';
 import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
 import OrderTrackingScreen from '../screens/carowner/marketplace/OrderTrackingScreen';
+import PickupTrackingScreen from '../screens/carowner/marketplace/PickupTrackingScreen';
 import RateProductScreen from '../screens/carowner/marketplace/RateProductScreen';
 import OrderDeliveredSuccessScreen from '../screens/carowner/marketplace/OrderDeliveredSuccessScreen';
 import ProductFeedbackSuccessScreen from '../screens/carowner/marketplace/ProductFeedbackSuccessScreen';
@@ -90,6 +93,11 @@ const CarOwnerStack = () => {
       />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ headerShown: false }} />
       <Stack.Screen
+        name={ROUTES.CAR_OWNER_PICKUP_TRACKING}
+        component={PickupTrackingScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="SparePartsOrderTrackingScreen"
         component={OrderTrackingScreen}
         options={{ headerShown: false }}
@@ -121,6 +129,16 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name={ROUTES.CAR_OWNER_CARD_PAYMENT}
+        component={CardPaymentScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_JOB_PAYSTACK_CHECKOUT}
+        component={JobPaystackCheckoutScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name={ROUTES.CAR_OWNER_PAYMENT_SUCCESS}
         component={PaymentSuccessScreen}
         options={{ headerShown: false }}
@@ -143,11 +161,6 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_MECHANIC_REVIEWS}
         component={CarOwnerMechanicReviewsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name={ROUTES.CAR_OWNER_JOB_DETAILS}
-        component={JobDetailsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -198,6 +211,11 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS}
         component={CarOwnerRequestDiagnosticsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_TOWING_COMPANIES}
+        component={CarOwnerTowingCompaniesScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

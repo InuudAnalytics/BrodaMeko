@@ -5,7 +5,7 @@ import { MinusSignIcon, PlusSignIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { useJobs } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
-import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
+import { pickSingleImageFromGallery } from '../../../utils';
 
 const toImageItem = (image) => {
   if (!image) {
@@ -43,12 +43,12 @@ const EditJobScreen = ({ navigation, route }) => {
     (Array.isArray(seedJob?.images) ? seedJob.images : [])
       .map(toImageItem)
       .filter(Boolean)
-      .slice(0, 5)
+      .slice(0, 2)
   );
   const [removedImages, setRemovedImages] = useState([]);
   const [error, setError] = useState('');
 
-  const canAddMore = useMemo(() => images.length < 5, [images.length]);
+  const canAddMore = useMemo(() => images.length < 2, [images.length]);
 
   const handleAddImage = async () => {
     if (!canAddMore) {
@@ -78,7 +78,7 @@ const EditJobScreen = ({ navigation, route }) => {
         type: asset.type,
         isExisting: false,
       },
-    ].slice(0, 5));
+    ].slice(0, 2));
   };
 
   const handleRemoveImage = (index) => {
@@ -129,7 +129,7 @@ const EditJobScreen = ({ navigation, route }) => {
       return;
     }
 
-    navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, { jobId, refresh: Date.now() });
+    navigation.goBack();
   };
 
   return (
@@ -163,7 +163,7 @@ const EditJobScreen = ({ navigation, route }) => {
 
         <View style={styles.imagesHeader}>
           <AppText style={styles.label}>Images</AppText>
-          <AppText style={styles.helper}>{images.length}/5</AppText>
+          <AppText style={styles.helper}>{images.length}/2</AppText>
         </View>
         <View style={styles.imageGrid}>
           {images.map((image, index) => (

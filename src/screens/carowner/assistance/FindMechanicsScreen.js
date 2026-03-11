@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,6 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useChat } from '../../../context';
+import { useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 import { getMechanicsForJob, hireMechanicForJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
@@ -288,21 +289,40 @@ const MechanicCard = ({ item, loading, onHire }) => {
 
 const FindMechanicsScreen = ({ navigation, route }) => {
   const { clearActiveConversation } = useChat();
-  const { location, refreshOnce } = useUserLocation();
+  const { permissionStatus: notificationPermissionStatus, promptPermissionIfNeeded } = useNotifications();
+  const { location, permissionStatus: locationPermissionStatus, requestPermission, refreshOnce } = useUserLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadingMechanicId, setLoadingMechanicId] = useState(null);
   const [mechanics, setMechanics] = useState([]);
   const [matchedIssueType, setMatchedIssueType] = useState('');
   const [locationLabel, setLocationLabel] = useState('');
+  const hasAutoRequestedLocationRef = useRef(false);
 
   const jobId = String(route?.params?.jobId || '').trim();
   const issueSummary = normalizeIssueSummary(route?.params?.job);
   const locationText = locationLabel || route?.params?.location || 'Detecting location...';
 
   useEffect(() => {
+    promptPermissionIfNeeded?.('car_owner_find_mechanics_mount');
     refreshOnce?.();
-  }, [refreshOnce]);
+  }, [promptPermissionIfNeeded, refreshOnce]);
+
+  useEffect(() => {
+    const locationStatus = String(locationPermissionStatus || '').toLowerCase();
+    const notifStatus = String(notificationPermissionStatus || '').toLowerCase();
+    if (locationStatus !== 'unknown') {
+      return;
+    }
+    if (notifStatus === 'unknown') {
+      return;
+    }
+    if (hasAutoRequestedLocationRef.current) {
+      return;
+    }
+    hasAutoRequestedLocationRef.current = true;
+    requestPermission();
+  }, [locationPermissionStatus, notificationPermissionStatus, requestPermission, hasAutoRequestedLocationRef]);
 
   useEffect(() => {
     let active = true;
@@ -365,8 +385,9 @@ const FindMechanicsScreen = ({ navigation, route }) => {
 
   useFocusEffect(
     useCallback(() => {
+      promptPermissionIfNeeded?.('car_owner_find_mechanics_focus');
       fetchMechanics();
-    }, [fetchMechanics])
+    }, [fetchMechanics, promptPermissionIfNeeded])
   );
 
   const handleHire = async (mechanic) => {

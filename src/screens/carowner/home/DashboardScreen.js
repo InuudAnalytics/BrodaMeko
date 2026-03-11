@@ -1,17 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  BackHandler,
-  Image,
-  InteractionManager,
-  PanResponder,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Image, InteractionManager, PanResponder, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Location06Icon, Mail01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
@@ -28,20 +16,20 @@ import {
 } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
-import { useAuth, useNotifications } from '../../../context';
+import { useAuth, useChat, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { confirmJob, getLatestJobLocation, updateJobStatus } from '../../../services/jobs.service';
+import { confirmJob, getLatestJobLocation, updateJobLocation, updateJobStatus } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
-import { closeScoped, connectScoped } from '../../../services/ws.service';
+import { closeScoped, connectScoped, sendScoped } from '../../../services/ws.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getWATGreeting, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const PANEL_MAX_DOWN = 320;
 const TRACKER_STEPS = [
   { key: 'accepted', label: 'Accepted' },
   { key: 'en_route', label: 'En Route' },
   { key: 'arrived', label: 'Arrived' },
-  { key: 'repairing', label: 'Repairing' },
+  { key: 'in_progress', label: 'Repairing' },
   { key: 'completed', label: 'Completed' },
 ];
 
@@ -65,7 +53,7 @@ const normalizeProgressStatus = (value) => {
   }
 
   if (status === 'repairing' || status === 'in_progress') {
-    return 'repairing';
+    return 'in_progress';
   }
 
   if (status === 'completed' || status === 'done') {
@@ -80,6 +68,9 @@ const extractFirstName = (user) => {
   const fullName = String(rawName).trim();
   return fullName ? fullName.split(/\s+/)[0] : '';
 };
+
+const readUserId = (user) =>
+  String(user?.id || user?._id || user?.user_id || '').trim();
 
 const normalizeAvatarUri = (value) => {
   const raw = String(value || '').trim();
@@ -156,7 +147,8 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
 
 const DashboardScreen = ({ navigation, route }) => {
   const { user, token } = useAuth();
-  const { unreadTick } = useNotifications();
+  const { carOwnerChatShortcut, clearCarOwnerChatShortcut } = useChat();
+  const { unreadTick, permissionStatus: notificationPermissionStatus, promptPermissionIfNeeded } = useNotifications();
   const { location, permissionStatus, loading, requestPermission, refreshOnce } = useUserLocation();
   const [activeSession, setActiveSession] = useState(null);
   const [syncing, setSyncing] = useState(false);
@@ -170,6 +162,7 @@ const DashboardScreen = ({ navigation, route }) => {
   const dragStartRef = useRef(0);
   const lastLocationUpdateRef = useRef(0);
   const locationPollRef = useRef(null);
+  const hasAutoRequestedLocationRef = useRef(false);
 
   useEffect(() => {
     const id = panelY.addListener(({ value }) => {
@@ -195,8 +188,35 @@ const DashboardScreen = ({ navigation, route }) => {
   const greetingText = firstName ? `${greetingPrefix}, ${firstName}` : greetingPrefix;
   const avatarInitial = firstName.charAt(0).toUpperCase() || 'U';
   const avatarUri = readAvatarUri(user);
+  const userId = readUserId(user);
   const hasLocationPermission = LOCATION_ENABLED && permissionStatus === 'granted';
   const isLocationBlocked = LOCATION_ENABLED && permissionStatus === 'blocked';
+
+  useFocusEffect(
+    useCallback(() => {
+      promptPermissionIfNeeded?.('car_owner_dashboard_focus');
+      return undefined;
+    }, [promptPermissionIfNeeded])
+  );
+
+  useEffect(() => {
+    const locationStatus = String(permissionStatus || '').toLowerCase();
+    const notifStatus = String(notificationPermissionStatus || '').toLowerCase();
+    if (!LOCATION_ENABLED) {
+      return;
+    }
+    if (locationStatus !== 'unknown') {
+      return;
+    }
+    if (notifStatus === 'unknown') {
+      return;
+    }
+    if (hasAutoRequestedLocationRef.current) {
+      return;
+    }
+    hasAutoRequestedLocationRef.current = true;
+    requestPermission();
+  }, [notificationPermissionStatus, permissionStatus, requestPermission]);
 
   useFocusEffect(
     useCallback(() => {
@@ -252,7 +272,7 @@ const DashboardScreen = ({ navigation, route }) => {
     const jobId = String(activeSession?.jobId || '').trim();
     const safeToken = String(token || '').trim();
     const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
-    const trackingAllowed = ['accepted', 'en_route', 'arrived', 'repairing'].includes(progressStatus);
+    const trackingAllowed = ['accepted', 'en_route', 'arrived', 'in_progress'].includes(progressStatus);
 
     if (!jobId || !safeToken || !trackingAllowed) {
       setTrackedLocation(null);
@@ -260,7 +280,6 @@ const DashboardScreen = ({ navigation, route }) => {
       return undefined;
     }
 
-    let mounted = true;
     lastLocationUpdateRef.current = 0;
 
     const handleMessage = (event) => {
@@ -279,6 +298,12 @@ const DashboardScreen = ({ navigation, route }) => {
           return;
         }
 
+        const senderRole = String(payload?.sender_role || payload?.role || '').trim().toLowerCase();
+        const senderId = String(payload?.sender_id || payload?.user_id || '').trim();
+        if (senderRole === 'car_owner' || (senderId && userId && senderId === userId)) {
+          return;
+        }
+
         const lat = Number(payload?.lat);
         const lng = Number(payload?.lng);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -286,9 +311,7 @@ const DashboardScreen = ({ navigation, route }) => {
         }
 
         lastLocationUpdateRef.current = Date.now();
-        if (mounted) {
-          setTrackedLocation({ latitude: lat, longitude: lng });
-        }
+        setTrackedLocation({ latitude: lat, longitude: lng });
       } catch {
         // ignore invalid payloads
       }
@@ -296,43 +319,65 @@ const DashboardScreen = ({ navigation, route }) => {
 
     connectScoped('job_location', safeToken, handleMessage);
 
-    const pollLatest = async () => {
+    const broadcastOwnLocation = async () => {
+      if (!hasLocationPermission) {
+        return;
+      }
+
       try {
-        const response = await getLatestJobLocation(jobId);
-        const payload = response?.data || response || {};
-        const lat = Number(payload?.lat ?? payload?.latitude);
-        const lng = Number(payload?.lng ?? payload?.longitude);
+        const refreshed = await refreshOnce?.();
+        const source = refreshed || location;
+        const lat = Number(source?.latitude);
+        const lng = Number(source?.longitude);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
           return;
         }
 
-        lastLocationUpdateRef.current = Date.now();
-        if (mounted) {
-          setTrackedLocation({ latitude: lat, longitude: lng });
-        }
+        const payload = {
+          type: 'job_location_update',
+          job_id: jobId,
+          sender_role: 'car_owner',
+          sender_id: userId || undefined,
+          lat,
+          lng,
+          heading: 0,
+          speed: 0,
+        };
+
+        sendScoped('job_location', payload);
+
+        await updateJobLocation(jobId, {
+          lat,
+          lng,
+          heading: 0,
+          speed: 0,
+        });
       } catch {
-        // ignore polling errors
+        // best effort only
       }
     };
 
-    const interval = setInterval(() => {
-      const lastUpdate = lastLocationUpdateRef.current || 0;
-      if (!lastUpdate || Date.now() - lastUpdate > 5000) {
-        pollLatest();
-      }
-    }, 3000);
+    const interval = setInterval(broadcastOwnLocation, 5000);
+    broadcastOwnLocation();
 
     locationPollRef.current = interval;
 
     return () => {
-      mounted = false;
       if (locationPollRef.current) {
         clearInterval(locationPollRef.current);
         locationPollRef.current = null;
       }
       closeScoped('job_location');
     };
-  }, [activeSession?.jobId, activeSession?.progressStatus, token]);
+  }, [
+    activeSession?.jobId,
+    activeSession?.progressStatus,
+    hasLocationPermission,
+    location,
+    refreshOnce,
+    token,
+    userId,
+  ]);
 
   const locationBadgeText = useMemo(() => {
     if (!location) {
@@ -446,7 +491,12 @@ const DashboardScreen = ({ navigation, route }) => {
 
   const handleCancelJob = async () => {
     const jobId = String(activeSession?.jobId || '').trim();
-    if (!jobId || cancelling) {
+    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+    const cancellableStatuses = new Set(['pending', 'accepted']);
+    if (!jobId || cancelling || !cancellableStatuses.has(progressStatus)) {
+      if (progressStatus && !cancellableStatuses.has(progressStatus)) {
+        AppAlert.alert('Cannot cancel', 'You can only cancel while job is pending or accepted.');
+      }
       return;
     }
 
@@ -454,9 +504,10 @@ const DashboardScreen = ({ navigation, route }) => {
     try {
       await updateJobStatus(jobId, 'cancelled');
       setActiveSession(null);
-      Alert.alert('Cancelled', 'Job has been cancelled.');
+      clearCarOwnerChatShortcut();
+      AppAlert.alert('Cancelled', 'Job has been cancelled.');
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Could not cancel job.');
+      AppAlert.alert('Error', error?.message || 'Could not cancel job.');
     } finally {
       setCancelling(false);
     }
@@ -469,11 +520,12 @@ const DashboardScreen = ({ navigation, route }) => {
     }
     setSyncing(true);
     try {
-      // TODO: Confirm backend allows car owners to mark arrival/repairing.
-      await updateJobStatus(jobId, 'repairing');
-      setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'repairing' } : prev));
+      // Contract (Mar 10, 2026): car_owner cannot PATCH job status to in_progress.
+      // Keeping this as local-only UI confirmation until backend supports owner-side acknowledgement.
+      // await updateJobStatus(jobId, 'in_progress');
+      setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'in_progress' } : prev));
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Could not update repairing status.');
+      AppAlert.alert('Error', error?.message || 'Could not update repairing status.');
     } finally {
       setSyncing(false);
     }
@@ -489,9 +541,9 @@ const DashboardScreen = ({ navigation, route }) => {
       // TODO: Confirm escrow debit/release result from API response.
       await confirmJob(jobId);
       setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'completed' } : prev));
-      Alert.alert('Success', 'Job completion confirmed.');
+      AppAlert.alert('Success', 'Job completion confirmed.');
     } catch (error) {
-      Alert.alert('Error', error?.message || 'Could not confirm completion.');
+      AppAlert.alert('Error', error?.message || 'Could not confirm completion.');
     } finally {
       setSyncing(false);
     }
@@ -507,6 +559,7 @@ const DashboardScreen = ({ navigation, route }) => {
       </AppText>
       <HelpActionRow label="I know the issues" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)} />
       <HelpActionRow label="Diagnose my car" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS)} />
+      <HelpActionRow label="Help tow my vehicle" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_TOWING_COMPANIES)} />
     </>
   );
 
@@ -516,6 +569,7 @@ const DashboardScreen = ({ navigation, route }) => {
     const currentStepIndex = TRACKER_STEPS.findIndex((item) => item.key === progressStatus);
     const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
     const isCompleted = progressStatus === 'completed';
+    const canOwnerCancel = progressStatus === 'pending' || progressStatus === 'accepted';
 
     return (
       <>
@@ -551,9 +605,16 @@ const DashboardScreen = ({ navigation, route }) => {
         {!isCompleted ? (
           <View style={styles.trackActions}>
             <AppButton label="Message" onPress={handleOpenChat} style={styles.trackBtn} />
-            <TouchableOpacity style={styles.callBtn} activeOpacity={0.88} onPress={handleCancelJob} disabled={cancelling}>
+            <TouchableOpacity
+              style={[styles.callBtn, !canOwnerCancel ? { opacity: 0.5 } : null]}
+              activeOpacity={0.88}
+              onPress={handleCancelJob}
+              disabled={cancelling || !canOwnerCancel}
+            >
               <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.accent} strokeWidth={2} />
-              <AppText style={styles.callBtnText}>{cancelling ? 'Cancelling...' : 'Cancel'}</AppText>
+              <AppText style={styles.callBtnText}>
+                {cancelling ? 'Cancelling...' : !canOwnerCancel ? 'Cannot cancel now' : 'Cancel'}
+              </AppText>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -571,7 +632,7 @@ const DashboardScreen = ({ navigation, route }) => {
             <AppButton
               label={syncing ? 'Confirming...' : 'Confirm completion (after payment)'}
               onPress={handleConfirmCompletion}
-              disabled={syncing || progressStatus !== 'repairing'}
+              disabled={syncing || progressStatus !== 'in_progress'}
             />
           ) : null}
           {isCompleted ? (
@@ -594,7 +655,10 @@ const DashboardScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   style={styles.secondaryActionHalf}
                   activeOpacity={0.88}
-                  onPress={() => setActiveSession(null)}
+                  onPress={() => {
+                    setActiveSession(null);
+                    clearCarOwnerChatShortcut();
+                  }}
                 >
                   <AppText style={styles.secondaryActionText}>Back to home</AppText>
                 </TouchableOpacity>
@@ -612,6 +676,39 @@ const DashboardScreen = ({ navigation, route }) => {
       </>
     );
   };
+
+  const shortcutAvatarUri = normalizeAvatarUri(
+    carOwnerChatShortcut?.mechanic?.avatar?.url ||
+      carOwnerChatShortcut?.mechanic?.avatarUrl ||
+      carOwnerChatShortcut?.mechanic?.avatarUri ||
+      carOwnerChatShortcut?.mechanic?.ownerAvatar ||
+      ''
+  );
+  const shortcutInitial = String(
+    carOwnerChatShortcut?.mechanic?.initials ||
+      carOwnerChatShortcut?.mechanic?.name ||
+      'M'
+  )
+    .trim()
+    .charAt(0)
+    .toUpperCase() || 'M';
+
+  const handleOpenFloatingChat = useCallback(() => {
+    const conversationId = String(carOwnerChatShortcut?.conversationId || '').trim();
+    const jobId = String(carOwnerChatShortcut?.jobId || '').trim();
+    if (!conversationId || !jobId) {
+      return;
+    }
+
+    navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+      conversationId,
+      jobId,
+      mechanicId: carOwnerChatShortcut?.mechanicId || null,
+      mechanic: carOwnerChatShortcut?.mechanic || null,
+      issueSummary: carOwnerChatShortcut?.issueSummary || null,
+      progressStatus: carOwnerChatShortcut?.progressStatus || '',
+    });
+  }, [carOwnerChatShortcut, navigation]);
 
   return (
     <View style={styles.root}>
@@ -657,7 +754,7 @@ const DashboardScreen = ({ navigation, route }) => {
               <AppText style={styles.locationLiveBadgeText}>{locationBadgeText}</AppText>
             </View>
             <View style={styles.osmAttribution}>
-              <AppText style={styles.osmAttributionText}>Map data © OpenStreetMap contributors</AppText>
+              <AppText style={styles.osmAttributionText}>Map data (C) OpenStreetMap contributors</AppText>
             </View>
           </>
         ) : (
@@ -712,6 +809,25 @@ const DashboardScreen = ({ navigation, route }) => {
       </TouchableOpacity>
 
       </ScreenContainer>
+
+      {carOwnerChatShortcut?.conversationId ? (
+        <TouchableOpacity
+          style={styles.floatingChatBtn}
+          activeOpacity={0.9}
+          onPress={handleOpenFloatingChat}
+        >
+          {shortcutAvatarUri ? (
+            <Image source={{ uri: shortcutAvatarUri }} style={styles.floatingChatAvatarImage} />
+          ) : (
+            <View style={styles.floatingChatAvatarFallback}>
+              <AppText style={styles.floatingChatAvatarText}>{shortcutInitial}</AppText>
+            </View>
+          )}
+          <View style={styles.floatingChatBadge}>
+            <HugeiconsIcon icon={Mail01Icon} size={12} color="#1A1A1A" strokeWidth={2} />
+          </View>
+        </TouchableOpacity>
+      ) : null}
 
       <AppBottomNav activeTab={ROUTES.CAR_OWNER_DASHBOARD} onTabPress={handleTabPress} style={styles.stickyFooter} />
     </View>
@@ -1051,6 +1167,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryActionText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
+  floatingChatBtn: {
+    position: 'absolute',
+    right: darkTheme.spacing.lg,
+    bottom: 88,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: withAlpha(darkTheme.colors.accent, 0.6),
+    backgroundColor: '#202631',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 35,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
+  },
+  floatingChatAvatarImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    resizeMode: 'cover',
+  },
+  floatingChatAvatarFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.2),
+  },
+  floatingChatAvatarText: {
+    color: darkTheme.colors.accent,
+    fontSize: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  floatingChatBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#10151D',
+  },
   stickyFooter: {
     position: 'absolute',
     left: 0,
@@ -1060,3 +1227,6 @@ const styles = StyleSheet.create({
 });
 
 export default DashboardScreen;
+
+
+

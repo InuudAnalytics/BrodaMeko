@@ -29,9 +29,9 @@ export const ENDPOINTS = {
     mechanic: {
       addServices: '/api/v1/me/mechanic/add-services',
       servicesList: '/api/v1/me/mechanic/services',
-      serviceUpdate: (serviceId) => `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}`,
+      serviceUpdate: (serviceId) => `/api/v1/me/mechanic/services/${encodeURIComponent(String(serviceId || ''))}`,
       serviceDelete: (serviceId) =>
-        `/api/v1/me/mechanic/${encodeURIComponent(String(serviceId || ''))}/delete`,
+        `/api/v1/me/mechanic/services/${encodeURIComponent(String(serviceId || ''))}`,
       addressList: '/api/v1/me/mechanic/address',
       addressAdd: '/api/v1/me/mechanic/address',
       addressUpdate: (addressId) =>
@@ -44,7 +44,7 @@ export const ENDPOINTS = {
       bankVerify: '/api/v1/me/mechanic/bank/verify',
       bankList: '/api/v1/me/mechanic/bank/list',
       bankGet: '/api/v1/me/mechanic/bank',
-      bankDelete: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/delete`,
+      bankDelete: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}`,
       bankSetPrimary: (bankId) => `/api/v1/me/mechanic/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
       earnings: '/api/v1/me/mechanic/earnings',
       onlineStatus: '/api/v1/me/mechanic/online-status',
@@ -128,7 +128,7 @@ export const ENDPOINTS = {
     leave: (mechanicId) =>
       `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/review`,
     list: (mechanicId) =>
-      `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/review`,
+      `/api/v1/mechanic-reviews/${encodeURIComponent(String(mechanicId || ''))}/reviews`,
     reply: (reviewId) =>
       `/api/v1/mechanic-reviews/${encodeURIComponent(String(reviewId || ''))}/reply`,
     replies: (reviewId) =>

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../components';
 import { darkTheme, withAlpha } from '../../theme';
 import { pickSingleImageFromGallery } from '../../utils';
-
+import AppAlert from '../../components/AppAlert';
 const UploadImageGlyph = ({ color }) => (
   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
     <Path
@@ -40,7 +40,7 @@ const SupportScreen = ({ navigation }) => {
       }
 
       if (error) {
-        Alert.alert('Upload failed', error);
+        AppAlert.alert('Upload failed', error);
         return;
       }
 
@@ -59,7 +59,7 @@ const SupportScreen = ({ navigation }) => {
   };
 
   const handleSubmit = () => {
-    Alert.alert('Submitted', 'Your support request has been sent.');
+    AppAlert.alert('Submitted', 'Your support request has been sent.');
   };
 
   return (
@@ -238,3 +238,7 @@ const styles = StyleSheet.create({
 });
 
 export default SupportScreen;
+
+
+
+

@@ -200,21 +200,28 @@ export const respondToQuotation = async (conversationId, { quotation_id, action 
   return response.data;
 };
 
-export const initiateJobPayment = async (jobId, { payment_method }) => {
+export const initiateJobPayment = async (jobId, { payment_method, email } = {}) => {
   const safeJobId = String(jobId || '').trim();
   const safePaymentMethod = String(payment_method || '').trim().toLowerCase();
+  const safeEmail = String(email || '').trim();
 
   if (!safeJobId) {
     buildServiceError('jobId is required.');
   }
 
-  if (!['wallet', 'paystack', 'cash'].includes(safePaymentMethod)) {
-    buildServiceError('payment_method must be wallet, paystack, or cash.');
+  if (!['wallet', 'paystack'].includes(safePaymentMethod)) {
+    buildServiceError('payment_method must be wallet or paystack.');
   }
 
-  const response = await api.post(ENDPOINTS.chat.jobPaymentInitiate(safeJobId), {
+  const payload = {
     payment_method: safePaymentMethod,
-  });
+  };
+
+  if (safeEmail) {
+    payload.email = safeEmail;
+  }
+
+  const response = await api.post(ENDPOINTS.chat.jobPaymentInitiate(safeJobId), payload);
   return response.data;
 };
 

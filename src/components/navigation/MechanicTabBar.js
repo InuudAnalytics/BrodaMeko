@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Briefcase01Icon, Store01Icon, User02Icon, Wallet01Icon } from '@hugeicons/core-free-icons';
+import { Briefcase01Icon, User02Icon, Wallet01Icon, Wrench01Icon } from '@hugeicons/core-free-icons';
 import { AppText } from '..';
 import { darkTheme } from '../../theme';
 
@@ -18,7 +18,7 @@ const HomeIcon = ({ color }) => {
 const TABS = [
   { key: 'home', label: 'Home', iconType: 'home' },
   { key: 'jobs', label: 'Jobs', icon: Briefcase01Icon },
-  { key: 'marketplace', label: 'Marketplace', icon: Store01Icon },
+  { key: 'marketplace', label: 'SpareParts', icon: Wrench01Icon },
   { key: 'wallet', label: 'Wallet', icon: Wallet01Icon },
   { key: 'profile', label: 'Profile', icon: User02Icon },
 ];

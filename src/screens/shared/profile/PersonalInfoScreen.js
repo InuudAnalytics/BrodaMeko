@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
@@ -9,7 +9,7 @@ import { deleteMechanicBank, setPrimaryMechanicBank } from '../../../services/me
 import { getMyProfile } from '../../../services/user.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const normalizeBankAccounts = (payload) => {
   const root = payload?.data || payload || {};
   const candidates = [
@@ -123,7 +123,7 @@ const PersonalInfoScreen = ({ navigation }) => {
       await setPrimaryMechanicBank(safeBankId);
       await refresh();
     } catch (requestError) {
-      Alert.alert('Action failed', requestError?.message || 'Could not set this bank as primary.');
+      AppAlert.alert('Action failed', requestError?.message || 'Could not set this bank as primary.');
     } finally {
       setBusyBankId('');
       setBusyAction('');
@@ -142,7 +142,7 @@ const PersonalInfoScreen = ({ navigation }) => {
       await deleteMechanicBank(safeBankId);
       await refresh();
     } catch (requestError) {
-      Alert.alert('Action failed', requestError?.message || 'Could not delete this bank.');
+      AppAlert.alert('Action failed', requestError?.message || 'Could not delete this bank.');
     } finally {
       setBusyBankId('');
       setBusyAction('');
@@ -358,3 +358,7 @@ const styles = StyleSheet.create({
 });
 
 export default PersonalInfoScreen;
+
+
+
+

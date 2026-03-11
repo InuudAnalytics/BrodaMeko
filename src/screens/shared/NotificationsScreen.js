@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -21,7 +21,7 @@ import { getConversationByJobId } from '../../services/jobs.service';
 import { getMessages as getConversationMessages } from '../../services/chat.service';
 import { darkTheme, withAlpha } from '../../theme';
 import { ROLES, ROUTES } from '../../utils';
-
+import AppAlert from '../../components/AppAlert';
 const TABS = [
   { key: 'all', label: 'All', category: '' },
   { key: 'jobs', label: 'Jobs', category: 'jobs' },
@@ -169,13 +169,13 @@ const NotificationsScreen = ({ navigation }) => {
         if (statusCode === 404) {
           resolvedConversationId = '';
         } else {
-          Alert.alert('Unable to open chat', navigationError?.message || 'Please try again.');
+          AppAlert.alert('Unable to open chat', navigationError?.message || 'Please try again.');
           return;
         }
       }
 
       if (!resolvedConversationId) {
-        Alert.alert('Chat unavailable', 'This chat is no longer available for this job.');
+        AppAlert.alert('Chat unavailable', 'This chat is no longer available for this job.');
         return;
       }
 
@@ -223,7 +223,7 @@ const NotificationsScreen = ({ navigation }) => {
       await deleteNotification(notificationId);
       setNotifications((prev) => prev.filter((entry) => entry.id !== notificationId));
     } catch (deleteError) {
-      Alert.alert('Delete failed', deleteError?.message || 'Could not delete notification.');
+      AppAlert.alert('Delete failed', deleteError?.message || 'Could not delete notification.');
     }
   };
 
@@ -232,7 +232,7 @@ const NotificationsScreen = ({ navigation }) => {
       await markAllNotificationsRead();
       setNotifications((prev) => prev.map((item) => ({ ...item, is_read: true })));
     } catch (markAllError) {
-      Alert.alert('Action failed', markAllError?.message || 'Could not mark all notifications as read.');
+      AppAlert.alert('Action failed', markAllError?.message || 'Could not mark all notifications as read.');
     }
   };
 
@@ -433,3 +433,7 @@ const styles = StyleSheet.create({
 });
 
 export default NotificationsScreen;
+
+
+
+

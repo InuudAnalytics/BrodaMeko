@@ -1,18 +1,11 @@
-﻿import React, { useMemo, useState } from 'react';
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  Alert,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
 import { checkoutMarketplaceOrder } from '../../../services/marketplace.service';
-
+import AppAlert from '../../../components/AppAlert';
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
@@ -76,7 +69,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       await clearCart();
       navigation.navigate('PaymentSuccessScreen');
     } catch (error) {
-      Alert.alert('Checkout failed', error?.message || 'Could not process checkout.');
+      AppAlert.alert('Checkout failed', error?.message || 'Could not process checkout.');
     }
   };
 
@@ -162,7 +155,7 @@ const CheckoutScreen = ({ navigation, route }) => {
               >
                 <AppText style={styles.deliveryTitle}>Request delivery</AppText>
                 <AppText style={styles.deliverySubtitle}>
-                  1-3 days • ?2,500
+                  1-3 days � ?2,500
                 </AppText>
                 {deliveryType === 'delivery' ? (
                   <View style={styles.deliveryCheck} />
@@ -483,3 +476,6 @@ const styles = StyleSheet.create({
 });
 
 export default CheckoutScreen;
+
+
+

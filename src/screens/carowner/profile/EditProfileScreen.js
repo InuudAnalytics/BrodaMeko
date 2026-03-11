@@ -1,14 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -27,7 +18,7 @@ import { uploadAvatar as uploadAvatarService } from '../../../services/user.serv
 import { uploadSellerStoreLogo } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { isValidNigerianPhoneDigits, pickSingleImageFromGallery, ROLES, ROUTES, withNigerianCountryCode } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -194,7 +185,7 @@ const EditProfileScreen = ({ navigation }) => {
       if (emailChangedWhenMissing) {
         const nextEmail = String(email || '').trim();
         if (!isEmailValid(nextEmail)) {
-          Alert.alert('Invalid email', 'Enter a valid email address to continue.');
+          AppAlert.alert('Invalid email', 'Enter a valid email address to continue.');
           return;
         }
 
@@ -211,7 +202,7 @@ const EditProfileScreen = ({ navigation }) => {
 
       if (phoneChangedWhenMissing) {
         if (!isValidNigerianPhoneDigits(safeCurrentPhone)) {
-          Alert.alert('Invalid phone number', 'Phone number must be exactly 10 digits.');
+          AppAlert.alert('Invalid phone number', 'Phone number must be exactly 10 digits.');
           return;
         }
 
@@ -231,7 +222,7 @@ const EditProfileScreen = ({ navigation }) => {
     } catch (updateError) {
       setEmail(profile.email);
       setPhone(profile.phone);
-      Alert.alert('Update failed', updateError?.message || 'Could not update profile.');
+      AppAlert.alert('Update failed', updateError?.message || 'Could not update profile.');
     } finally {
       setIsSaving(false);
     }
@@ -589,3 +580,6 @@ const styles = StyleSheet.create({
 });
 
 export default EditProfileScreen;
+
+
+

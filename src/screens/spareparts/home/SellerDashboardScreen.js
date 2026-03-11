@@ -30,7 +30,7 @@ const SCREEN_BG = '#000033';
 
 const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const { user } = useAuth();
-  const { unreadTick } = useNotifications();
+  const { unreadTick, promptPermissionIfNeeded } = useNotifications();
   const [unreadCount, setUnreadCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const pullDistance = React.useRef(new Animated.Value(0)).current;
@@ -72,6 +72,13 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
       setUnreadCount(0);
     }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      promptPermissionIfNeeded?.('seller_dashboard_focus');
+      return undefined;
+    }, [promptPermissionIfNeeded])
+  );
 
   useFocusEffect(
     useCallback(() => {

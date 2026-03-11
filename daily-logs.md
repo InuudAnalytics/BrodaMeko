@@ -277,16 +277,6 @@
    - Improved FCM token sync behavior and notification permission flow wiring.
    - Updated background notification handler setup.
 
-4. **fix(mech-dashboard): sync job card actions with status flow** (`14edfbb`)
-
-   - Made dashboard job actions status-driven to match mechanic jobs screen behavior.
-   - Fixed active/completed action-state consistency.
-
-5. **feat(mech-jobs): unify job cards and status-driven actions** (`194addd`)
-
-   - Added shared `MechanicJobCard` component and reused it across mechanic job surfaces.
-   - Unified accept/decline/cancel/progression button behavior and final-status rendering.
-
 ### Release / Ops
 
 1. Built and uploaded the first iOS `.ipa` to App Store Connect TestFlight using Codemagic middleware publishing flow.
@@ -318,3 +308,17 @@
 
    - Updated notification permission gate handling to remain visible until user explicitly accepts/declines.
    - Prevented premature dismissal when location permission modal flow overlaps.
+
+2. **feat(spareparts): add seller pickup confirmation details flow** (`63f6146`) - 19:05 WAT
+
+   - Added dedicated seller pickup order details screen with buyer/product details and 4-digit code input.
+   - Wired pickup order routing from seller orders list and local completion state update after verification.
+
+3. **chore(towing): annotate mock data and booking handler TODOs** (`59a367b`) - 19:05 WAT
+
+   - Added explicit backend TODO markers for towing companies data source and booking action handler.
+   - Kept current modal-based mock towing booking behavior intact.
+
+4. **docs(logs): add march 9 and march 10 activity entries** (`ef0af1c`) - 19:06 WAT
+
+   - Updated daily logs with dated/timestamped records for March 9 and March 10.

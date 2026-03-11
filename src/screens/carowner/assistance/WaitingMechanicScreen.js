@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
@@ -8,7 +8,7 @@ import { getConversationByJobId, getJobRequestStatus, updateJobStatus } from '..
 import { closeScoped as closeSocketScoped, connectScoped as connectSocketScoped } from '../../../services/ws.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const WAIT_SCOPE = 'car-owner-waiting-screen';
 const INITIAL_WAIT_SECONDS = 90;
 
@@ -103,7 +103,7 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
       if (!active) {
         return;
       }
-      Alert.alert('Request declined', 'Mechanic declined your request. Please find another mechanic.');
+      AppAlert.alert('Request declined', 'Mechanic declined your request. Please find another mechanic.');
       navigation.replace(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
         jobId: sessionPayload.jobId,
         job: route?.params?.job,
@@ -115,7 +115,7 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
       if (!active) {
         return;
       }
-      Alert.alert('Mechanic cancelled', 'Please choose another mechanic.');
+      AppAlert.alert('Mechanic cancelled', 'Please choose another mechanic.');
       navigation.replace(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
         jobId: sessionPayload.jobId,
         job: route?.params?.job,
@@ -252,7 +252,7 @@ const WaitingMechanicScreen = ({ navigation, route }) => {
       clearActiveConversation();
       navigation.replace(ROUTES.CAR_OWNER_DASHBOARD);
     } catch (error) {
-      Alert.alert('Cancel failed', error?.message || 'Could not cancel this request.');
+      AppAlert.alert('Cancel failed', error?.message || 'Could not cancel this request.');
     } finally {
       setCancelling(false);
     }
@@ -455,3 +455,7 @@ const styles = StyleSheet.create({
 });
 
 export default WaitingMechanicScreen;
+
+
+
+

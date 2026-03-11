@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -9,6 +10,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { openSettings } from 'react-native-permissions';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { Mail01Icon } from '@hugeicons/core-free-icons';
 import {
   AppButton,
   AppText,
@@ -21,11 +24,14 @@ import {
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 import {
+  getConversationByJobId,
   getMechanicAssignedJobs,
   getMechanicPendingJobRequests,
   respondToJobRequest,
   updateJobStatus,
 } from '../../../services/jobs.service';
+import { useChat } from '../../../context';
+import { useNotifications } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -35,8 +41,8 @@ const TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 
-const COMPLETED_STATUSES = new Set(['completed', 'done']);
-const FINAL_STATUSES = new Set(['completed', 'done', 'cancelled']);
+const COMPLETED_STATUSES = new Set(['completed']);
+const FINAL_STATUSES = new Set(['completed', 'cancelled', 'disputed']);
 
 const readOwnerName = (item, fallback = 'Customer') => {
   const firstName =
@@ -89,33 +95,47 @@ const readList = response => {
 const normalizePendingRequest = (item, index) => ({
   id: String(item?.id || `pending-${index}`),
   jobId: String(item?.job_id || item?.jobId || ''),
+  ownerId: item?.car_owner?.id || item?.car_owner?._id || item?.owner?.id || item?.owner?._id || item?.user?.id || item?.user?._id || '',
   ownerName: readOwnerName(item, 'Car owner'),
   issue: String(item?.issue_type || item?.title || 'Car issue'),
   carMake: String(item?.car_make || ''),
   avatarUri: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
   ownerAvatar: String(item?.owner_avatar || item?.car_owner?.avatar || '').trim(),
   urgent: String(item?.priority || '').toLowerCase() === 'urgent',
-  status: String(item?.status || 'pending').toLowerCase(),
+  status: normalizeStatus(String(item?.status || 'pending').toLowerCase()),
   distanceText: String(item?.distance_text || item?.distance || item?.distance_km || '').trim(),
   etaText: String(item?.eta_text || item?.eta || item?.estimated_time || '').trim(),
 });
 
 const normalizeAssignedJob = (item, index) => ({
   id: String(item?.id || item?._id || item?.job_id || `job-${index}`),
+  ownerId: item?.car_owner?.id || item?.car_owner?._id || item?.owner?.id || item?.owner?._id || item?.user?.id || item?.user?._id || '',
   ownerName: readOwnerName(item, 'Customer'),
   issue: String(item?.issue_type || item?.title || 'Car issue'),
   carMake: String(item?.car_make || ''),
-  status: String(item?.status || '').toLowerCase(),
+  status: normalizeStatus(String(item?.status || '').toLowerCase()),
   urgent: String(item?.priority || '').toLowerCase() === 'urgent',
+  avatarUri: String(item?.owner_avatar || item?.car_owner?.avatar || item?.owner?.avatar || item?.user?.avatar || '').trim(),
+  ownerAvatar: String(item?.owner_avatar || item?.car_owner?.avatar || item?.owner?.avatar || item?.user?.avatar || '').trim(),
   distanceText: String(item?.distance_text || item?.distance || item?.distance_km || '').trim(),
   etaText: String(item?.eta_text || item?.eta || item?.estimated_time || '').trim(),
 });
 
 const normalizeStatus = status => {
   const safe = String(status || '').trim().toLowerCase();
-  if (safe === 'arrived') return 'arrive';
+  if (safe === 'arrive') return 'arrived';
+  if (safe === 'enroute' || safe === 'on_the_way') return 'en_route';
   if (safe === 'repairing') return 'in_progress';
+  if (safe === 'done') return 'completed';
   return safe;
+};
+
+const sanitizeOutgoingMechanicStatus = (status) => {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'canceled') {
+    return 'cancelled';
+  }
+  return normalized;
 };
 
 const formatStatus = value =>
@@ -123,16 +143,27 @@ const formatStatus = value =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, char => char.toUpperCase());
 
+const normalizeAvatarUri = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return '';
+  }
+  if (/^(https?:\/\/|file:|content:|data:|asset:)/i.test(raw)) {
+    return raw;
+  }
+  return raw;
+};
+
 const getNextAction = status => {
   const normalized = normalizeStatus(status);
-  const flow = ['accepted', 'en_route', 'arrive', 'in_progress', 'completed'];
+  const flow = ['accepted', 'en_route', 'arrived', 'in_progress', 'completed'];
   const currentIndex = flow.indexOf(normalized);
 
   if (currentIndex === -1) {
-    return { status: 'en_route', label: 'On my way' };
+    return null;
   }
 
-  if (normalized === 'completed') {
+  if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'disputed') {
     return null;
   }
 
@@ -143,12 +174,17 @@ const getNextAction = status => {
 
   const labels = {
     en_route: 'On my way',
-    arrive: 'Arrive',
+    arrived: 'Arrived',
     in_progress: 'Start work',
     completed: 'Complete',
   };
 
   return { status: nextStatus, label: labels[nextStatus] || 'Update' };
+};
+
+const canMechanicProgressStatus = status => {
+  const normalized = normalizeStatus(status);
+  return normalized === 'accepted' || normalized === 'en_route' || normalized === 'arrived' || normalized === 'in_progress';
 };
 
 const JobCard = ({
@@ -162,6 +198,7 @@ const JobCard = ({
 }) => {
   const normalizedStatus = normalizeStatus(item.status);
   const nextAction = getNextAction(normalizedStatus);
+  const canProgress = canMechanicProgressStatus(normalizedStatus);
   const isFinal = FINAL_STATUSES.has(normalizedStatus);
   const distance = item.distanceText ? `${item.distanceText} away` : '';
   const eta = item.etaText ? `${item.etaText}` : '';
@@ -213,9 +250,9 @@ const JobCard = ({
         ) : (
           <View style={styles.buttonRow}>
             <AppButton
-              label={busyAction === nextAction?.status ? 'Updating...' : nextAction?.label || 'On my way'}
-              onPress={() => onAdvance(item, nextAction?.status || 'en_route')}
-              disabled={Boolean(busyAction)}
+              label={busyAction === nextAction?.status ? 'Updating...' : canProgress ? nextAction?.label || 'Update' : 'Awaiting acceptance'}
+              onPress={() => nextAction?.status && onAdvance(item, nextAction.status)}
+              disabled={Boolean(busyAction) || !nextAction?.status || !canProgress}
               style={styles.acceptBtn}
             />
             <AppButton
@@ -233,6 +270,8 @@ const JobCard = ({
 };
 
 const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
+  const { mechanicChatShortcut, setMechanicChatShortcut, clearMechanicChatShortcut } = useChat();
+  const { promptPermissionIfNeeded } = useNotifications();
   const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -292,6 +331,10 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
       return;
     }
 
+    if (action === 'accept') {
+      await promptPermissionIfNeeded?.('mechanic_jobs_accept_job');
+    }
+
     if (action === 'accept' && LOCATION_ENABLED) {
       const status =
         permissionStatus === 'granted'
@@ -310,8 +353,54 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
     setBusyRequestId(item.id);
     setBusyAction(action);
     try {
-      await respondToJobRequest(safeJobId, action);
+      const response = await respondToJobRequest(safeJobId, action);
       if (action === 'accept') {
+        const payload = response?.data || response || {};
+        let conversationId = String(payload?.conversation_id || payload?.conversationId || '').trim();
+        if (!conversationId) {
+          try {
+            const convoRes = await getConversationByJobId(safeJobId);
+            const convoPayload = convoRes?.data || convoRes || {};
+            const convoData = convoPayload?.data || convoPayload;
+            const conversation = convoData?.conversation || convoData;
+            conversationId = String(conversation?.id || conversation?._id || '').trim();
+          } catch {
+            // best effort fallback
+          }
+        }
+
+        if (conversationId) {
+          const customer = {
+            id: item?.ownerId || null,
+            name: item?.ownerName || 'Customer',
+            initials: String(item?.ownerName || 'C').trim().charAt(0).toUpperCase() || 'C',
+            avatarUri: item?.avatarUri || item?.ownerAvatar || '',
+          };
+
+          setMechanicChatShortcut({
+            conversationId,
+            jobId: safeJobId,
+            customer,
+            issueSummary: {
+              issueType: item?.issue || '',
+              carMake: item?.carMake || '',
+            },
+            progressStatus: 'accepted',
+          });
+
+          navigation.navigate(ROUTES.MECH_CHAT, {
+            conversationId,
+            jobId: safeJobId,
+            mechanicId: null,
+            customer,
+            issueSummary: {
+              issueType: item?.issue || '',
+              carMake: item?.carMake || '',
+            },
+            progressStatus: 'accepted',
+          });
+        }
+
         setActiveTab('active');
         await fetchData();
       } else {
@@ -330,12 +419,78 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
     if (!safeJobId || busyStatusJobId) {
       return;
     }
+    const currentStatus = normalizeStatus(item?.status || '');
+    if (!canMechanicProgressStatus(currentStatus)) {
+      setError('Status update is available only after customer accepts the quotation.');
+      return;
+    }
+    const safeStatus = sanitizeOutgoingMechanicStatus(status);
+    const allowed = new Set(['en_route', 'arrived', 'in_progress', 'cancelled', 'completed']);
+    if (!allowed.has(safeStatus)) {
+      setError('Invalid status transition. Refresh and try again.');
+      return;
+    }
 
     setBusyStatusJobId(safeJobId);
-    setBusyStatusAction(status);
+    setBusyStatusAction(safeStatus);
 
     try {
-      await updateJobStatus(safeJobId, status);
+      await updateJobStatus(safeJobId, safeStatus);
+      const normalized = String(safeStatus || '').trim().toLowerCase();
+
+      if (normalized === 'en_route') {
+        let conversationId = '';
+        if (String(mechanicChatShortcut?.jobId || '').trim() === safeJobId) {
+          conversationId = String(mechanicChatShortcut?.conversationId || '').trim();
+        }
+        if (!conversationId) {
+          try {
+            const convoRes = await getConversationByJobId(safeJobId);
+            const convoPayload = convoRes?.data || convoRes || {};
+            const convoData = convoPayload?.data || convoPayload;
+            const conversation = convoData?.conversation || convoData;
+            conversationId = String(conversation?.id || conversation?._id || '').trim();
+          } catch {
+            // best effort fallback
+          }
+        }
+
+        const customer = {
+          id: item?.ownerId || null,
+          name: item?.ownerName || 'Customer',
+          initials: String(item?.ownerName || 'C').trim().charAt(0).toUpperCase() || 'C',
+          avatarUri: item?.avatarUri || item?.ownerAvatar || '',
+        };
+
+        setMechanicChatShortcut({
+          conversationId,
+          jobId: safeJobId,
+          customer,
+          issueSummary: {
+            issueType: item?.issue || '',
+            carMake: item?.carMake || '',
+          },
+          progressStatus: normalized,
+        });
+
+        navigation.navigate(ROUTES.MECH_LIVE_TRACKING, {
+          jobId: safeJobId,
+          mechanicId: null,
+          carOwnerId: customer.id,
+          customer,
+          conversationId,
+          issueSummary: {
+            issueType: item?.issue || '',
+            carMake: item?.carMake || '',
+          },
+          trackingStatus: normalized,
+          progressStatus: normalized,
+        });
+      }
+
+      if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'disputed') {
+        clearMechanicChatShortcut();
+      }
       await fetchData();
     } catch (requestError) {
       setError(requestError?.message || 'Could not update job status.');
@@ -354,6 +509,38 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
     }
     return completedJobs;
   }, [activeJobs, activeTab, completedJobs, pendingRequests]);
+
+  const shortcutAvatarUri = normalizeAvatarUri(
+    mechanicChatShortcut?.customer?.avatarUri ||
+      mechanicChatShortcut?.customer?.avatar ||
+      '',
+  );
+  const shortcutInitial =
+    String(
+      mechanicChatShortcut?.customer?.initials ||
+        mechanicChatShortcut?.customer?.name ||
+        'C',
+    )
+      .trim()
+      .charAt(0)
+      .toUpperCase() || 'C';
+
+  const handleOpenFloatingChat = useCallback(() => {
+    const conversationId = String(mechanicChatShortcut?.conversationId || '').trim();
+    const jobId = String(mechanicChatShortcut?.jobId || '').trim();
+    if (!conversationId || !jobId) {
+      return;
+    }
+
+    navigation.navigate(ROUTES.MECH_CHAT, {
+      conversationId,
+      jobId,
+      mechanicId: null,
+      customer: mechanicChatShortcut?.customer || null,
+      issueSummary: mechanicChatShortcut?.issueSummary || null,
+      progressStatus: mechanicChatShortcut?.progressStatus || '',
+    });
+  }, [mechanicChatShortcut, navigation]);
 
   return (
     <ScreenContainer
@@ -463,6 +650,24 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
           </View>
         ) : null}
       </View>
+      {mechanicChatShortcut?.conversationId ? (
+        <TouchableOpacity
+          style={styles.floatingChatBtn}
+          activeOpacity={0.9}
+          onPress={handleOpenFloatingChat}
+        >
+          {shortcutAvatarUri ? (
+            <Image source={{ uri: shortcutAvatarUri }} style={styles.floatingChatAvatarImage} />
+          ) : (
+            <View style={styles.floatingChatAvatarFallback}>
+              <AppText style={styles.floatingChatAvatarText}>{shortcutInitial}</AppText>
+            </View>
+          )}
+          <View style={styles.floatingChatBadge}>
+            <HugeiconsIcon icon={Mail01Icon} size={12} color="#1A1A1A" strokeWidth={2} />
+          </View>
+        </TouchableOpacity>
+      ) : null}
     </ScreenContainer>
   );
 };
@@ -558,6 +763,57 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#FF7F7F',
     textAlign: 'center',
+  },
+  floatingChatBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 86,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: 'rgba(230, 199, 20, 0.6)',
+    backgroundColor: '#202631',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 35,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
+  },
+  floatingChatAvatarImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    resizeMode: 'cover',
+  },
+  floatingChatAvatarFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(230, 199, 20, 0.2)',
+  },
+  floatingChatAvatarText: {
+    color: darkTheme.colors.accent,
+    fontSize: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  floatingChatBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#10151D',
   },
   retryText: {
     color: darkTheme.colors.accent,

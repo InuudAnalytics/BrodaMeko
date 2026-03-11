@@ -1,15 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, CancelCircleIcon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
@@ -17,7 +7,7 @@ import { useSellerStore } from '../../../context/SellerStoreContext';
 import { addSellerPartImages, createSellerPart } from '../../../services/spareParts.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const MAX_IMAGES = 5;
 const SCREEN_BG = '#000033';
 
@@ -41,7 +31,7 @@ const AddProductScreen = ({ navigation }) => {
 
   const handleAddImage = async () => {
     if (images.length >= MAX_IMAGES) {
-      Alert.alert('Limit reached', 'You can upload up to 5 images.');
+      AppAlert.alert('Limit reached', 'You can upload up to 5 images.');
       return;
     }
 
@@ -55,7 +45,7 @@ const AddProductScreen = ({ navigation }) => {
       }
 
       if (error) {
-        Alert.alert('Upload failed', error);
+        AppAlert.alert('Upload failed', error);
         return;
       }
 
@@ -106,10 +96,10 @@ const AddProductScreen = ({ navigation }) => {
         addProduct(saved);
       }
 
-      Alert.alert('Product published', 'Your product is now visible in your store.');
+      AppAlert.alert('Product published', 'Your product is now visible in your store.');
       navigation.navigate(ROUTES.SPARE_PARTS_TABS, { tab: 'store' });
     } catch (error) {
-      Alert.alert('Publish failed', error?.message || 'Could not publish product.');
+      AppAlert.alert('Publish failed', error?.message || 'Could not publish product.');
     } finally {
       setIsPublishing(false);
     }
@@ -431,3 +421,6 @@ const styles = StyleSheet.create({
 });
 
 export default AddProductScreen;
+
+
+

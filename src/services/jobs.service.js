@@ -137,7 +137,7 @@ export const createJob = async ({ issue_type, description, car_make, images }) =
     payload.description = safeDescription;
   }
 
-  const imageFiles = Array.isArray(images) ? images.slice(0, 5) : [];
+  const imageFiles = Array.isArray(images) ? images.slice(0, 2) : [];
   if (imageFiles.length) {
     payload.images = imageFiles;
   }
@@ -182,7 +182,7 @@ export const updateCarOwnerJob = async (jobId, { description, car_make, imagesTo
   }
 
   if (Array.isArray(imagesToAdd) && imagesToAdd.length) {
-    payload.images = imagesToAdd.slice(0, 5);
+    payload.images = imagesToAdd.slice(0, 2);
   }
 
   if (remove_images !== undefined) {

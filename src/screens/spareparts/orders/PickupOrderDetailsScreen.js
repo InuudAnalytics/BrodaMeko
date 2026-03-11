@@ -1,21 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Alert,
-  DeviceEventEmitter,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { DeviceEventEmitter, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
-
+import AppAlert from '../../../components/AppAlert';
 const formatNaira = (value) => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
 const resolveImageUri = (value) => {
@@ -61,7 +50,7 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
   const handleConfirmPickup = async () => {
     const code = pickupCodeInput.replace(/\D/g, '').slice(0, 4);
     if (code.length !== 4) {
-      Alert.alert('Invalid code', 'Enter the 4-digit pickup code provided by the buyer.');
+      AppAlert.alert('Invalid code', 'Enter the 4-digit pickup code provided by the buyer.');
       return;
     }
 
@@ -69,12 +58,12 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
     try {
       // TODO: backend pickup verification endpoint required here
       if (code !== expectedCode) {
-        Alert.alert('Code mismatch', 'Pickup code is incorrect. Confirm with the buyer and try again.');
+        AppAlert.alert('Code mismatch', 'Pickup code is incorrect. Confirm with the buyer and try again.');
         return;
       }
 
       DeviceEventEmitter.emit('sellerPickupConfirmed', { orderId });
-      Alert.alert('Pickup confirmed', 'Order has been marked as completed.', [
+      AppAlert.alert('Pickup confirmed', 'Order has been marked as completed.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } finally {
@@ -330,3 +319,6 @@ const styles = StyleSheet.create({
 });
 
 export default PickupOrderDetailsScreen;
+
+
+

@@ -18,27 +18,29 @@ const readTarget = message => {
 const NotificationsGlobalGate = () => {
   const { token, isBootstrapped } = useAuth();
   const { permissionStatus, requestPermission, lastNotification } = useNotifications();
-  const [showGate, setShowGate] = useState(false);
+  const [sessionDismissed, setSessionDismissed] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const toastAnim = useRef(new Animated.Value(0)).current;
   const hideTimerRef = useRef(null);
   const seenToastKeyRef = useRef('');
-  const gateDismissedRef = useRef(false);
 
   const normalizedStatus = String(permissionStatus || '').toLowerCase();
-  const shouldPrompt = isBootstrapped && Boolean(token) && normalizedStatus !== 'granted';
   const isBlocked = normalizedStatus === 'blocked';
+  const hasSession = isBootstrapped && Boolean(token);
+  const isGranted = normalizedStatus === 'granted';
+  const showGate = hasSession && !isGranted && !sessionDismissed;
 
   useEffect(() => {
-    if (!shouldPrompt) {
-      gateDismissedRef.current = false;
-      setShowGate(false);
-      return;
+    // New login session should always be allowed to show gate again.
+    setSessionDismissed(false);
+  }, [token]);
+
+  useEffect(() => {
+    if (isGranted) {
+      setSessionDismissed(false);
     }
-    if (!gateDismissedRef.current) {
-      setShowGate(true);
-    }
-  }, [shouldPrompt]);
+  }, [isGranted]);
 
   const toastKey = useMemo(() => {
     const id = String(lastNotification?.data?.notification_id || '').trim();
@@ -91,7 +93,12 @@ const NotificationsGlobalGate = () => {
       openSettings().catch(() => {});
       return;
     }
-    await requestPermission();
+    setIsRequestingPermission(true);
+    try {
+      await requestPermission();
+    } finally {
+      setIsRequestingPermission(false);
+    }
   };
 
   const handleToastPress = () => {
@@ -115,9 +122,9 @@ const NotificationsGlobalGate = () => {
               <TouchableOpacity
                 style={styles.gateSecondaryBtn}
                 activeOpacity={0.9}
+                disabled={isRequestingPermission}
                 onPress={() => {
-                  gateDismissedRef.current = true;
-                  setShowGate(false);
+                  setSessionDismissed(true);
                 }}
               >
                 <AppText style={styles.gateSecondaryText}>Not now</AppText>
@@ -125,10 +132,11 @@ const NotificationsGlobalGate = () => {
               <TouchableOpacity
                 style={styles.gatePrimaryBtn}
                 activeOpacity={0.9}
+                disabled={isRequestingPermission}
                 onPress={handleEnableNotifications}
               >
                 <AppText style={styles.gatePrimaryText}>
-                  {isBlocked ? 'Open settings' : 'Enable'}
+                  {isRequestingPermission ? 'Please wait...' : isBlocked ? 'Open settings' : 'Enable'}
                 </AppText>
               </TouchableOpacity>
             </View>

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppInput, AppText, FloatingScrollDownButton, ScreenContainer } from '../../../components';
 import MechanicServicesContext from '../../../context/MechanicServicesContext';
 import {
   ISSUE_TYPES,
@@ -135,6 +135,7 @@ const ServiceSelector = ({
 };
 
 const SetServicesScreen = ({ navigation }) => {
+  const scrollRef = useRef(null);
   const mechanicServicesContext = useContext(MechanicServicesContext);
   const hasContext = Boolean(mechanicServicesContext);
   const contextFetchServices = mechanicServicesContext?.fetchServices;
@@ -419,6 +420,10 @@ const SetServicesScreen = ({ navigation }) => {
     }
   }, [fetchServices]);
 
+  const handleScrollToBottom = useCallback(() => {
+    scrollRef.current?.scrollToEnd({ animated: false });
+  }, []);
+
   const inlineError = useMemo(() => formError || contextError || '', [formError, contextError]);
   const lastRow = rows[rows.length - 1];
   const canAddMore = Boolean(lastRow && lastRow.issueType && lastRow.minPrice && lastRow.maxPrice);
@@ -426,6 +431,7 @@ const SetServicesScreen = ({ navigation }) => {
   return (
     <ScreenContainer padded={false} style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -459,7 +465,10 @@ const SetServicesScreen = ({ navigation }) => {
         <View style={styles.servicesList}>
           {rows.map((row, index) => {
             const isLast = index === rows.length - 1;
-            const isBusy = row.serviceId && loadingAction.includes(row.serviceId);
+            const serviceToken = String(row.serviceId || '');
+            const isRemoving = Boolean(serviceToken) && loadingAction === `delete-${serviceToken}`;
+            const isUpdating = Boolean(serviceToken) && loadingAction === `update-${serviceToken}`;
+            const isBusy = isRemoving || isUpdating;
             const readOnly = row.isExisting && !row.isEditing;
             return (
               <View key={row.id} style={styles.serviceBlock}>
@@ -517,7 +526,7 @@ const SetServicesScreen = ({ navigation }) => {
                       disabled={isBusy}
                     >
                       <HugeiconsIcon icon={Cancel01Icon} size={14} color="#FFFFFF" strokeWidth={2} />
-                      <AppText style={styles.actionText}>{isBusy ? 'Removing...' : 'Remove'}</AppText>
+                      <AppText style={styles.actionText}>{isRemoving ? 'Removing...' : 'Remove'}</AppText>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.editBtn]}
@@ -532,7 +541,7 @@ const SetServicesScreen = ({ navigation }) => {
                       disabled={isBusy}
                     >
                       <AppText style={styles.editText}>
-                        {isBusy ? 'Saving...' : row.isEditing ? 'Save' : 'Edit'}
+                        {isUpdating ? 'Saving...' : row.isEditing ? 'Save' : 'Edit'}
                       </AppText>
                     </TouchableOpacity>
                   </View>
@@ -557,6 +566,10 @@ const SetServicesScreen = ({ navigation }) => {
         />
 
       </ScrollView>
+      <FloatingScrollDownButton
+        onPress={handleScrollToBottom}
+        style={styles.scrollDownFab}
+      />
       <View style={styles.finishBar}>
         <AppButton
           label="Finish"
@@ -749,6 +762,10 @@ const styles = StyleSheet.create({
     color: '#FF7B8A',
     marginTop: 8,
     fontSize: 12,
+  },
+  scrollDownFab: {
+    right: 14,
+    bottom: 94,
   },
 });
 

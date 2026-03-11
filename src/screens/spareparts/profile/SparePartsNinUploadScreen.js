@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useSparePartsProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getSparePartsOnboardingStepIndex, pickSingleImageFromGallery, ROUTES, SPARE_PARTS_ONBOARDING_STEPS } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const SparePartsNinUploadScreen = ({ navigation, route }) => {
   const { sparePartsProfile, setNin, completedSteps } = useSparePartsProfile();
   const [ninImages, setNinImages] = useState(sparePartsProfile.ninImages?.slice(0, 1) || []);
@@ -22,7 +22,7 @@ const SparePartsNinUploadScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.cac) {
-      Alert.alert('Complete previous step', 'Please upload your CAC document first.');
+      AppAlert.alert('Complete previous step', 'Please upload your CAC document first.');
       navigation.replace(ROUTES.SPARE_PARTS_PROFILE_SETUP);
     }
   }, [completedSteps.cac, isOnboarding, navigation]);
@@ -40,7 +40,7 @@ const SparePartsNinUploadScreen = ({ navigation, route }) => {
       }
 
       if (error) {
-        Alert.alert('Upload failed', error);
+        AppAlert.alert('Upload failed', error);
         return;
       }
 
@@ -250,3 +250,7 @@ const styles = StyleSheet.create({
 });
 
 export default SparePartsNinUploadScreen;
+
+
+
+

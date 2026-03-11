@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useMechanicProfile } from '../../../context';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, pickSingleImageFromGallery, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const UploadCertificateScreen = ({ navigation, route }) => {
   const { mechanicProfile, setCertificateImages, completedSteps } = useMechanicProfile();
   const [images, setImages] = useState(mechanicProfile.certificateImages?.slice(0, 1) || []);
@@ -21,7 +21,7 @@ const UploadCertificateScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.id) {
-      Alert.alert('Complete previous step', 'Please upload your ID first.');
+      AppAlert.alert('Complete previous step', 'Please upload your ID first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
   }, [completedSteps.id, isOnboarding, navigation]);
@@ -38,7 +38,7 @@ const UploadCertificateScreen = ({ navigation, route }) => {
       }
 
       if (error) {
-        Alert.alert('Upload failed', error);
+        AppAlert.alert('Upload failed', error);
         return;
       }
 
@@ -241,3 +241,7 @@ const styles = StyleSheet.create({
 });
 
 export default UploadCertificateScreen;
+
+
+
+

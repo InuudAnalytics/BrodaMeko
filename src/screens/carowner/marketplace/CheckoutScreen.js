@@ -1,18 +1,11 @@
-﻿import React, { useMemo, useState } from 'react';
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  Alert,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
 import { checkoutMarketplaceOrder } from '../../../services/marketplace.service';
-
+import AppAlert from '../../../components/AppAlert';
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
@@ -55,6 +48,12 @@ const CheckoutScreen = ({ navigation, route }) => {
   const deliveryFee = deliveryType === 'delivery' ? 2500 : 0;
   const serviceFee = 500;
   const total = subtotal + deliveryFee + serviceFee;
+
+  const pickupCode = useMemo(() => {
+    // TODO: replace local pickup code generation with backend-issued pickup code
+    return String(Math.floor(1000 + Math.random() * 9000));
+  }, []);
+
   const handleCheckout = async () => {
     try {
       if (directProduct) {
@@ -64,10 +63,14 @@ const CheckoutScreen = ({ navigation, route }) => {
       const payload = {
         payment_method: paymentMethod === 'card' ? 'paystack' : 'paystack',
         fulfillment_type: deliveryType === 'pickup' ? 'pickup' : 'delivery',
-        delivery_street: 'No 1, Onireke street, Agbabiaka',
-        delivery_city: 'Lagos',
-        delivery_state: 'Lagos',
-        delivery_country: 'Nigeria',
+        ...(deliveryType === 'delivery'
+          ? {
+              delivery_street: 'No 1, Onireke street, Agbabiaka',
+              delivery_city: 'Lagos',
+              delivery_state: 'Lagos',
+              delivery_country: 'Nigeria',
+            }
+          : {}),
         contact_phone: String(user?.phone_number || user?.phone || '+2348012345678'),
         email: String(user?.email || 'buyer@example.com'),
       };
@@ -81,9 +84,25 @@ const CheckoutScreen = ({ navigation, route }) => {
         responsePayload?.id ||
         responsePayload?.data?.order_id ||
         responsePayload?.data?.id;
-      navigation.navigate('PaymentSuccessScreen', { orderId: createdOrderId });
+      navigation.navigate('PaymentSuccessScreen', {
+        orderId: createdOrderId,
+        fulfillmentType: deliveryType === 'pickup' ? 'pickup' : 'delivery',
+        pickupCode,
+        product: {
+          name: product?.name || 'Product',
+          price: Number(product?.price || 0),
+          shop: product?.shop || 'Seller',
+          images: Array.isArray(product?.images) ? product.images : [],
+        },
+        seller: {
+          name: product?.shop || 'Seller',
+          avatar: '',
+          isActive: true,
+        },
+        deliveryAddress: 'No 1, Onireke street, Agbabiaka',
+      });
     } catch (error) {
-      Alert.alert('Checkout failed', error?.message || 'Could not process checkout.');
+      AppAlert.alert('Checkout failed', error?.message || 'Could not process checkout.');
     }
   };
 
@@ -169,7 +188,7 @@ const CheckoutScreen = ({ navigation, route }) => {
               >
                 <AppText style={styles.deliveryTitle}>Request delivery</AppText>
                 <AppText style={styles.deliverySubtitle}>
-                  1-3 days • ?2,500
+                  1-3 days � ?2,500
                 </AppText>
                 {deliveryType === 'delivery' ? (
                   <View style={styles.deliveryCheck} />
@@ -490,3 +509,6 @@ const styles = StyleSheet.create({
 });
 
 export default CheckoutScreen;
+
+
+

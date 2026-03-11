@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, Alert, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Delete02Icon, StarIcon } from '@hugeicons/core-free-icons';
 import {
@@ -15,7 +15,7 @@ import { useChat } from '../../../context';
 import { deleteJob, getCarOwnerJobs, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const MOCK_COMPLETED_JOBS = [
   {
     id: 'mock_1',
@@ -261,9 +261,11 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cance
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity activeOpacity={0.85} style={[styles.actionBtn, styles.actionBtnView]} onPress={onViewDetails}>
-          <AppText style={styles.actionBtnViewText}>View details</AppText>
-        </TouchableOpacity>
+        {typeof onViewDetails === 'function' ? (
+          <TouchableOpacity activeOpacity={0.85} style={[styles.actionBtn, styles.actionBtnView]} onPress={onViewDetails}>
+            <AppText style={styles.actionBtnViewText}>View details</AppText>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity
           activeOpacity={0.85}
@@ -383,8 +385,15 @@ const HistoryScreen = ({ navigation }) => {
     if (!safeJobId) {
       return;
     }
+    const job = jobs.find((entry) => String(entry?.jobId || '').trim() === safeJobId);
+    const currentStatus = String(job?.status || '').trim().toLowerCase();
+    const allowed = new Set(['pending', 'accepted']);
+    if (!allowed.has(currentStatus)) {
+      AppAlert.alert('Cannot cancel', 'Only pending or accepted jobs can be cancelled by car owner.');
+      return;
+    }
 
-    Alert.alert('Cancel job', 'Are you sure you want to cancel this job?', [
+    AppAlert.alert('Cancel job', 'Are you sure you want to cancel this job?', [
       { text: 'No', style: 'cancel' },
       {
         text: 'Yes, cancel',
@@ -397,16 +406,16 @@ const HistoryScreen = ({ navigation }) => {
             setJobs((prev) =>
               prev.map((entry) => (entry.jobId === safeJobId ? { ...entry, status: 'cancelled' } : entry))
             );
-            Alert.alert('Cancelled', 'Job has been cancelled.');
+            AppAlert.alert('Cancelled', 'Job has been cancelled.');
           } catch (requestError) {
-            Alert.alert('Cancel failed', requestError?.message || 'Could not cancel this job.');
+            AppAlert.alert('Cancel failed', requestError?.message || 'Could not cancel this job.');
           } finally {
             setCancellingJobId('');
           }
         },
       },
     ]);
-  }, [clearActiveConversation]);
+  }, [clearActiveConversation, jobs]);
 
   const handleDeleteJob = useCallback((jobId) => {
     const safeJobId = String(jobId || '').trim();
@@ -414,7 +423,7 @@ const HistoryScreen = ({ navigation }) => {
       return;
     }
 
-    Alert.alert('Delete job', 'Are you sure you want to delete this job?', [
+    AppAlert.alert('Delete job', 'Are you sure you want to delete this job?', [
       { text: 'No', style: 'cancel' },
       {
         text: 'Yes, delete',
@@ -425,9 +434,9 @@ const HistoryScreen = ({ navigation }) => {
             await deleteJob(safeJobId);
             clearActiveConversation();
             setJobs((prev) => prev.filter((entry) => entry.jobId !== safeJobId));
-            Alert.alert('Deleted', 'Job deleted successfully.');
+            AppAlert.alert('Deleted', 'Job deleted successfully.');
           } catch (requestError) {
-            Alert.alert('Delete failed', requestError?.message || 'Could not delete this job.');
+            AppAlert.alert('Delete failed', requestError?.message || 'Could not delete this job.');
           } finally {
             setDeletingJobId('');
           }
@@ -453,7 +462,7 @@ const HistoryScreen = ({ navigation }) => {
   const renderItem = useCallback(({ item }) => (
     <JobHistoryCard
       item={item}
-      onViewDetails={() => navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, { jobId: item.jobId })}
+      onViewDetails={null}
       onCancel={() => handleCancelJob(item.jobId)}
       onDelete={() => handleDeleteJob(item.jobId)}
       cancelling={cancellingJobId === item.jobId}
@@ -494,7 +503,7 @@ const HistoryScreen = ({ navigation }) => {
     if (!hasMore && filteredJobs.length > 0) {
       return (
         <View style={styles.footerWrap}>
-          <AppText style={styles.footerText}>You’ve reached the end.</AppText>
+          <AppText style={styles.footerText}>You've reached the end.</AppText>
         </View>
       );
     }
@@ -859,3 +868,7 @@ const styles = StyleSheet.create({
 });
 
 export default HistoryScreen;
+
+
+
+

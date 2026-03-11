@@ -1,15 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  DeviceEventEmitter,
-  Image,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Animated, DeviceEventEmitter, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
@@ -17,7 +7,7 @@ import { confirmMarketplaceOrderItem } from '../../../services/marketplace.servi
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const ORDERS = [
   {
     id: '1',
@@ -206,7 +196,7 @@ const OrdersScreen = ({ navigation }) => {
 
   const handleConfirmItem = async (order) => {
     if (!order?.orderId || !order?.itemId) {
-      Alert.alert('Missing order info', 'Unable to update this order right now.');
+      AppAlert.alert('Missing order info', 'Unable to update this order right now.');
       return;
     }
 
@@ -214,7 +204,7 @@ const OrdersScreen = ({ navigation }) => {
       await confirmMarketplaceOrderItem(order.orderId, order.itemId);
       fetchOrders();
     } catch (error) {
-      Alert.alert('Could not update order', error?.message || 'Please try again.');
+      AppAlert.alert('Could not update order', error?.message || 'Please try again.');
     }
   };
 
@@ -586,3 +576,6 @@ const styles = StyleSheet.create({
 });
 
 export default OrdersScreen;
+
+
+

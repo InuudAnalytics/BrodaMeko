@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
@@ -9,7 +9,7 @@ import { useMechanicProfile } from '../../../context';
 import { uploadAvatar as uploadAvatarService } from '../../../services/user.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, pickSingleImageFromGallery, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const normalizeAvatarUri = (value, { cacheBust = false } = {}) => {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -55,7 +55,7 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
       }
 
       if (error) {
-        Alert.alert('Photo upload', error);
+        AppAlert.alert('Photo upload', error);
         return;
       }
 
@@ -69,7 +69,7 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
 
   const handleSave = () => {
     if (!selectedUri) {
-      Alert.alert('Photo required', 'Please upload a profile photo to continue.');
+      AppAlert.alert('Photo required', 'Please upload a profile photo to continue.');
       return;
     }
 
@@ -116,7 +116,7 @@ const UploadProfilePhotoScreen = ({ navigation, route }) => {
 
         navigation.goBack();
       } catch (uploadError) {
-        Alert.alert('Upload failed', uploadError?.message || 'Could not upload profile photo.');
+        AppAlert.alert('Upload failed', uploadError?.message || 'Could not upload profile photo.');
       } finally {
         setUploading(false);
       }
@@ -296,3 +296,7 @@ const styles = StyleSheet.create({
 });
 
 export default UploadProfilePhotoScreen;
+
+
+
+

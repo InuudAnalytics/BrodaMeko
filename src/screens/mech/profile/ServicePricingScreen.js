@@ -1,14 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
@@ -21,7 +12,7 @@ import {
 } from '../../../services/mechanic.service';
 import { darkTheme } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const SERVICE_OPTIONS = [
   { label: 'Flat tyres', value: 'flat_tyres' },
   { label: 'Tyre burst', value: 'tyre_burst' },
@@ -216,7 +207,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.bank) {
-      Alert.alert('Complete previous step', 'Please add your bank details first.');
+      AppAlert.alert('Complete previous step', 'Please add your bank details first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
   }, [completedSteps.bank, isOnboarding, navigation]);
@@ -951,3 +942,6 @@ const styles = StyleSheet.create({
 });
 
 export default ServicePricingScreen;
+
+
+

@@ -1,17 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppText, ScreenContainer } from '../../../components';
-import { useChat } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const BackIcon = ({ color }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
     <Path
@@ -26,7 +19,7 @@ const BackIcon = ({ color }) => (
 
 const formatNaira = value => {
   const amount = Number(value || 0);
-  return `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
+  return `\u20A6${amount.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`;
 };
 
 const RadioOption = ({ label, active, onPress }) => (
@@ -43,8 +36,6 @@ const RadioOption = ({ label, active, onPress }) => (
 );
 
 const EscrowFundingScreen = ({ navigation, route }) => {
-  const { respondQuotation, initiatePaymentForJob, addLocalMessage } =
-    useChat();
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [paying, setPaying] = useState(false);
 
@@ -87,51 +78,30 @@ const EscrowFundingScreen = ({ navigation, route }) => {
 
   const handleConfirmAndPay = async () => {
     if (!quotationId || !conversationId || !jobId) {
-      Alert.alert('Unable to continue', 'Payment context is incomplete.');
+      AppAlert.alert('Unable to continue', 'Payment context is incomplete.');
       return;
     }
 
+    const paymentParams = {
+      quotationId,
+      conversationId,
+      jobId,
+      issueSummary,
+      mechanic,
+      mechanicId,
+    };
+
     setPaying(true);
     try {
-      // Step 1: Accept the quotation — this assigns the mechanic.
-      await respondQuotation(conversationId, {
-        quotation_id: quotationId,
-        action: 'accept',
-      });
+      if (paymentMethod === 'card') {
+        navigation.navigate(ROUTES.CAR_OWNER_CARD_PAYMENT, paymentParams);
+        return;
+      }
 
-      // Step 2: Initiate payment. Backend accepts wallet/paystack/cash.
-      // UI offers card/transfer — both go through paystack.
-      await initiatePaymentForJob(jobId, 'paystack');
-
-      // Step 3: Add a local system message in the chat thread so the car
-      // owner sees confirmation when they return to chat.
-      addLocalMessage(conversationId, {
-        type: 'system',
-        text: 'Price accepted. Mechanic has been assigned.',
+      navigation.navigate(ROUTES.CAR_OWNER_JOB_PAYSTACK_CHECKOUT, {
+        ...paymentParams,
+        paymentMethodLabel: 'transfer',
       });
-
-      // Step 4: Navigate to payment success screen, which then redirects
-      // back to the chat with progressStatus:'accepted' so the live tracking
-      // banner appears automatically.
-      navigation.replace(ROUTES.CAR_OWNER_PAYMENT_SUCCESS, {
-        payeeName: mechanicName,
-        nextRoute: ROUTES.CAR_OWNER_CHAT,
-        nextParams: {
-          conversationId,
-          jobId,
-          mechanic,
-          mechanicId,
-          issueSummary,
-          // This is the key addition — tells CarOwnerChatScreen to show the
-          // live tracking banner as soon as the user lands back in chat.
-          progressStatus: 'accepted',
-        },
-      });
-    } catch (error) {
-      Alert.alert(
-        'Payment failed',
-        error?.message || 'Could not complete payment.',
-      );
     } finally {
       setPaying(false);
     }
@@ -335,3 +305,6 @@ const styles = StyleSheet.create({
 });
 
 export default EscrowFundingScreen;
+
+
+

@@ -5,19 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {
-  AppState,
-  Alert,
-  Animated,
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { AppState, Animated, FlatList, Image, Modal, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { BubbleChatIcon, SentIcon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -26,7 +14,7 @@ import { useChat } from '../../context/ChatContext';
 import { darkTheme } from '../../theme';
 import { ROLES, ROUTES, useKeyboardLift } from '../../utils';
 import { useFocusEffect } from '@react-navigation/native';
-
+import AppAlert from '../../components/AppAlert';
 const hexToRgba = (hex, alpha) => {
   const cleaned = String(hex || '')
     .replace('#', '')
@@ -315,7 +303,6 @@ const SharedChatScreen = ({
     retryPendingMessage,
     addPendingSocketMessage,
     addMockTextMessage,
-    addLocalMessage,
     sendTypingEvent,
     sendQuotation,
     respondQuotation,
@@ -355,7 +342,7 @@ const SharedChatScreen = ({
     }
     conversationUnavailableNotifiedRef.current = true;
     disconnectChatSocket('conversation-ended');
-    Alert.alert('Chat unavailable', 'This conversation has ended for this job.', [
+    AppAlert.alert('Chat unavailable', 'This conversation has ended for this job.', [
       {
         text: 'OK',
         onPress: () => {
@@ -540,27 +527,10 @@ const SharedChatScreen = ({
     });
 
     if (!response) {
-      Alert.alert('Error', 'Could not send quotation.');
+      AppAlert.alert('Error', 'Could not send quotation.');
       setShowPriceConfirm(false);
       return;
     }
-
-    const quotationPayload =
-      response?.data?.quotation || response?.data || null;
-    const normalizedId =
-      quotationPayload?.id ||
-      quotationPayload?._id ||
-      quotationPayload?.quotation_id ||
-      `local-quote-${Date.now()}`;
-
-    addLocalMessage(conversationId, {
-      id: normalizedId,
-      type: 'price_quote',
-      amount: Number(quotationPayload?.amount || amount),
-      quotation_id: normalizedId,
-      text: `Set price at ${amount} NGN`,
-      sender: 'me',
-    });
 
     setShowPriceConfirm(false);
     setInputValue('');
@@ -577,7 +547,7 @@ const SharedChatScreen = ({
       message?.quotation_id || message?.id || message?._id || '',
     ).trim();
     if (!quotationId) {
-      Alert.alert('Unable to continue', 'Quotation reference is missing.');
+      AppAlert.alert('Unable to continue', 'Quotation reference is missing.');
       return;
     }
 
@@ -610,7 +580,7 @@ const SharedChatScreen = ({
       message?.quotation_id || message?.id || message?._id || '',
     ).trim();
     if (!quotationId) {
-      Alert.alert('Unable to continue', 'Quotation reference is missing.');
+      AppAlert.alert('Unable to continue', 'Quotation reference is missing.');
       return;
     }
 
@@ -630,16 +600,12 @@ const SharedChatScreen = ({
         return next;
       });
       setBusyQuotationId('');
-      Alert.alert('Error', 'Could not decline quotation.');
+      AppAlert.alert('Error', 'Could not decline quotation.');
       return;
     }
 
     setBusyQuotationId('');
 
-    addLocalMessage(conversationId, {
-      type: 'system',
-      text: 'Price declined',
-    });
   };
 
   const isSendEnabled = inputValue.trim().length > 0;
@@ -1246,3 +1212,6 @@ const styles = StyleSheet.create({
 });
 
 export default SharedChatScreen;
+
+
+

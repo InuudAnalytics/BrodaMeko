@@ -75,6 +75,21 @@ const readQuotationPayload = (item) => {
   return quoted;
 };
 
+const parseAmountFromText = (text) => {
+  const raw = String(text || '').trim();
+  if (!raw) {
+    return 0;
+  }
+
+  const matched = raw.match(/(?:₦|NGN\s*)?([0-9][0-9,]*(?:\.[0-9]+)?)/i);
+  if (!matched?.[1]) {
+    return 0;
+  }
+
+  const parsed = Number(String(matched[1]).replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const getConversationId = (conversation) => {
   if (!conversation || typeof conversation !== 'object') {
     return '';
@@ -156,7 +171,7 @@ const normalizeApiMessage = (item, fallbackConversationId = '') => {
       quotation?.text ||
       ''
   ).trim();
-  const amountValue = Number(
+  const rawAmountValue = Number(
     item?.amount ??
       item?.quoted_amount ??
       item?.quote_amount ??
@@ -167,6 +182,10 @@ const normalizeApiMessage = (item, fallbackConversationId = '') => {
       quotation?.price ??
       0
   );
+  const amountValue =
+    Number.isFinite(rawAmountValue) && rawAmountValue > 0
+      ? rawAmountValue
+      : parseAmountFromText(contentText);
   const quotationId = String(
     item?.quotation_id ||
       item?.quote_id ||
@@ -285,6 +304,8 @@ export const ChatProvider = ({ children }) => {
   const [wsDebugInfo, setWsDebugInfo] = useState({ url: '', tokenLength: 0, state: 'idle' });
   const [latestJobRequestUpdate, setLatestJobRequestUpdate] = useState(null);
   const [latestJobStatusUpdate, setLatestJobStatusUpdate] = useState(null);
+  const [carOwnerChatShortcut, setCarOwnerChatShortcutState] = useState(null);
+  const [mechanicChatShortcut, setMechanicChatShortcutState] = useState(null);
   const [error, setError] = useState(null);
   const messagesByConversationIdRef = useRef({});
 
@@ -335,6 +356,56 @@ export const ChatProvider = ({ children }) => {
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const setCarOwnerChatShortcut = useCallback((payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+
+    const conversationId = String(payload?.conversationId || '').trim();
+    const jobId = String(payload?.jobId || '').trim();
+    if (!conversationId || !jobId) {
+      return;
+    }
+
+    setCarOwnerChatShortcutState({
+      conversationId,
+      jobId,
+      mechanicId: payload?.mechanicId || null,
+      mechanic: payload?.mechanic || null,
+      issueSummary: payload?.issueSummary || null,
+      progressStatus: payload?.progressStatus || '',
+    });
+  }, []);
+
+  const clearCarOwnerChatShortcut = useCallback(() => {
+    setCarOwnerChatShortcutState(null);
+  }, []);
+
+  const setMechanicChatShortcut = useCallback((payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+
+    const conversationId = String(payload?.conversationId || '').trim();
+    const jobId = String(payload?.jobId || '').trim();
+    if (!conversationId || !jobId) {
+      return;
+    }
+
+    setMechanicChatShortcutState({
+      conversationId,
+      jobId,
+      mechanicId: payload?.mechanicId || null,
+      customer: payload?.customer || null,
+      issueSummary: payload?.issueSummary || null,
+      progressStatus: payload?.progressStatus || '',
+    });
+  }, []);
+
+  const clearMechanicChatShortcut = useCallback(() => {
+    setMechanicChatShortcutState(null);
   }, []);
 
   const appendMessage = useCallback((conversationId, message) => {
@@ -456,6 +527,8 @@ export const ChatProvider = ({ children }) => {
     setActiveConversation(null);
     setMessagesByConversationId({});
     setConversations([]);
+    setCarOwnerChatShortcutState(null);
+    setMechanicChatShortcutState(null);
     activeConversationIdRef.current = '';
     reconnectAttemptsRef.current = 0;
   }, [disconnectChatSocket]);
@@ -466,6 +539,8 @@ export const ChatProvider = ({ children }) => {
 
       if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'canceled') {
         clearActiveConversation();
+        setCarOwnerChatShortcutState(null);
+        setMechanicChatShortcutState(null);
       }
     },
     [clearActiveConversation]
@@ -844,7 +919,7 @@ export const ChatProvider = ({ children }) => {
     }
   }, [clearError]);
 
-  const initiatePaymentForJob = useCallback(async (jobId, paymentMethod) => {
+  const initiatePaymentForJob = useCallback(async (jobId, paymentMethod, options = {}) => {
     const safeJobId = String(jobId || '').trim();
 
     if (!safeJobId) {
@@ -855,7 +930,10 @@ export const ChatProvider = ({ children }) => {
     clearError();
 
     try {
-      const response = await initiateJobPayment(safeJobId, { payment_method: paymentMethod || 'wallet' });
+      const response = await initiateJobPayment(safeJobId, {
+        payment_method: paymentMethod || 'wallet',
+        email: options?.email,
+      });
       return response;
     } catch (paymentError) {
       setError(paymentError?.message || 'Failed to initiate payment.');
@@ -1112,6 +1190,8 @@ export const ChatProvider = ({ children }) => {
     setConversations([]);
     setActiveConversation(null);
     setMessagesByConversationId({});
+    setCarOwnerChatShortcutState(null);
+    setMechanicChatShortcutState(null);
     activeConversationIdRef.current = '';
     reconnectAttemptsRef.current = 0;
     setError(null);
@@ -1134,8 +1214,14 @@ export const ChatProvider = ({ children }) => {
       wsDebugExtras,
       latestJobRequestUpdate,
       latestJobStatusUpdate,
+      carOwnerChatShortcut,
+      mechanicChatShortcut,
       error,
       clearError,
+      setCarOwnerChatShortcut,
+      clearCarOwnerChatShortcut,
+      setMechanicChatShortcut,
+      clearMechanicChatShortcut,
       clearActiveConversation,
       handleJobStatusChange,
       fetchConversations,
@@ -1174,8 +1260,14 @@ export const ChatProvider = ({ children }) => {
       wsDebugExtras,
       latestJobRequestUpdate,
       latestJobStatusUpdate,
+      carOwnerChatShortcut,
+      mechanicChatShortcut,
       error,
       clearError,
+      setCarOwnerChatShortcut,
+      clearCarOwnerChatShortcut,
+      setMechanicChatShortcut,
+      clearMechanicChatShortcut,
       clearActiveConversation,
       handleJobStatusChange,
       fetchConversations,
@@ -1221,8 +1313,14 @@ export const useChat = () => {
       wsStatus: 'error',
       latestJobRequestUpdate: null,
       latestJobStatusUpdate: null,
+      carOwnerChatShortcut: null,
+      mechanicChatShortcut: null,
       error: 'Chat provider unavailable',
       clearError: () => {},
+      setCarOwnerChatShortcut: () => {},
+      clearCarOwnerChatShortcut: () => {},
+      setMechanicChatShortcut: () => {},
+      clearMechanicChatShortcut: () => {},
       clearActiveConversation: () => {},
       handleJobStatusChange: () => {},
       fetchConversations: async () => null,

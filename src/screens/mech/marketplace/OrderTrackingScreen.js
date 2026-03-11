@@ -1,14 +1,5 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  Animated,
-  Image,
-  PanResponder,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -21,18 +12,18 @@ import {
   ScreenContainer,
 } from '../../../components';
 import { darkTheme } from '../../../theme';
-
+import AppAlert from '../../../components/AppAlert';
 const PANEL_MAX_DOWN = 360;
 
 const fallbackTimeline = [
-  { id: 'confirmed', label: 'Order confirmed', eta: 'Today • 10:15 AM' },
+  { id: 'confirmed', label: 'Order confirmed', eta: 'Today � 10:15 AM' },
   {
     id: 'preparing',
     label: 'Seller preparing package',
-    eta: 'Today • 11:30 AM',
+    eta: 'Today � 11:30 AM',
   },
-  { id: 'out_for_delivery', label: 'Out for delivery', eta: 'Today • 1:20 PM' },
-  { id: 'delivered', label: 'Delivered', eta: 'Today • 3:30 PM' },
+  { id: 'out_for_delivery', label: 'Out for delivery', eta: 'Today � 1:20 PM' },
+  { id: 'delivered', label: 'Delivered', eta: 'Today � 3:30 PM' },
 ];
 
 const fallbackProduct = {
@@ -126,7 +117,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   });
 
   const handleMessageSeller = () => {
-    Alert.alert('Coming soon', 'Seller chat is not available yet.');
+    AppAlert.alert('Coming soon', 'Seller chat is not available yet.');
   };
 
   const handleConfirmDelivery = () => {
@@ -139,7 +130,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   };
 
   const handleReportIssue = () => {
-    Alert.alert('Report issue', 'Issue reporting will be wired soon.');
+    AppAlert.alert('Report issue', 'Issue reporting will be wired soon.');
   };
 
   return (
@@ -598,3 +589,6 @@ const styles = StyleSheet.create({
 });
 
 export default OrderTrackingScreen;
+
+
+

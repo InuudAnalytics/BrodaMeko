@@ -1,5 +1,7 @@
 export { default as AnimatedLogo } from './AnimatedLogo';
 export { default as AppBottomNav } from './AppBottomNav';
+export { default as AppAlert } from './AppAlert';
+export { AppAlertProvider } from './AppAlert';
 export { default as ScrollableTabs } from './ScrollableTabs';
 export { default as CenteredHeader } from './CenteredHeader';
 export { default as PersonalInfoAlert } from './PersonalInfoAlert';
@@ -18,5 +20,6 @@ export { default as NigerianPhoneInput } from './NigerianPhoneInput';
 export { default as MechanicJobCard } from './MechanicJobCard';
 export { default as NotificationPermissionChip } from './NotificationPermissionChip';
 export { default as NotificationsGlobalGate } from './NotificationsGlobalGate';
+export { default as FloatingScrollDownButton } from './FloatingScrollDownButton';
 
 export { default as PullToRefreshIndicator } from './PullToRefreshIndicator';

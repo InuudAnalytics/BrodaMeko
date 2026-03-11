@@ -1,15 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, ArrowRight01Icon, ImageUploadIcon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
@@ -35,7 +25,7 @@ import {
   SPARE_PARTS_ONBOARDING_STEPS,
 } from '../../../utils';
 import { fetchPlaceDetails, fetchPlaceSuggestions, parseAddressComponents, reverseGeocode } from '../../../utils/places';
-
+import AppAlert from '../../../components/AppAlert';
 const DAYS = [
   'Monday',
   'Tuesday',
@@ -136,7 +126,7 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.nin) {
-      Alert.alert('Complete previous step', 'Please upload your NIN first.');
+      AppAlert.alert('Complete previous step', 'Please upload your NIN first.');
       navigation.replace(ROUTES.SPARE_PARTS_PROFILE_SETUP);
     }
   }, [completedSteps.nin, isOnboarding, navigation]);
@@ -280,7 +270,7 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
     try {
       const status = permissionStatus === 'granted' ? permissionStatus : await requestPermission();
       if (status !== 'granted') {
-        Alert.alert(
+        AppAlert.alert(
           'Location permission needed',
           'Enable location permission to auto-fill your store address.',
           [
@@ -319,7 +309,7 @@ const SparePartsAddressScreen = ({ navigation, route }) => {
       return;
     }
     if (error) {
-      Alert.alert('Upload failed', error);
+      AppAlert.alert('Upload failed', error);
       return;
     }
     if (asset?.uri) {
@@ -1018,3 +1008,6 @@ const styles = StyleSheet.create({
 });
 
 export default SparePartsAddressScreen;
+
+
+

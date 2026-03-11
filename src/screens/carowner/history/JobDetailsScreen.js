@@ -1,15 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Animated, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
@@ -17,7 +7,7 @@ import { AppButton, AppText, PullToRefreshIndicator, ScreenContainer } from '../
 import { useJobs } from '../../../context';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const readImages = (job) => {
   const images = job?.images || job?.photos || job?.attachments || [];
   return Array.isArray(images) ? images : [];
@@ -101,7 +91,7 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const images = useMemo(() => readImages(job), [job]);
 
   const handleDelete = () => {
-    Alert.alert('Delete job', 'Are you sure you want to delete this job?', [
+    AppAlert.alert('Delete job', 'Are you sure you want to delete this job?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -109,10 +99,10 @@ const JobDetailsScreen = ({ navigation, route }) => {
         onPress: async () => {
           const response = await deleteJob(jobId);
           if (!response) {
-            Alert.alert('Error', 'Could not delete this job.');
+            AppAlert.alert('Error', 'Could not delete this job.');
             return;
           }
-          Alert.alert('Deleted', 'Job deleted successfully.');
+          AppAlert.alert('Deleted', 'Job deleted successfully.');
           navigation.navigate(ROUTES.CAR_OWNER_HISTORY, { refresh: Date.now() });
         },
       },
@@ -324,3 +314,6 @@ const styles = StyleSheet.create({
 });
 
 export default JobDetailsScreen;
+
+
+

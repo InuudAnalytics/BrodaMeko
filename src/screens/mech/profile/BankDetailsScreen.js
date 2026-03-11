@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowDown01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
@@ -7,7 +7,7 @@ import { useAuth, useMechanicProfile } from '../../../context';
 import { addMechanicBank, getMechanicBankList, verifyMechanicBank } from '../../../services/mechanic.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const normalizeBankItems = (payload) => {
   if (Array.isArray(payload)) {
     return payload;
@@ -89,7 +89,7 @@ const BankDetailsScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.address) {
-      Alert.alert('Complete previous step', 'Please add your address first.');
+      AppAlert.alert('Complete previous step', 'Please add your address first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
   }, [completedSteps.address, isOnboarding, navigation]);
@@ -621,3 +621,7 @@ const styles = StyleSheet.create({
 });
 
 export default BankDetailsScreen;
+
+
+
+

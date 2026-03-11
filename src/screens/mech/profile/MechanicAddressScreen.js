@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Delete02Icon, Edit02Icon, Location01Icon, Tick04Icon } from '@hugeicons/core-free-icons';
 import { openSettings } from 'react-native-permissions';
@@ -16,7 +16,7 @@ import {
 import { darkTheme } from '../../../theme';
 import { getOnboardingStepIndex, MECH_ONBOARDING_STEPS, ROUTES } from '../../../utils';
 import { fetchPlaceDetails, fetchPlaceSuggestions, parseAddressComponents, reverseGeocode } from '../../../utils/places';
-
+import AppAlert from '../../../components/AppAlert';
 const buildEmptyAddress = () => ({
   id: `new-${Date.now()}-${Math.random()}`,
   addressType: 'home',
@@ -91,7 +91,7 @@ const MechanicAddressScreen = ({ navigation, route }) => {
     }
 
     if (!completedSteps.certificate) {
-      Alert.alert('Complete previous step', 'Please upload your certificate first.');
+      AppAlert.alert('Complete previous step', 'Please upload your certificate first.');
       navigation.replace(ROUTES.MECH_PROFILE_SETUP);
     }
   }, [completedSteps.certificate, isOnboarding, navigation]);
@@ -217,7 +217,7 @@ const MechanicAddressScreen = ({ navigation, route }) => {
     try {
       const status = permissionStatus === 'granted' ? permissionStatus : await requestPermission();
       if (status !== 'granted') {
-        Alert.alert(
+        AppAlert.alert(
           'Location permission needed',
           'Enable location permission to auto-fill your address.',
           [
@@ -375,7 +375,7 @@ const MechanicAddressScreen = ({ navigation, route }) => {
       return;
     }
 
-    Alert.alert('Delete address?', 'This address will be removed.', [
+    AppAlert.alert('Delete address?', 'This address will be removed.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -1050,3 +1050,7 @@ const styles = StyleSheet.create({
 });
 
 export default MechanicAddressScreen;
+
+
+
+

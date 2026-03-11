@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
-
+import AppAlert from '../../../components/AppAlert';
 const TAGS = [
   'Good condition',
   'Original / Genuine',
@@ -69,7 +69,7 @@ const RateProductScreen = ({ navigation, route }) => {
 
   const handleSubmit = async () => {
     if (!rating) {
-      Alert.alert('Select rating', 'Please choose a star rating before submitting.');
+      AppAlert.alert('Select rating', 'Please choose a star rating before submitting.');
       return;
     }
 
@@ -78,7 +78,7 @@ const RateProductScreen = ({ navigation, route }) => {
       // TODO: Hook into product rating endpoint when available.
       navigation.navigate('ProductFeedbackSuccess');
     } catch (submitError) {
-      Alert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
+      AppAlert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
     } finally {
       setSubmitting(false);
     }
@@ -293,3 +293,7 @@ const styles = StyleSheet.create({
 });
 
 export default RateProductScreen;
+
+
+
+

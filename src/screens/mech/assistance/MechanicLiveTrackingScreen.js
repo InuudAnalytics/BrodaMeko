@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { CallIcon, CancelCircleIcon, Location01Icon, Mail01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -10,7 +10,7 @@ import { updateJobLocation } from '../../../services/jobs.service';
 import { closeScoped, connectScoped, sendScoped } from '../../../services/ws.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
-
+import AppAlert from '../../../components/AppAlert';
 const STATUS_STEPS = ['Accepted', 'En Route', 'Arrived', 'Repairing', 'Done'];
 const toStatusIndex = (value) => {
   const status = String(value || '').trim().toLowerCase();
@@ -62,18 +62,23 @@ const StatusStepper = ({ currentIndex }) => {
 };
 
 const MechanicLiveTrackingScreen = ({ navigation, route }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { location, refreshOnce } = useUserLocation();
   const locationRef = useRef(null);
   const jobId = String(route?.params?.jobId || '').trim();
-  const carOwnerLocation = route?.params?.customerLocation || null;
+  const userId = String(user?.id || user?._id || user?.user_id || '').trim();
+  const [carOwnerLocation, setCarOwnerLocation] = useState(route?.params?.customerLocation || null);
 
-  const customer = route?.params?.customer || {
-    id: route?.params?.carOwnerId || '',
-    name: route?.params?.carOwnerName || 'Car Owner',
-    initials: 'CO',
-    rating: '4.8',
-  };
+  const customer = useMemo(
+    () =>
+      route?.params?.customer || {
+        id: route?.params?.carOwnerId || '',
+        name: route?.params?.carOwnerName || 'Car Owner',
+        initials: 'CO',
+        rating: '4.8',
+      },
+    [route?.params?.carOwnerId, route?.params?.carOwnerName, route?.params?.customer],
+  );
 
   const recipient = useMemo(() => ({
     name: customer?.name || 'Car Owner',
@@ -95,23 +100,59 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
       return undefined;
     }
 
-    let mounted = true;
     const safeToken = String(token || '').trim();
+    const senderId = String(userId || route?.params?.mechanicId || '').trim();
+
+    const handleMessage = (event) => {
+      if (!event?.data) {
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload?.type !== 'job_location_update') {
+          return;
+        }
+
+        const payloadJobId = String(payload?.job_id || '').trim();
+        if (!payloadJobId || payloadJobId !== jobId) {
+          return;
+        }
+
+        const senderRole = String(payload?.sender_role || payload?.role || '').trim().toLowerCase();
+        const incomingSenderId = String(payload?.sender_id || payload?.user_id || '').trim();
+        if (senderRole === 'mechanic' || (incomingSenderId && senderId && incomingSenderId === senderId)) {
+          return;
+        }
+
+        const lat = Number(payload?.lat);
+        const lng = Number(payload?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return;
+        }
+
+        setCarOwnerLocation({ latitude: lat, longitude: lng });
+      } catch {
+        // ignore invalid payloads
+      }
+    };
 
     if (safeToken) {
-      connectScoped('job_location', safeToken);
+      connectScoped('job_location', safeToken, handleMessage);
     }
 
     const sendLocation = async () => {
-      const current = locationRef.current;
+      const refreshed = await refreshOnce?.();
+      const current = refreshed || locationRef.current;
       if (!current) {
-        await refreshOnce?.();
         return;
       }
 
       const payload = {
         type: 'job_location_update',
         job_id: jobId,
+        sender_role: 'mechanic',
+        sender_id: senderId || undefined,
         lat: current.latitude,
         lng: current.longitude,
         heading: 0,
@@ -139,11 +180,10 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
     sendLocation();
 
     return () => {
-      mounted = false;
       clearInterval(interval);
       closeScoped('job_location');
     };
-  }, [jobId, refreshOnce, token]);
+  }, [jobId, refreshOnce, route?.params?.mechanicId, token, userId]);
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -190,7 +230,7 @@ const MechanicLiveTrackingScreen = ({ navigation, route }) => {
           <View style={styles.actions}>
             <AppButton
               label="Call"
-              onPress={() => Alert.alert('Call', `Calling ${recipient.name}`)}
+              onPress={() => AppAlert.alert('Call', `Calling ${recipient.name}`)}
               style={styles.callBtn}
               left={<HugeiconsIcon icon={CallIcon} size={18} color={darkTheme.colors.background} strokeWidth={2} />}
             />
@@ -388,3 +428,7 @@ const styles = StyleSheet.create({
 });
 
 export default MechanicLiveTrackingScreen;
+
+
+
+

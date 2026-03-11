@@ -9,6 +9,7 @@ import { ROUTES } from '../../../utils';
 const PaymentSuccessScreen = ({ navigation, route }) => {
   const { role } = useAuth();
   const orderId = route?.params?.orderId;
+  const fulfillmentType = String(route?.params?.fulfillmentType || 'delivery').toLowerCase();
 
   const handleBackToMarketplace = () => {
     if (String(role || '').toLowerCase() === 'mech') {
@@ -25,14 +26,28 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
           <HugeiconsIcon icon={CheckmarkCircle01Icon} size={72} color="#22C55E" strokeWidth={2} />
           <AppText style={styles.title}>Payment successful</AppText>
           <AppText style={styles.subtitle}>
-            Your order is being processed and will be delivered soon.
+            {fulfillmentType === 'pickup'
+              ? 'Your order is ready for pickup flow. Use your pickup code at the shop.'
+              : 'Your order is being processed and will be delivered soon.'}
           </AppText>
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={() => navigation.navigate('OrderTracking', { orderId })}
+              onPress={() =>
+                fulfillmentType === 'pickup'
+                  ? navigation.navigate(ROUTES.CAR_OWNER_PICKUP_TRACKING, {
+                      orderId,
+                      pickupCode: route?.params?.pickupCode,
+                      product: route?.params?.product,
+                      seller: route?.params?.seller,
+                      deliveryAddress: route?.params?.deliveryAddress,
+                    })
+                  : navigation.navigate('OrderTracking', { orderId })
+              }
             >
-              <AppText style={styles.primaryText}>Track order</AppText>
+              <AppText style={styles.primaryText}>
+                {fulfillmentType === 'pickup' ? 'Track pickup' : 'Track order'}
+              </AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={handleBackToMarketplace}>
               <AppText style={styles.secondaryText}>Go to marketplace</AppText>

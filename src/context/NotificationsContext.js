@@ -47,43 +47,42 @@ export const NotificationsProvider = ({ children }) => {
   const [unreadTick, setUnreadTick] = useState(0);
   const tokenRef = useRef('');
   const appStateRef = useRef(AppState.currentState);
+  const hadTokenRef = useRef(false);
+
+  const logTelemetry = useCallback((event, payload = {}) => {
+    if (__DEV__) {
+      console.log('[Notifications][Telemetry]', event, payload);
+    }
+  }, []);
 
   const registerToken = useCallback(
     async (nextToken) => {
       const safeToken = String(nextToken || '').trim();
       if (!safeToken || !token) {
-        if (__DEV__) {
-          console.log('[Notifications] registerToken skipped', {
-            hasToken: Boolean(token),
-            hasFcmToken: Boolean(safeToken),
-          });
-        }
+        logTelemetry('register_token_skipped', {
+          hasToken: Boolean(token),
+          hasFcmToken: Boolean(safeToken),
+        });
         return;
       }
 
       try {
         await registerDevice({ fcm_token: safeToken, device_type: getDeviceType() });
-        if (__DEV__) {
-          console.log('[Notifications] registerDevice success');
-        }
+        logTelemetry('register_device_success');
       } catch (error) {
-        if (__DEV__) {
-          console.log('[Notifications] Failed to register device token:', error?.message || error);
-        }
+        logTelemetry('register_device_failed', { message: error?.message || String(error) });
       }
     },
-    [token]
+    [logTelemetry, token]
   );
 
   const syncGrantedToken = useCallback(async () => {
     const tokenValue = await getFcmToken();
     const trimmed = String(tokenValue || '').trim();
-    if (__DEV__) {
-      console.log('[Notifications] FCM token fetched', {
-        hasToken: Boolean(trimmed),
-        sameAsCurrent: trimmed && trimmed === tokenRef.current,
-      });
-    }
+    logTelemetry('fcm_token_fetched', {
+      hasToken: Boolean(trimmed),
+      sameAsCurrent: trimmed && trimmed === tokenRef.current,
+    });
 
     if (!trimmed && __DEV__) {
       console.warn(
@@ -98,21 +97,20 @@ export const NotificationsProvider = ({ children }) => {
     tokenRef.current = trimmed;
     setFcmToken(trimmed);
     await registerToken(trimmed);
-  }, [registerToken]);
+  }, [logTelemetry, registerToken]);
 
-  const checkAndSyncToken = useCallback(async () => {
+  const checkAndSyncToken = useCallback(async (source = 'manual') => {
     if (!token) {
       setFcmToken('');
       tokenRef.current = '';
       setPermissionStatus('unknown');
+      logTelemetry('permission_check_skipped_no_auth', { source });
       return;
     }
 
     const status = await checkNotificationPermission();
     setPermissionStatus(status);
-    if (__DEV__) {
-      console.log('[Notifications] permission status (check)', status);
-    }
+    logTelemetry('permission_status_check', { source, status });
     if (status !== 'granted') {
       setFcmToken('');
       tokenRef.current = '';
@@ -120,7 +118,7 @@ export const NotificationsProvider = ({ children }) => {
     }
 
     await syncGrantedToken();
-  }, [syncGrantedToken, token]);
+  }, [logTelemetry, syncGrantedToken, token]);
 
   const requestAndSyncToken = useCallback(async () => {
     if (!token) {
@@ -129,9 +127,7 @@ export const NotificationsProvider = ({ children }) => {
 
     const status = await requestNotificationPermission();
     setPermissionStatus(status);
-    if (__DEV__) {
-      console.log('[Notifications] permission status (request)', status);
-    }
+    logTelemetry('permission_status_request', { status });
     if (status !== 'granted') {
       setFcmToken('');
       tokenRef.current = '';
@@ -139,7 +135,43 @@ export const NotificationsProvider = ({ children }) => {
     }
 
     await syncGrantedToken();
-  }, [syncGrantedToken, token]);
+  }, [logTelemetry, syncGrantedToken, token]);
+
+  const promptPermissionIfNeeded = useCallback(
+    async (source = 'manual_prompt') => {
+      if (!token) {
+        logTelemetry('permission_prompt_skipped_no_auth', { source });
+        return 'unknown';
+      }
+
+      const currentStatus = await checkNotificationPermission();
+      setPermissionStatus(currentStatus);
+      logTelemetry('permission_status_before_prompt', { source, status: currentStatus });
+
+      if (currentStatus === 'granted') {
+        await syncGrantedToken();
+        return 'granted';
+      }
+
+      if (currentStatus === 'blocked') {
+        return 'blocked';
+      }
+
+      const requestedStatus = await requestNotificationPermission();
+      setPermissionStatus(requestedStatus);
+      logTelemetry('permission_status_after_prompt', { source, status: requestedStatus });
+
+      if (requestedStatus === 'granted') {
+        await syncGrantedToken();
+      } else {
+        setFcmToken('');
+        tokenRef.current = '';
+      }
+
+      return requestedStatus;
+    },
+    [logTelemetry, syncGrantedToken, token]
+  );
 
   const refreshUnreadCount = useCallback(async () => {
     try {
@@ -180,10 +212,17 @@ export const NotificationsProvider = ({ children }) => {
     if (!token) {
       setFcmToken('');
       tokenRef.current = '';
+      hadTokenRef.current = false;
       return undefined;
     }
 
-    checkAndSyncToken();
+    const hasTokenNow = Boolean(token);
+    const source = !hadTokenRef.current && hasTokenNow ? 'login_access' : 'provider_active';
+    hadTokenRef.current = hasTokenNow;
+    checkAndSyncToken(source);
+    if (source === 'login_access') {
+      promptPermissionIfNeeded('login_access_auto_prompt');
+    }
 
     const unsubscribeMessage = listenForForegroundMessages(handleForegroundMessage);
     const unsubscribeOpen = listenForNotificationOpen(handleNotificationOpen);
@@ -202,12 +241,12 @@ export const NotificationsProvider = ({ children }) => {
       unsubscribeOpen?.();
       unsubscribeRefresh?.();
     };
-  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, registerToken, token]);
+  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, promptPermissionIfNeeded, registerToken, token]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        checkAndSyncToken();
+        checkAndSyncToken('app_foreground');
         refreshUnreadCount();
       }
       appStateRef.current = nextState;
@@ -223,9 +262,11 @@ export const NotificationsProvider = ({ children }) => {
       lastNotification,
       unreadTick,
       requestPermission: requestAndSyncToken,
+      recheckPermissionStatus: checkAndSyncToken,
+      promptPermissionIfNeeded,
       refreshUnreadCount,
     }),
-    [fcmToken, lastNotification, permissionStatus, refreshUnreadCount, requestAndSyncToken, unreadTick]
+    [checkAndSyncToken, fcmToken, lastNotification, permissionStatus, promptPermissionIfNeeded, refreshUnreadCount, requestAndSyncToken, unreadTick]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
