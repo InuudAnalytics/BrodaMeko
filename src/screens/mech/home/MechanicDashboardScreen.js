@@ -163,6 +163,16 @@ const readAvatarUri = (user) =>
     ''
   );
 
+const readUnreadCount = (payload) => {
+  const count = Number(
+    payload?.unread_count ??
+      payload?.data?.unread_count ??
+      payload?.meta?.unread_count ??
+      0,
+  );
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+};
+
 const MechanicDashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
   const { mechanicChatShortcut, setMechanicChatShortcut, clearMechanicChatShortcut } = useChat();
@@ -596,9 +606,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
       const fetchUnread = async () => {
         try {
           const response = await getNotifications({ page: 1, limit: 1 });
-          const payload = response?.data || response || {};
-          const count = Number(payload?.unread_count || 0);
-          if (active) setUnreadCount(Number.isFinite(count) ? count : 0);
+          const payload = response || {};
+          if (active) setUnreadCount(readUnreadCount(payload));
         } catch {
           if (active) setUnreadCount(0);
         }
@@ -682,9 +691,8 @@ const MechanicDashboardScreen = ({ navigation }) => {
       }
 
       if (unreadRes) {
-        const unreadPayload = unreadRes?.data || unreadRes || {};
-        const count = Number(unreadPayload?.unread_count || 0);
-        setUnreadCount(Number.isFinite(count) ? count : 0);
+        const unreadPayload = unreadRes || {};
+        setUnreadCount(readUnreadCount(unreadPayload));
       }
     } catch {
       setError('Could not refresh dashboard.');
@@ -1040,17 +1048,18 @@ const styles = StyleSheet.create({
   },
   bellBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: 3,
+    right: 3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 1,
     borderColor: darkTheme.colors.background,
+    zIndex: 2,
   },
   bellBadgeText: {
     color: '#1A1A1A',

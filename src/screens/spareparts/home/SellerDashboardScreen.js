@@ -28,6 +28,16 @@ const getFirstName = (user) => {
 
 const SCREEN_BG = '#000033';
 
+const readUnreadCount = (payload) => {
+  const count = Number(
+    payload?.unread_count ??
+      payload?.data?.unread_count ??
+      payload?.meta?.unread_count ??
+      0,
+  );
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+};
+
 const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const { user } = useAuth();
   const { unreadTick, promptPermissionIfNeeded } = useNotifications();
@@ -65,9 +75,8 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const fetchUnread = useCallback(async () => {
     try {
       const response = await getNotifications({ page: 1, limit: 1 });
-      const payload = response?.data || response || {};
-      const count = Number(payload?.unread_count || 0);
-      setUnreadCount(Number.isFinite(count) ? count : 0);
+      const payload = response || {};
+      setUnreadCount(readUnreadCount(payload));
     } catch {
       setUnreadCount(0);
     }
@@ -296,17 +305,18 @@ const styles = StyleSheet.create({
   },
   bellBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    top: 3,
+    right: 3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: darkTheme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 1,
     borderColor: SCREEN_BG,
+    zIndex: 2,
   },
   bellBadgeText: {
     color: '#1A1A1A',

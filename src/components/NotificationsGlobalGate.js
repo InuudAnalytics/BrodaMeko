@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { openSettings } from 'react-native-permissions';
 import AppText from './AppText';
+import ForegroundNotificationToast from './ForegroundNotificationToast';
 import { useAuth, useNotifications } from '../context';
 import { navigationRef } from '../navigation/navigationRef';
 import { darkTheme } from '../theme';
-
-const TOAST_HIDE_DELAY_MS = 3800;
 
 const readTarget = message => {
   const data = message?.data && typeof message.data === 'object' ? message.data : {};
@@ -20,10 +19,6 @@ const NotificationsGlobalGate = () => {
   const { permissionStatus, requestPermission, lastNotification } = useNotifications();
   const [sessionDismissed, setSessionDismissed] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const toastAnim = useRef(new Animated.Value(0)).current;
-  const hideTimerRef = useRef(null);
-  const seenToastKeyRef = useRef('');
 
   const normalizedStatus = String(permissionStatus || '').toLowerCase();
   const isBlocked = normalizedStatus === 'blocked';
@@ -41,52 +36,6 @@ const NotificationsGlobalGate = () => {
       setSessionDismissed(false);
     }
   }, [isGranted]);
-
-  const toastKey = useMemo(() => {
-    const id = String(lastNotification?.data?.notification_id || '').trim();
-    if (id) {
-      return id;
-    }
-    return `${lastNotification?.title || ''}|${lastNotification?.body || ''}|${
-      lastNotification?.data?.job_id || ''
-    }|${lastNotification?.data?.conversation_id || ''}`;
-  }, [lastNotification]);
-
-  useEffect(() => {
-    if (!lastNotification) {
-      return;
-    }
-    if (!toastKey || toastKey === seenToastKeyRef.current) {
-      return;
-    }
-    seenToastKeyRef.current = toastKey;
-    setToastVisible(true);
-    Animated.timing(toastAnim, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-    }
-    hideTimerRef.current = setTimeout(() => {
-      Animated.timing(toastAnim, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }).start(() => setToastVisible(false));
-    }, TOAST_HIDE_DELAY_MS);
-  }, [lastNotification, toastAnim, toastKey]);
-
-  useEffect(
-    () => () => {
-      if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
-      }
-    },
-    [],
-  );
 
   const handleEnableNotifications = async () => {
     if (isBlocked) {
@@ -144,34 +93,7 @@ const NotificationsGlobalGate = () => {
         </View>
       ) : null}
 
-      {toastVisible ? (
-        <Animated.View
-          style={[
-            styles.toastWrap,
-            {
-              opacity: toastAnim,
-              transform: [
-                {
-                  translateY: toastAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-12, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-          pointerEvents="box-none"
-        >
-          <TouchableOpacity style={styles.toastCard} activeOpacity={0.9} onPress={handleToastPress}>
-            <AppText style={styles.toastTitle}>
-              {String(lastNotification?.title || 'New notification').trim() || 'New notification'}
-            </AppText>
-            <AppText style={styles.toastBody} numberOfLines={2}>
-              {String(lastNotification?.body || 'Tap to view details.').trim() || 'Tap to view details.'}
-            </AppText>
-          </TouchableOpacity>
-        </Animated.View>
-      ) : null}
+      <ForegroundNotificationToast notification={lastNotification} onPress={handleToastPress} />
     </>
   );
 };
@@ -238,33 +160,6 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     fontSize: 12,
     fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  toastWrap: {
-    position: 'absolute',
-    top: 52,
-    left: 12,
-    right: 12,
-    zIndex: 70,
-  },
-  toastCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(0,0,51,0.93)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  toastTitle: {
-    color: darkTheme.colors.text,
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: darkTheme.typography.fontWeights.semibold,
-  },
-  toastBody: {
-    marginTop: 2,
-    color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 15,
   },
 });
 

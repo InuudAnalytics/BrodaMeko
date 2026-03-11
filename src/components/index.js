@@ -20,6 +20,7 @@ export { default as NigerianPhoneInput } from './NigerianPhoneInput';
 export { default as MechanicJobCard } from './MechanicJobCard';
 export { default as NotificationPermissionChip } from './NotificationPermissionChip';
 export { default as NotificationsGlobalGate } from './NotificationsGlobalGate';
+export { default as ForegroundNotificationToast } from './ForegroundNotificationToast';
 export { default as FloatingScrollDownButton } from './FloatingScrollDownButton';
 
 export { default as PullToRefreshIndicator } from './PullToRefreshIndicator';
