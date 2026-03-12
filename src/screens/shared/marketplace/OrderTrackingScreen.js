@@ -254,6 +254,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
         productImage: product?.images?.[0],
         sellerName: seller?.name,
         orderId,
+        storeId: product?.storeId || seller?.storeId || '',
       });
     } catch (error) {
       AppAlert.alert('Could not confirm delivery', error?.message || 'Please try again.');
@@ -284,6 +285,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           name: part?.name || item?.name || fallbackProduct.name,
           price: part?.price || item?.price || fallbackProduct.price,
           shop: store?.store_name || store?.name || fallbackProduct.shop,
+          storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
           images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
           latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
           longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
@@ -292,6 +294,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
 
         const resolvedSeller = {
           name: store?.store_name || store?.name || fallbackSeller.name,
+          storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
           avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
           isActive: Boolean(store?.is_active ?? true),
           coordinates: store?.coordinates || null,
@@ -396,6 +399,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                         name: part?.name || item?.name || fallbackProduct.name,
                         price: part?.price || item?.price || fallbackProduct.price,
                         shop: store?.store_name || store?.name || fallbackProduct.shop,
+                        storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
                         images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
                         latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
                         longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
@@ -404,6 +408,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
 
                       const resolvedSeller = {
                         name: store?.store_name || store?.name || fallbackSeller.name,
+                        storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
                         avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
                         isActive: Boolean(store?.is_active ?? true),
                         coordinates: store?.coordinates || null,

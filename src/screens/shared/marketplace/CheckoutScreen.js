@@ -154,6 +154,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         pickupCode,
         product: {
           name: product?.name || 'Product',
+          storeId: String(product?.storeId || product?.store_id || product?.store?.id || '').trim(),
           price: Number(product?.price || 0),
           shop: product?.shop || 'Seller',
           images: Array.isArray(product?.images) ? product.images : [],

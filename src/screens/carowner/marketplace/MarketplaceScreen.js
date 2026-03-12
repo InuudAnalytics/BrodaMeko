@@ -38,6 +38,7 @@ const formatStoreAddress = (value) => {
 
 const mapPartToProduct = (part) => ({
   id: String(part?.id || part?._id || ''),
+  storeId: String(part?.store_id || part?.store?.id || '').trim(),
   name: String(part?.name || part?.title || 'Spare part'),
   price: Number(part?.price || 0),
   shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),

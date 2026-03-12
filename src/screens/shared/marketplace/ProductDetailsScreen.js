@@ -18,6 +18,7 @@ import {
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useCart } from '../../../context';
 import { getMarketplacePart } from '../../../services/marketplace.service';
+import { getStoreReviews } from '../../../services/store-reviews.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -95,13 +96,36 @@ const ProductDetailsScreen = ({ navigation, route }) => {
         const payload = response?.data || response || {};
         const part = payload?.part || payload?.data || payload;
         if (active && part) {
+          const resolvedStoreId = String(part?.store_id || part?.store?.id || '').trim();
+          let reviewCount = Number(part?.reviews || part?.review_count || 0);
+          let averageRating = Number(part?.rating ?? part?.average_rating ?? 0);
+
+          if (resolvedStoreId) {
+            try {
+              const reviewResponse = await getStoreReviews(resolvedStoreId);
+              const reviewPayload = reviewResponse?.data || reviewResponse || {};
+              const reviewData = reviewPayload?.data || reviewPayload || {};
+              const responseAvg = Number(reviewData?.avg_rating ?? reviewPayload?.avg_rating);
+              const responseCount = Number(reviewData?.total_reviews ?? reviewPayload?.total_reviews);
+              if (Number.isFinite(responseAvg)) {
+                averageRating = responseAvg;
+              }
+              if (Number.isFinite(responseCount)) {
+                reviewCount = responseCount;
+              }
+            } catch {
+              // Keep part payload rating/review_count when review summary request fails.
+            }
+          }
+
           setProduct({
             id: String(part?.id || part?._id || id),
+            storeId: resolvedStoreId,
             name: String(part?.name || part?.title || 'Spare part'),
             price: Number(part?.price || 0),
             shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
-            rating: Number(part?.rating ?? part?.average_rating ?? 0),
-            reviews: Number(part?.reviews || part?.review_count || 0),
+            rating: averageRating,
+            reviews: reviewCount,
             stock: Number(part?.stock_quantity || part?.stock || 0),
             location: buildStoreLocationLabel(part),
             compatibility: String(part?.compatibility || 'Compatible'),

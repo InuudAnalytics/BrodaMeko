@@ -134,6 +134,16 @@ export const ENDPOINTS = {
     replies: (reviewId) =>
       `/api/v1/mechanic-reviews/${encodeURIComponent(String(reviewId || ''))}/replies`,
   },
+  storeReviews: {
+    leave: (storeId) =>
+      `/api/v1/store-reviews/${encodeURIComponent(String(storeId || ''))}/review`,
+    list: (storeId) =>
+      `/api/v1/store-reviews/${encodeURIComponent(String(storeId || ''))}/reviews`,
+    reply: (reviewId) =>
+      `/api/v1/store-reviews/${encodeURIComponent(String(reviewId || ''))}/reply`,
+    replies: (reviewId) =>
+      `/api/v1/store-reviews/${encodeURIComponent(String(reviewId || ''))}/replies`,
+  },
   transactions: {
     list: '/api/v1/transactions/list',
     details: (reference) => `/api/v1/transactions/${encodeURIComponent(String(reference || ''))}`,

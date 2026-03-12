@@ -25,6 +25,11 @@ const OrderDeliveredSuccessScreen = ({ navigation, route }) => {
   const productImage = resolveImageUri(route?.params?.productImage || route?.params?.product?.images?.[0]);
   const sellerName = route?.params?.sellerName || route?.params?.seller?.name || 'Okon spare part hub';
   const orderId = route?.params?.orderId || route?.params?.order_id || 'BM-98-09';
+  const storeId =
+    route?.params?.storeId ||
+    route?.params?.store_id ||
+    route?.params?.product?.storeId ||
+    '';
 
   const handleBackToMarketplace = () => {
     if (String(role || '').toLowerCase() === 'mech') {
@@ -40,6 +45,7 @@ const OrderDeliveredSuccessScreen = ({ navigation, route }) => {
       productImage,
       sellerName,
       orderId,
+      storeId,
     });
   };
 

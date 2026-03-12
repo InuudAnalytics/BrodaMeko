@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, TouchableOpacity, View } from 'react-nati
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { darkTheme } from '../../../theme';
+import { leaveStoreReview } from '../../../services/store-reviews.service';
 import AppAlert from '../../../components/AppAlert';
 const TAGS = [
   'Good condition',
@@ -48,6 +49,7 @@ const RateProductScreen = ({ navigation, route }) => {
   const productImage = resolveImageUri(route?.params?.productImage || route?.params?.product?.images?.[0]);
   const sellerName = route?.params?.sellerName || route?.params?.seller?.name || 'Okon spare part hub';
   const orderId = route?.params?.orderId || route?.params?.order_id || 'BM-98-09';
+  const storeId = route?.params?.storeId || route?.params?.store_id || route?.params?.product?.storeId || '';
 
   const initials = useMemo(() => {
     const parts = String(productName || '').trim().split(/\s+/).filter(Boolean);
@@ -72,11 +74,21 @@ const RateProductScreen = ({ navigation, route }) => {
       AppAlert.alert('Select rating', 'Please choose a star rating before submitting.');
       return;
     }
+    if (!storeId) {
+      AppAlert.alert('Missing store', 'Store reference is missing for this review.');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      // TODO: Hook into product rating endpoint when available.
-      navigation.navigate('ProductFeedbackSuccess');
+      await leaveStoreReview(storeId, {
+        rating,
+        comment: feedback,
+      });
+      navigation.navigate('ProductFeedbackSuccess', {
+        storeId,
+        rating,
+      });
     } catch (submitError) {
       AppAlert.alert('Submit failed', submitError?.message || 'Could not submit review right now.');
     } finally {
