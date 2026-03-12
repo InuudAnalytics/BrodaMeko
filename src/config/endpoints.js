@@ -83,6 +83,7 @@ export const ENDPOINTS = {
     mechanicAssignedDetails: (jobId) => `/api/v1/jobs/mechanic/assigned/${encodeURIComponent(String(jobId || ''))}`,
     updateStatus: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/status`,
     confirm: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/confirm`,
+    dispute: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/dispute`,
     mechanicsForJob: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/mechanics/for-job`,
     hire: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/hire`,
     requestRespond: (jobId) => `/api/v1/jobs/${encodeURIComponent(String(jobId || ''))}/request/respond`,

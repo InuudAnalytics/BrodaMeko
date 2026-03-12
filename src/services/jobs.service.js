@@ -259,6 +259,18 @@ export const confirmJob = async (jobId) => {
   return response.data;
 };
 
+export const fileJobDispute = async (jobId, reason) => {
+  const safeJobId = assertJobId(jobId);
+  const safeReason = String(reason || '').trim();
+
+  if (!safeReason) {
+    buildServiceError('reason is required.');
+  }
+
+  const response = await api.post(ENDPOINTS.jobs.dispute(safeJobId), { reason: safeReason });
+  return response.data;
+};
+
 export const getMechanicsForJob = async (jobId) => {
   const safeJobId = assertJobId(jobId);
   const response = await api.get(ENDPOINTS.jobs.mechanicsForJob(safeJobId));
@@ -394,6 +406,7 @@ export default {
   getMechanicAssignedJob,
   updateJobStatus,
   confirmJob,
+  fileJobDispute,
   getMechanicsForJob,
   hireMechanicForJob,
   respondToJobRequest,

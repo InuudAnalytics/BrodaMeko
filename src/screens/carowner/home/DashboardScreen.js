@@ -18,7 +18,14 @@ import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useChat, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
-import { confirmJob, getLatestJobLocation, updateJobLocation, updateJobStatus } from '../../../services/jobs.service';
+import {
+  confirmJob,
+  fileJobDispute,
+  getCarOwnerJob,
+  getLatestJobLocation,
+  updateJobLocation,
+  updateJobStatus,
+} from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
 import { closeScoped, connectScoped, sendScoped } from '../../../services/ws.service';
 import { darkTheme, withAlpha } from '../../../theme';
@@ -38,6 +45,10 @@ const normalizeProgressStatus = (value) => {
 
   if (!status) {
     return 'accepted';
+  }
+
+  if (status === 'pending') {
+    return 'pending';
   }
 
   if (status === 'accepted') {
@@ -61,6 +72,28 @@ const normalizeProgressStatus = (value) => {
   }
 
   return 'accepted';
+};
+
+const extractSingleJob = (response) => {
+  const root = response?.data || response || {};
+
+  if (!root || typeof root !== 'object') {
+    return null;
+  }
+
+  if (root.job && typeof root.job === 'object') {
+    return root.job;
+  }
+
+  if (root.data && typeof root.data === 'object') {
+    if (root.data.job && typeof root.data.job === 'object') {
+      return root.data.job;
+    }
+
+    return root.data;
+  }
+
+  return root;
 };
 
 const extractFirstName = (user) => {
@@ -163,6 +196,7 @@ const DashboardScreen = ({ navigation, route }) => {
   const [activeSession, setActiveSession] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [disputing, setDisputing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [trackedLocation, setTrackedLocation] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -388,6 +422,50 @@ const DashboardScreen = ({ navigation, route }) => {
     userId,
   ]);
 
+  useEffect(() => {
+    const jobId = String(activeSession?.jobId || '').trim();
+
+    if (!jobId) {
+      return undefined;
+    }
+
+    let active = true;
+
+    const syncStatus = async () => {
+      try {
+        const response = await getCarOwnerJob(jobId);
+        const job = extractSingleJob(response);
+        const nextStatus = normalizeProgressStatus(job?.status);
+        if (!active || !nextStatus) {
+          return;
+        }
+
+        setActiveSession((prev) => {
+          if (!prev) {
+            return prev;
+          }
+
+          const currentStatus = normalizeProgressStatus(prev?.progressStatus);
+          if (currentStatus === nextStatus) {
+            return prev;
+          }
+
+          return { ...prev, progressStatus: nextStatus };
+        });
+      } catch {
+        // silent sync; no UI loader or alert
+      }
+    };
+
+    syncStatus();
+    const interval = setInterval(syncStatus, 8000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeSession?.jobId]);
+
   const locationBadgeText = useMemo(() => {
     if (!location) {
       return 'Detecting location...';
@@ -521,40 +599,63 @@ const DashboardScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleConfirmRepairing = async () => {
-    const jobId = String(activeSession?.jobId || '').trim();
-    if (!jobId || syncing) {
-      return;
-    }
-    setSyncing(true);
-    try {
-      // Contract (Mar 10, 2026): car_owner cannot PATCH job status to in_progress.
-      // Keeping this as local-only UI confirmation until backend supports owner-side acknowledgement.
-      // await updateJobStatus(jobId, 'in_progress');
-      setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'in_progress' } : prev));
-    } catch (error) {
-      AppAlert.alert('Error', error?.message || 'Could not update repairing status.');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const handleConfirmCompletion = async () => {
     const jobId = String(activeSession?.jobId || '').trim();
-    if (!jobId || syncing) {
+    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+
+    if (!jobId || syncing || progressStatus !== 'completed') {
       return;
     }
-    setSyncing(true);
-    try {
-      // TODO: Confirm escrow debit/release result from API response.
-      await confirmJob(jobId);
-      setActiveSession((prev) => (prev ? { ...prev, progressStatus: 'completed' } : prev));
-      AppAlert.alert('Success', 'Job completion confirmed.');
-    } catch (error) {
-      AppAlert.alert('Error', error?.message || 'Could not confirm completion.');
-    } finally {
-      setSyncing(false);
+
+    AppAlert.alert(
+      'Confirm completion',
+      'This confirms the mechanic completed the job. Continue?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes',
+          onPress: async () => {
+            setSyncing(true);
+            try {
+              await confirmJob(jobId);
+              AppAlert.alert('Success', 'Job completion confirmed.');
+            } catch (error) {
+              AppAlert.alert('Error', error?.message || 'Could not confirm completion.');
+            } finally {
+              setSyncing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDisputeJob = () => {
+    const jobId = String(activeSession?.jobId || '').trim();
+    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+
+    if (!jobId || disputing || progressStatus !== 'completed') {
+      return;
     }
+
+    const submitDispute = async (reason) => {
+      setDisputing(true);
+      try {
+        await fileJobDispute(jobId, reason);
+        AppAlert.alert('Dispute submitted', 'Your dispute has been logged for review.');
+      } catch (error) {
+        AppAlert.alert('Error', error?.message || 'Could not submit dispute.');
+      } finally {
+        setDisputing(false);
+      }
+    };
+
+    AppAlert.alert('Open dispute', 'Select the reason for this dispute.', [
+      { text: 'Work not completed', onPress: () => submitDispute('Work not completed') },
+      { text: 'Overcharged', onPress: () => submitDispute('Overcharged') },
+      { text: 'Other issue', onPress: () => submitDispute('Other issue') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const renderDefaultContent = () => (
@@ -578,6 +679,7 @@ const DashboardScreen = ({ navigation, route }) => {
     const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
     const isCompleted = progressStatus === 'completed';
     const canOwnerCancel = progressStatus === 'pending' || progressStatus === 'accepted';
+    const isTransitOrRepair = progressStatus === 'en_route' || progressStatus === 'arrived' || progressStatus === 'in_progress';
 
     return (
       <>
@@ -613,38 +715,49 @@ const DashboardScreen = ({ navigation, route }) => {
         {!isCompleted ? (
           <View style={styles.trackActions}>
             <AppButton label="Message" onPress={handleOpenChat} style={styles.trackBtn} />
-            <TouchableOpacity
-              style={[styles.callBtn, !canOwnerCancel ? { opacity: 0.5 } : null]}
-              activeOpacity={0.88}
-              onPress={handleCancelJob}
-              disabled={cancelling || !canOwnerCancel}
-            >
-              <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.accent} strokeWidth={2} />
-              <AppText style={styles.callBtnText}>
-                {cancelling ? 'Cancelling...' : !canOwnerCancel ? 'Cannot cancel now' : 'Cancel'}
-              </AppText>
-            </TouchableOpacity>
+            {canOwnerCancel ? (
+              <TouchableOpacity
+                style={styles.callBtn}
+                activeOpacity={0.88}
+                onPress={handleCancelJob}
+                disabled={cancelling}
+              >
+                <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.accent} strokeWidth={2} />
+                <AppText style={styles.callBtnText}>{cancelling ? 'Cancelling...' : 'Cancel'}</AppText>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : null}
         </View>
 
         <View style={styles.trackFooterActions}>
-          {!isCompleted && (progressStatus === 'en_route' || progressStatus === 'arrived') ? (
-            <AppButton
-              label={syncing ? 'Updating...' : 'Confirm arrived & started repairing'}
-              onPress={handleConfirmRepairing}
-              disabled={syncing}
-            />
-          ) : null}
-          {!isCompleted ? (
-            <AppButton
-              label={syncing ? 'Confirming...' : 'Confirm completion (after payment)'}
-              onPress={handleConfirmCompletion}
-              disabled={syncing || progressStatus !== 'in_progress'}
-            />
+          {isTransitOrRepair ? (
+            <View style={styles.phaseNotice}>
+              <AppText style={styles.phaseNoticeText}>
+                Job is in progress. Completion actions become available after mechanic marks it completed.
+              </AppText>
+            </View>
           ) : null}
           {isCompleted ? (
             <>
+              <View style={styles.postCompleteRow}>
+                <AppButton
+                  label={syncing ? 'Confirming...' : 'Confirm completion'}
+                  onPress={handleConfirmCompletion}
+                  disabled={syncing || disputing}
+                  style={styles.trackBtn}
+                />
+                <TouchableOpacity
+                  style={[styles.secondaryActionHalf, disputing ? styles.actionDisabled : null]}
+                  activeOpacity={0.88}
+                  onPress={handleDisputeJob}
+                  disabled={disputing || syncing}
+                >
+                  <AppText style={styles.secondaryActionText}>
+                    {disputing ? 'Submitting...' : 'Dispute'}
+                  </AppText>
+                </TouchableOpacity>
+              </View>
               <View style={styles.postCompleteRow}>
                 <TouchableOpacity
                   style={styles.secondaryActionHalf}
@@ -1140,6 +1253,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: darkTheme.spacing.sm,
   },
+  phaseNotice: {
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: darkTheme.radius.md,
+    paddingHorizontal: darkTheme.spacing.sm,
+    paddingVertical: darkTheme.spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  phaseNoticeText: {
+    color: darkTheme.colors.muted,
+    fontSize: darkTheme.typography.fontSizes.xs,
+    textAlign: 'center',
+  },
   trackActions: { marginTop: darkTheme.spacing.md, rowGap: darkTheme.spacing.sm },
   trackBtn: { minHeight: 44 },
   callBtn: {
@@ -1176,6 +1302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryActionText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
+  actionDisabled: { opacity: 0.65 },
   floatingChatBtn: {
     position: 'absolute',
     right: darkTheme.spacing.lg,
