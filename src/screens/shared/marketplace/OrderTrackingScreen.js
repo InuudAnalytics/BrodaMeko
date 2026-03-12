@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, PanResponder, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, Linking, PanResponder, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
-  Message02Icon,
+  CallIcon,
 } from '@hugeicons/core-free-icons';
 import {
   AppButton,
@@ -42,6 +42,7 @@ const fallbackProduct = {
 const fallbackSeller = {
   name: 'Okon spare part hub',
   avatar: 'https://i.pravatar.cc/100?img=12',
+  phone: '',
   isActive: true,
 };
 
@@ -237,8 +238,23 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     }
   }, [permissionStatus, refreshOnce, requestPermission]);
 
-  const handleMessageSeller = () => {
-    AppAlert.alert('Coming soon', 'Seller chat is not available yet.');
+  const handleCallSeller = async () => {
+    const phone = String(seller?.phone || '').trim();
+    if (!phone) {
+      AppAlert.alert('Number unavailable', 'Seller phone number is not available yet.');
+      return;
+    }
+    const url = `tel:${phone}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        AppAlert.alert('Call unavailable', 'This device cannot place calls right now.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      AppAlert.alert('Call failed', 'Could not start call.');
+    }
   };
 
   const handleConfirmDelivery = async () => {
@@ -296,6 +312,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           name: store?.store_name || store?.name || fallbackSeller.name,
           storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
           avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
+          phone: String(store?.phone || store?.phone_number || '').trim(),
           isActive: Boolean(store?.is_active ?? true),
           coordinates: store?.coordinates || null,
         };
@@ -410,6 +427,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                         name: store?.store_name || store?.name || fallbackSeller.name,
                         storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
                         avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
+                        phone: String(store?.phone || store?.phone_number || '').trim(),
                         isActive: Boolean(store?.is_active ?? true),
                         coordinates: store?.coordinates || null,
                       };
@@ -549,16 +567,16 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               </View>
               <TouchableOpacity
                 style={styles.messageBtn}
-                onPress={handleMessageSeller}
+                onPress={handleCallSeller}
                 activeOpacity={0.85}
               >
                 <HugeiconsIcon
-                  icon={Message02Icon}
+                  icon={CallIcon}
                   size={18}
                   color="#E6C714"
                   strokeWidth={2}
                 />
-                <AppText style={styles.messageText}>Message seller</AppText>
+                <AppText style={styles.messageText}>Call seller</AppText>
               </TouchableOpacity>
             </View>
 

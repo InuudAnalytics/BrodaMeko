@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, Linking, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, Message02Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, CallIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
 import { getMarketplaceOrder } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
@@ -91,9 +91,10 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const seller = route?.params?.seller || {
     name: product?.shop || 'Okon spare part hub',
     avatar: 'https://i.pravatar.cc/100?img=12',
+    phone: '',
     isActive: true,
   };
-  const pickupAddress = route?.params?.deliveryAddress || 'No 1, Onireke street, Agbabiaka';
+  const pickupAddress = route?.params?.storeAddress || route?.params?.deliveryAddress || 'No 1, Onireke street, Agbabiaka';
 
   const shopCoordinates = useMemo(() => {
     // TODO: backend should provide shop coordinates for pickup navigation
@@ -189,8 +190,23 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     [animatePanelTo, panelY],
   );
 
-  const handleMessageSeller = () => {
-    AppAlert.alert('Coming soon', 'Seller chat will be wired soon.');
+  const handleCallSeller = async () => {
+    const phone = String(seller?.phone || '').trim();
+    if (!phone) {
+      AppAlert.alert('Number unavailable', 'Seller phone number is not available yet.');
+      return;
+    }
+    const url = `tel:${phone}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        AppAlert.alert('Call unavailable', 'This device cannot place calls right now.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      AppAlert.alert('Call failed', 'Could not start call.');
+    }
   };
 
   const handleReportIssue = () => {
@@ -262,10 +278,10 @@ const PickupTrackingScreen = ({ navigation, route }) => {
                 </View>
               </View>
               <AppButton
-                label="Message seller"
-                onPress={handleMessageSeller}
+                label="Call seller"
+                onPress={handleCallSeller}
                 style={styles.messageButton}
-                left={<HugeiconsIcon icon={Message02Icon} size={16} color="#1A1A1A" strokeWidth={2.1} />}
+                left={<HugeiconsIcon icon={CallIcon} size={16} color="#1A1A1A" strokeWidth={2.1} />}
               />
             </View>
 

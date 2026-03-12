@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, DeviceEventEmitter, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, DeviceEventEmitter, Image, Linking, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, NoInternetState, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
@@ -88,7 +88,7 @@ const OrdersScreen = ({ navigation }) => {
           total: Number(order?.total_amount || firstItem?.subtotal || 0),
           orderedAt: order?.created_at || firstItem?.created_at || 'Recently',
           buyerName: order?.buyer_name || detail?.buyer_name || 'Buyer',
-          buyerPhone: '',
+          buyerPhone: String(order?.buyer_phone || detail?.buyer_phone || detail?.buyer?.phone || '').trim(),
           deliveryType: String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase(),
           pickupCode: '',
           shopName: firstItem?.store_name || 'Spare parts shop',
@@ -199,6 +199,25 @@ const OrdersScreen = ({ navigation }) => {
     },
     [isPickupOrder, navigation]
   );
+
+  const handleCallBuyer = useCallback(async (order) => {
+    const phone = String(order?.buyerPhone || '').trim();
+    if (!phone) {
+      AppAlert.alert('Number unavailable', 'Buyer phone number is not available yet.');
+      return;
+    }
+    const url = `tel:${phone}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        AppAlert.alert('Call unavailable', 'This device cannot place calls right now.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      AppAlert.alert('Call failed', 'Could not start call.');
+    }
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -317,8 +336,12 @@ const OrdersScreen = ({ navigation }) => {
 
                 {order.status === 'in_transit' ? (
                   <View style={styles.dualRow}>
-                    <TouchableOpacity style={styles.outlineButton} activeOpacity={0.85}>
-                      <AppText style={styles.outlineButtonText}>Chat with buyer</AppText>
+                    <TouchableOpacity
+                      style={styles.outlineButton}
+                      activeOpacity={0.85}
+                      onPress={() => handleCallBuyer(order)}
+                    >
+                      <AppText style={styles.outlineButtonText}>Call buyer</AppText>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.outlineButton} activeOpacity={0.85}>
                       <AppText style={styles.outlineButtonText}>Track order</AppText>

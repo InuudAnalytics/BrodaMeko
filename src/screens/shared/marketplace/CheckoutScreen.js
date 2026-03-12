@@ -73,7 +73,7 @@ const extractShopCoordinates = (product) => {
 const CheckoutScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { items, calculateTotal, clearCart, addToCart } = useCart();
-  const [deliveryType, setDeliveryType] = useState('delivery');
+  const [deliveryType, setDeliveryType] = useState('pickup');
   const [paymentMethod, setPaymentMethod] = useState('transfer');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -165,6 +165,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         seller: {
           name: storeName,
           avatar: product?.store?.logo || product?.store?.avatar || '',
+          phone: String(product?.store?.phone || product?.phone || '').trim(),
           isActive: true,
           coordinates: shopCoordinates,
         },
@@ -258,7 +259,10 @@ const CheckoutScreen = ({ navigation, route }) => {
                   styles.deliveryCard,
                   deliveryType === 'delivery' && styles.deliveryCardActive,
                 ]}
-                onPress={() => setDeliveryType('delivery')}
+                onPress={() => {
+                  AppAlert.alert('Delivery unavailable', 'Delivery mode is not available yet. Please use Pick up for now.');
+                  setDeliveryType('pickup');
+                }}
                 activeOpacity={0.85}
               >
                 <AppText style={styles.deliveryTitle}>Request delivery</AppText>
