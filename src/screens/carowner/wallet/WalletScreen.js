@@ -24,7 +24,7 @@ import {
   WalletAdd02Icon,
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppBottomNav, AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppBottomNav, AppButton, AppText, NoInternetState, ScreenContainer } from '../../../components';
 import { getTransactions } from '../../../services/transactions.service';
 import { getWalletBalance, getWithdrawals, requestWithdrawal } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
@@ -625,7 +625,11 @@ const WalletScreen = ({ navigation }) => {
           </View>
         ) : null}
 
-        {!loading && !filteredTransactions.length ? (
+        {!loading && error && !filteredTransactions.length ? (
+          <NoInternetState message={error} onRetry={loadWalletData} />
+        ) : null}
+
+        {!loading && !error && !filteredTransactions.length ? (
           <View style={styles.centerState}>
             <AppText style={styles.errorText}>
               {hasAppliedFilters ? 'No transactions match your current filters.' : emptyText}

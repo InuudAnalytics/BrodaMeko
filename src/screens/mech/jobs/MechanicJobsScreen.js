@@ -14,6 +14,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Mail01Icon } from '@hugeicons/core-free-icons';
 import {
   AppButton,
+  NoInternetState,
   AppText,
   CenteredHeader,
   MechanicJobCard,
@@ -576,12 +577,7 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
         ) : null}
 
         {!loading && error ? (
-          <View style={styles.centerState}>
-            <AppText style={styles.errorText}>{error}</AppText>
-            <TouchableOpacity activeOpacity={0.85} onPress={fetchData}>
-              <AppText style={styles.retryText}>Retry</AppText>
-            </TouchableOpacity>
-          </View>
+          <NoInternetState message={error} onRetry={fetchData} />
         ) : null}
 
         {!loading && !error ? (
@@ -761,10 +757,6 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.muted,
     textAlign: 'center',
   },
-  errorText: {
-    color: '#FF7F7F',
-    textAlign: 'center',
-  },
   floatingChatBtn: {
     position: 'absolute',
     right: 16,
@@ -815,9 +807,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#10151D',
-  },
-  retryText: {
-    color: darkTheme.colors.accent,
   },
 });
 

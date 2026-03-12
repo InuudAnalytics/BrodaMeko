@@ -4,13 +4,14 @@ import {
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
-import { AppText, ScreenContainer } from '../../../components';
+import { AppText, NoInternetState, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useChat } from '../../../context';
 import { useNotifications } from '../../../context';
@@ -457,12 +458,7 @@ const FindMechanicsScreen = ({ navigation, route }) => {
       ) : null}
 
       {!loading && error ? (
-        <View style={styles.centerState}>
-          <AppText style={styles.errorText}>{error}</AppText>
-          <TouchableOpacity activeOpacity={0.85} onPress={fetchMechanics} style={styles.retryBtn}>
-            <AppText style={styles.retryText}>Retry</AppText>
-          </TouchableOpacity>
-        </View>
+        <NoInternetState message={error} onRetry={fetchMechanics} />
       ) : null}
 
       {!loading && !error ? (
@@ -472,6 +468,14 @@ const FindMechanicsScreen = ({ navigation, route }) => {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={fetchMechanics}
+              tintColor="transparent"
+              colors={['transparent']}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.centerState}>
               <AppText style={styles.emptyText}>No mechanics available for this job yet.</AppText>
@@ -664,21 +668,6 @@ const styles = StyleSheet.create({
   emptyText: {
     color: darkTheme.colors.muted,
     textAlign: 'center',
-  },
-  errorText: {
-    color: '#FF7F7F',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  retryBtn: {
-    borderWidth: 1,
-    borderColor: darkTheme.colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  retryText: {
-    color: darkTheme.colors.accent,
   },
 });
 

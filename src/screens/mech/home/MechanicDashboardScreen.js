@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { openSettings } from 'react-native-permissions';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Location01Icon, Mail01Icon, Notification01Icon, StarIcon, Time04Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, MechanicJobCard, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScrollableTabs } from '../../../components';
+import { AppButton, AppText, MechanicJobCard, NoInternetState, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScrollableTabs } from '../../../components';
 import { LOCATION_ENABLED } from '../../../config/featureFlags';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth, useChat, useNotifications } from '../../../context';
@@ -1009,7 +1009,7 @@ const MechanicDashboardScreen = ({ navigation }) => {
         {loading ? (
           <AppText style={styles.jobsStateText}>Loading jobs...</AppText>
         ) : error ? (
-          <AppText style={styles.jobsErrorText}>{error}</AppText>
+          <NoInternetState message={error} onRetry={handleRefresh} style={styles.jobsErrorState} />
         ) : visibleJobs.length === 0 ? (
           <AppText style={styles.jobsStateText}>No jobs available at the moment.</AppText>
         ) : (
@@ -1396,10 +1396,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  jobsErrorText: {
-    color: '#FF7F7F',
-    textAlign: 'center',
-    marginTop: 20,
+  jobsErrorState: {
+    marginTop: 8,
   },
   jobActions: {
     marginTop: 10,

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Search01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
+import { AppButton, AppText, NoInternetState, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useSellerStore } from '../../../context';
 import { deleteSellerPart, deleteSellerPartImage, updateSellerPart } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
@@ -167,7 +167,11 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
           </View>
         ) : null}
 
-        {!loading && isHydrated && products.length === 0 ? (
+        {!loading && error ? (
+          <NoInternetState message={error} onRetry={refreshStore} style={styles.errorState} />
+        ) : null}
+
+        {!loading && !error && isHydrated && products.length === 0 ? (
           <View style={styles.emptyState}>
             <AppText style={styles.emptyTitle}>No products yet</AppText>
             <AppText variant="muted" style={styles.emptySubtitle}>
@@ -177,7 +181,7 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
           </View>
         ) : null}
 
-        {!loading && isHydrated && products.length > 0 ? (
+        {!loading && !error && isHydrated && products.length > 0 ? (
           <View style={styles.listWrap}>
             <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
             <Animated.ScrollView
@@ -385,6 +389,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   listWrap: {
+    flex: 1,
+  },
+  errorState: {
     flex: 1,
   },
   listScroll: {

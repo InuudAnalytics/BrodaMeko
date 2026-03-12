@@ -22,5 +22,6 @@ export { default as NotificationPermissionChip } from './NotificationPermissionC
 export { default as NotificationsGlobalGate } from './NotificationsGlobalGate';
 export { default as ForegroundNotificationToast } from './ForegroundNotificationToast';
 export { default as FloatingScrollDownButton } from './FloatingScrollDownButton';
+export { default as NoInternetState } from './NoInternetState';
 
 export { default as PullToRefreshIndicator } from './PullToRefreshIndicator';

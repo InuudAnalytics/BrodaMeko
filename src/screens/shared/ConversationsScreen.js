@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { AppText, ScreenContainer } from '../../components';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { AppText, NoInternetState, ScreenContainer } from '../../components';
 import { useChat } from '../../context/ChatContext';
 import { darkTheme, withAlpha } from '../../theme';
 
@@ -162,12 +162,28 @@ const SharedConversationsScreen = ({ onConversationPress, emptyStateMessage, ren
                     contentContainerStyle={styles.listContent}
                     renderItem={({ item }) => <ConversationItem item={item} onPress={() => handleOpen(item)} />}
                     ItemSeparatorComponent={ConversationSeparator}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={loadingConversations}
+                            onRefresh={fetchConversations}
+                            tintColor="transparent"
+                            colors={['transparent']}
+                        />
+                    }
                     ListEmptyComponent={
-                        <View style={styles.centerState}>
-                            <AppText variant="muted" style={styles.stateText}>
-                                {error ? 'Could not load conversations right now.' : (emptyStateMessage || 'No conversations yet.')}
-                            </AppText>
-                        </View>
+                        error ? (
+                            <NoInternetState
+                                message="Could not load conversations right now."
+                                onRetry={fetchConversations}
+                                style={styles.networkWrap}
+                            />
+                        ) : (
+                            <View style={styles.centerState}>
+                                <AppText variant="muted" style={styles.stateText}>
+                                    {emptyStateMessage || 'No conversations yet.'}
+                                </AppText>
+                            </View>
+                        )
                     }
                 />
             )}
@@ -297,6 +313,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: darkTheme.spacing.lg,
         rowGap: darkTheme.spacing.xs,
+    },
+    networkWrap: {
+        minHeight: 220,
     },
     stateText: {
         textAlign: 'center',

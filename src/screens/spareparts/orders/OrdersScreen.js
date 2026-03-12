@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, DeviceEventEmitter, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
-import { AppText, CenteredHeader, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
+import { AppText, CenteredHeader, NoInternetState, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
 import { confirmMarketplaceOrderItem, getMarketplaceOrder } from '../../../services/marketplace.service';
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
@@ -245,9 +245,7 @@ const OrdersScreen = ({ navigation }) => {
             </View>
           ) : null}
 
-          {errorText ? (
-            <AppText style={styles.errorText}>{errorText}</AppText>
-          ) : null}
+          {errorText ? <NoInternetState message={errorText} onRetry={fetchOrders} /> : null}
 
           {visibleOrders.map((order) => {
             const status = statusConfig[order.status] || statusConfig.new;
@@ -401,11 +399,6 @@ const styles = StyleSheet.create({
   loadingRow: {
     paddingVertical: 12,
     alignItems: 'center',
-  },
-  errorText: {
-    color: '#F87171',
-    fontSize: 12,
-    marginBottom: 8,
   },
   card: {
     backgroundColor: '#1A1A4A',

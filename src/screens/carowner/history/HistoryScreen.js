@@ -6,6 +6,7 @@ import { ArrowLeft01Icon, Delete02Icon, StarIcon } from '@hugeicons/core-free-ic
 import {
   AppBottomNav,
   AppButton,
+  NoInternetState,
   AppText,
   PullToRefreshIndicator,
   ScreenContainer,
@@ -16,41 +17,6 @@ import { deleteJob, getCarOwnerJobs, updateJobStatus } from '../../../services/j
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
-const MOCK_COMPLETED_JOBS = [
-  {
-    id: 'mock_1',
-    jobId: 'mock_1',
-    mechanicName: 'Emeka Nwosu',
-    issueSummary: 'Flat Tire Replacement',
-    rating: 4.6,
-    amount: 8500,
-    hasAmount: true,
-    status: 'completed',
-    avatarUrl: 'https://i.pravatar.cc/100?img=12',
-  },
-  {
-    id: 'mock_2',
-    jobId: 'mock_2',
-    mechanicName: 'Tunde Bakare',
-    issueSummary: 'Battery Jump Start',
-    rating: 4.6,
-    amount: 5000,
-    hasAmount: true,
-    status: 'pending',
-    avatarUrl: 'https://i.pravatar.cc/100?img=15',
-  },
-  {
-    id: 'mock_3',
-    jobId: 'mock_3',
-    mechanicName: 'Chidi Okafor',
-    issueSummary: 'Engine Diagnostics',
-    rating: 4.6,
-    amount: 8900,
-    hasAmount: true,
-    status: 'cancelled',
-    avatarUrl: 'https://i.pravatar.cc/100?img=65',
-  },
-];
 
 const toCurrency = (amount) => {
   const safe = Number(amount);
@@ -304,7 +270,6 @@ const HistoryScreen = ({ navigation }) => {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [error, setError] = useState('');
-  const [usingFallback, setUsingFallback] = useState(false);
   const [cancellingJobId, setCancellingJobId] = useState('');
   const [deletingJobId, setDeletingJobId] = useState('');
   const pullDistance = useRef(new Animated.Value(0)).current;
@@ -327,7 +292,7 @@ const HistoryScreen = ({ navigation }) => {
   }, []);
 
   const fetchHistory = useCallback(async ({ reset = false } = {}) => {
-    if (!reset && (loadingMore || loading || !hasMore || usingFallback)) {
+    if (!reset && (loadingMore || loading || !hasMore)) {
       return;
     }
 
@@ -335,7 +300,6 @@ const HistoryScreen = ({ navigation }) => {
     if (reset) {
       setLoading(true);
       setError('');
-      setUsingFallback(false);
       setHasMore(true);
       setPage(1);
     } else {
@@ -350,18 +314,8 @@ const HistoryScreen = ({ navigation }) => {
       setPage(targetPage);
       setHasMore(normalized.length >= PAGE_LIMIT);
     } catch (requestError) {
-      const statusCode = Number(requestError?.statusCode || 0);
-      const shouldUseMockFallback = statusCode === 0 || statusCode === 401;
-
-      if (reset && shouldUseMockFallback) {
-        setUsingFallback(true);
-        setJobs(MOCK_COMPLETED_JOBS);
-        setHasMore(false);
-        setPage(1);
-      } else {
-        if (reset) {
-          setError('Could not load your history right now. Please try again.');
-        }
+      if (reset) {
+        setError(requestError?.message || 'Could not load your history right now. Please try again.');
       }
     } finally {
       if (reset) {
@@ -370,7 +324,7 @@ const HistoryScreen = ({ navigation }) => {
         setLoadingMore(false);
       }
     }
-  }, [hasMore, loading, loadingMore, mergeUniqueJobs, page, usingFallback]);
+  }, [hasMore, loading, loadingMore, mergeUniqueJobs, page]);
 
   fetchHistoryRef.current = fetchHistory;
 
@@ -453,11 +407,11 @@ const HistoryScreen = ({ navigation }) => {
   }, [activeTab, jobs]);
 
   const handleEndReached = useCallback(() => {
-    if (loading || loadingMore || !hasMore || usingFallback) {
+    if (loading || loadingMore || !hasMore) {
       return;
     }
     fetchHistory({ reset: false });
-  }, [fetchHistory, hasMore, loading, loadingMore, usingFallback]);
+  }, [fetchHistory, hasMore, loading, loadingMore]);
 
   const renderItem = useCallback(({ item }) => (
     <JobHistoryCard
@@ -485,11 +439,8 @@ const HistoryScreen = ({ navigation }) => {
   const listHeader = useMemo(() => (
     <View style={styles.tabsWrap}>
       <ScrollableTabs tabs={HISTORY_TABS} activeKey={activeTab} onChange={setActiveTab} />
-      {usingFallback ? (
-        <AppText style={styles.fallbackHint}>Showing recent mock history while connection is unavailable.</AppText>
-      ) : null}
     </View>
-  ), [activeTab, usingFallback]);
+  ), [activeTab]);
 
   const listFooter = useMemo(() => {
     if (loadingMore) {
@@ -518,11 +469,11 @@ const HistoryScreen = ({ navigation }) => {
 
     if (error) {
       return (
-        <View style={styles.stateWrap}>
-          <AppText style={styles.stateTitle}>Unable to load history</AppText>
-          <AppText style={styles.stateText}>{error}</AppText>
-          <AppButton label="Retry" onPress={() => fetchHistory({ reset: true })} style={styles.retryBtn} />
-        </View>
+        <NoInternetState
+          title="Network error"
+          message={error}
+          onRetry={() => fetchHistory({ reset: true })}
+        />
       );
     }
 
@@ -644,12 +595,6 @@ const styles = StyleSheet.create({
   },
   list: {
     rowGap: 12,
-  },
-  fallbackHint: {
-    color: darkTheme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 4,
   },
   card: {
     borderRadius: 14,
@@ -817,10 +762,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: 14,
-    minWidth: 140,
   },
   skeletonWrap: {
     rowGap: 12,

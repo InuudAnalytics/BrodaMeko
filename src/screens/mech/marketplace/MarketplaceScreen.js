@@ -8,7 +8,7 @@ import {
   Search01Icon,
   ShoppingCart02Icon,
 } from '@hugeicons/core-free-icons';
-import { AppText, PullToRefreshIndicator, ScreenContainer } from '../../../components';
+import { AppText, NoInternetState, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { ROUTES } from '../../../utils';
 import ProductCard from '../../../components/marketplace/ProductCard';
 import { useCart } from '../../../context';
@@ -81,16 +81,19 @@ const MechanicMarketplaceScreen = ({ navigation }) => {
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const pullDistance = React.useRef(new Animated.Value(0)).current;
 
   const fetchParts = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await getMarketplaceParts();
       const payload = response?.data || response || {};
       const list = normalizeParts(payload);
       setProducts(list.map(mapPartToProduct));
-    } catch {
+    } catch (fetchError) {
+      setError(fetchError?.message || 'Could not load products.');
       setProducts([]);
     } finally {
       setLoading(false);
@@ -188,42 +191,48 @@ const MechanicMarketplaceScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.listWrap}>
-            <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
-            <FlatList
-              data={listData}
-              keyExtractor={item => item.id}
-              numColumns={2}
-              columnWrapperStyle={styles.columnWrap}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              onScroll={event => {
-                const offsetY = event.nativeEvent.contentOffset.y;
-                const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
-                pullDistance.setValue(pullValue);
-              }}
-              scrollEventThrottle={16}
-              refreshControl={
-                <RefreshControl
-                  refreshing={loading}
-                  onRefresh={fetchParts}
-                  tintColor="transparent"
-                  colors={['transparent']}
-                />
-              }
-              renderItem={({ item }) => (
-                <View style={styles.cardWrap}>
-                  {item.isSkeleton ? (
-                    <SkeletonCard />
-                  ) : (
-                    <ProductCard
-                      product={item}
-                      onPress={() => handleOpenProduct(item)}
-                      onAddToCart={() => handleAddToCart(item)}
+            {!loading && error ? (
+              <NoInternetState message={error} onRetry={fetchParts} style={styles.errorStateWrap} />
+            ) : (
+              <>
+                <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
+                <FlatList
+                  data={listData}
+                  keyExtractor={item => item.id}
+                  numColumns={2}
+                  columnWrapperStyle={styles.columnWrap}
+                  contentContainerStyle={styles.listContent}
+                  showsVerticalScrollIndicator={false}
+                  onScroll={event => {
+                    const offsetY = event.nativeEvent.contentOffset.y;
+                    const pullValue = offsetY < 0 ? Math.min(-offsetY, 140) : 0;
+                    pullDistance.setValue(pullValue);
+                  }}
+                  scrollEventThrottle={16}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={loading}
+                      onRefresh={fetchParts}
+                      tintColor="transparent"
+                      colors={['transparent']}
                     />
+                  }
+                  renderItem={({ item }) => (
+                    <View style={styles.cardWrap}>
+                      {item.isSkeleton ? (
+                        <SkeletonCard />
+                      ) : (
+                        <ProductCard
+                          product={item}
+                          onPress={() => handleOpenProduct(item)}
+                          onAddToCart={() => handleAddToCart(item)}
+                        />
+                      )}
+                    </View>
                   )}
-                </View>
-              )}
-            />
+                />
+              </>
+            )}
           </View>
         </View>
       </ScreenContainer>
@@ -304,6 +313,9 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   listWrap: {
+    flex: 1,
+  },
+  errorStateWrap: {
     flex: 1,
   },
   columnWrap: {

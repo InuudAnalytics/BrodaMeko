@@ -26,7 +26,7 @@ import {
   WalletAdd02Icon,
   Wrench01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, ScreenContainer } from '../../../components';
+import { AppButton, AppText, NoInternetState, ScreenContainer } from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { getTransactions } from '../../../services/transactions.service';
 import { getWalletBalance, getWithdrawals, requestWithdrawal } from '../../../services/wallet.service';
@@ -684,7 +684,11 @@ const MechanicWalletScreen = ({
             </View>
           ) : null}
 
-          {!loading && !filteredTransactions.length ? (
+          {!loading && error && !filteredTransactions.length ? (
+            <NoInternetState message={error} onRetry={fetchWalletData} />
+          ) : null}
+
+          {!loading && !error && !filteredTransactions.length ? (
             <View style={styles.centerState}>
               <AppText style={styles.errorText}>
                 {hasAppliedFilters

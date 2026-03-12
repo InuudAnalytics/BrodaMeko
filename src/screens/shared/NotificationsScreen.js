@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -9,7 +9,7 @@ import {
   Shield01Icon,
   Wallet01Icon,
 } from '@hugeicons/core-free-icons';
-import { AppText, ScreenContainer, ScrollableTabs } from '../../components';
+import { AppText, NoInternetState, ScreenContainer, ScrollableTabs } from '../../components';
 import { useAuth, useMechanicProfile } from '../../context';
 import {
   deleteNotification,
@@ -262,16 +262,22 @@ const NotificationsScreen = ({ navigation }) => {
         ) : null}
 
         {!loading && error ? (
-          <View style={styles.centerState}>
-            <AppText style={styles.errorText}>{error}</AppText>
-            <TouchableOpacity activeOpacity={0.85} onPress={fetchNotifications}>
-              <AppText style={styles.retryText}>Retry</AppText>
-            </TouchableOpacity>
-          </View>
+          <NoInternetState message={error} onRetry={fetchNotifications} />
         ) : null}
 
         {!loading && !error ? (
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={loading}
+                onRefresh={fetchNotifications}
+                tintColor="transparent"
+                colors={['transparent']}
+              />
+            }
+          >
             {list.map((item) => {
               const ui = getNotificationUi(item, hasPendingProfileReminder);
               const isRead = Boolean(item?.is_read);
@@ -422,13 +428,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: darkTheme.colors.muted,
-  },
-  errorText: {
-    color: '#FF7F7F',
-    textAlign: 'center',
-  },
-  retryText: {
-    color: darkTheme.colors.accent,
   },
 });
 
