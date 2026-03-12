@@ -1,19 +1,38 @@
 import React, { useContext, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
+  AlertCircleIcon,
   ArrowLeft01Icon,
   BatteryCharging02Icon,
   HelpCircleIcon,
+  LockKeyIcon,
   MinusSignIcon,
   OilBarrelIcon,
   StopCircleIcon,
   TemperatureIcon,
   TireIcon,
+  TransmissionIcon,
+  Wrench01Icon,
   ZapIcon,
 } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
-import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import {
+  AppButton,
+  AppInput,
+  AppText,
+  ScreenContainer,
+} from '../../../components';
 import { useNotifications } from '../../../context';
 import JobsContext from '../../../context/JobsContext';
 import { darkTheme, withAlpha } from '../../../theme';
@@ -70,9 +89,9 @@ const ISSUE_GROUPS = [
     issues: [
       { label: 'Electrical fault', value: 'electrical_fault' },
       { label: 'Headlight issue', value: 'headlight_issue' },
-      { label: 'Dashboard warning light', value: 'dashboard_warning_light' },
       { label: 'Wiring problem', value: 'wiring_problem' },
       { label: 'Fuse problem', value: 'fuse_problem' },
+      { label: 'Dashboard warning light', value: 'dashboard_warning_light' },
     ],
   },
   {
@@ -89,7 +108,7 @@ const ISSUE_GROUPS = [
   {
     key: 'steering',
     label: 'Steering & Suspension',
-    icon: HelpCircleIcon,
+    icon: Wrench01Icon,
     issues: [
       { label: 'Steering problem', value: 'steering_problem' },
       { label: 'Suspension noise', value: 'suspension_noise' },
@@ -110,14 +129,12 @@ const ISSUE_GROUPS = [
     key: 'ac_comfort',
     label: 'AC & Comfort',
     icon: TemperatureIcon,
-    issues: [
-      { label: 'AC not cooling', value: 'ac_not_cooling' },
-    ],
+    issues: [{ label: 'AC not cooling', value: 'ac_not_cooling' }],
   },
   {
     key: 'transmission',
     label: 'Transmission',
-    icon: HelpCircleIcon,
+    icon: TransmissionIcon,
     issues: [
       { label: 'Gear not shifting', value: 'gear_not_shifting' },
       { label: 'Clutch problem', value: 'clutch_problem' },
@@ -127,7 +144,7 @@ const ISSUE_GROUPS = [
   {
     key: 'lock_key',
     label: 'Lock & Key',
-    icon: HelpCircleIcon,
+    icon: LockKeyIcon,
     issues: [
       { label: 'Key locked inside', value: 'key_locked_inside' },
       { label: 'Ignition problem', value: 'ignition_problem' },
@@ -136,9 +153,9 @@ const ISSUE_GROUPS = [
   {
     key: 'emergency',
     label: 'Emergency / Misc',
-    icon: HelpCircleIcon,
+    icon: AlertCircleIcon,
     issues: [
-      { label: 'Car accident damage', value: 'car_accident_damage' },
+      { label: 'Car accident', value: 'car_accident_damage' },
       { label: 'Towing needed', value: 'towing_needed' },
       { label: 'General inspection', value: 'general_inspection' },
       { label: 'Other', value: 'other' },
@@ -150,11 +167,28 @@ const IssueCard = ({ label, icon, selected, onPress }) => {
   const iconColor = selected ? darkTheme.colors.accent : darkTheme.colors.text;
 
   return (
-    <Pressable onPress={onPress} style={[styles.issueCard, selected ? styles.issueCardSelected : null]}>
-      <View style={[styles.issueIconWrap, selected ? styles.issueIconWrapSelected : null]}>
-        <HugeiconsIcon icon={icon} size={20} color={iconColor} strokeWidth={2} />
+    <Pressable
+      onPress={onPress}
+      style={[styles.issueCard, selected ? styles.issueCardSelected : null]}
+    >
+      <View
+        style={[
+          styles.issueIconWrap,
+          selected ? styles.issueIconWrapSelected : null,
+        ]}
+      >
+        <HugeiconsIcon
+          icon={icon}
+          size={20}
+          color={iconColor}
+          strokeWidth={2}
+        />
       </View>
-      <AppText style={[styles.issueText, selected ? styles.issueTextSelected : null]}>{label}</AppText>
+      <AppText
+        style={[styles.issueText, selected ? styles.issueTextSelected : null]}
+      >
+        {label}
+      </AppText>
     </Pressable>
   );
 };
@@ -167,9 +201,24 @@ const UploadImageGlyph = ({ color }) => {
         stroke={color}
         strokeWidth={1.8}
       />
-      <Path d="M8 15l2.7-3.2a1 1 0 0 1 1.5 0L16 16" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-      <Path d="M13.5 8.5h5" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
-      <Path d="M16 6v5" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <Path
+        d="M8 15l2.7-3.2a1 1 0 0 1 1.5 0L16 16"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M13.5 8.5h5"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M16 6v5"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 };
@@ -187,15 +236,23 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
       {hasImages ? (
         <View style={styles.uploadWrap}>
           <View style={styles.previewGrid}>
-            {images.slice(0, 2).map((image) => (
+            {images.slice(0, 2).map(image => (
               <View key={image.id} style={styles.previewTile}>
-                <Image source={{ uri: image.uri }} style={styles.previewImage} />
+                <Image
+                  source={{ uri: image.uri }}
+                  style={styles.previewImage}
+                />
                 <TouchableOpacity
                   style={styles.removeImageButton}
                   activeOpacity={0.8}
                   onPress={() => onRemoveImage(image.id)}
                 >
-                  <HugeiconsIcon icon={MinusSignIcon} size={12} color={darkTheme.colors.background} strokeWidth={2.6} />
+                  <HugeiconsIcon
+                    icon={MinusSignIcon}
+                    size={12}
+                    color={darkTheme.colors.background}
+                    strokeWidth={2.6}
+                  />
                 </TouchableOpacity>
               </View>
             ))}
@@ -209,7 +266,12 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
                 maxReached || isPickingImage ? styles.addTileDisabled : null,
               ]}
             >
-              <AppText style={[styles.addTileText, maxReached ? styles.addTileTextDisabled : null]}>
+              <AppText
+                style={[
+                  styles.addTileText,
+                  maxReached ? styles.addTileTextDisabled : null,
+                ]}
+              >
                 {isPickingImage ? '...' : '+'}
               </AppText>
             </TouchableOpacity>
@@ -228,14 +290,22 @@ const UploadBox = ({ images, onAddPress, onRemoveImage, isPickingImage }) => {
             Add photos of the damage for better diagnosis
           </AppText>
 
-          <TouchableOpacity onPress={onAddPress} activeOpacity={0.85} style={styles.addPhotosButton}>
-            <AppText style={styles.addPhotosText}>{isPickingImage ? 'Opening...' : 'Add photos'}</AppText>
+          <TouchableOpacity
+            onPress={onAddPress}
+            activeOpacity={0.85}
+            style={styles.addPhotosButton}
+          >
+            <AppText style={styles.addPhotosText}>
+              {isPickingImage ? 'Opening...' : 'Add photos'}
+            </AppText>
           </TouchableOpacity>
         </View>
       )}
 
       {maxReached ? (
-        <AppText style={styles.uploadMaxText}>Maximum of 2 uploads reached</AppText>
+        <AppText style={styles.uploadMaxText}>
+          Maximum of 2 uploads reached
+        </AppText>
       ) : null}
 
       {images.length ? (
@@ -267,13 +337,21 @@ const ReportIssueScreen = ({ navigation }) => {
   const isCreatingJob = Boolean(jobsContext?.loading?.createJob);
 
   const activeGroup = useMemo(
-    () => ISSUE_GROUPS.find((group) => group.key === activeGroupKey) || ISSUE_GROUPS[0],
-    [activeGroupKey]
+    () =>
+      ISSUE_GROUPS.find(group => group.key === activeGroupKey) ||
+      ISSUE_GROUPS[0],
+    [activeGroupKey],
   );
   const selectedIssueLabel = useMemo(() => {
-    for (let groupIndex = 0; groupIndex < ISSUE_GROUPS.length; groupIndex += 1) {
+    for (
+      let groupIndex = 0;
+      groupIndex < ISSUE_GROUPS.length;
+      groupIndex += 1
+    ) {
       const group = ISSUE_GROUPS[groupIndex];
-      const match = group.issues.find((issue) => issue.value === selectedIssueType);
+      const match = group.issues.find(
+        issue => issue.value === selectedIssueType,
+      );
       if (match) {
         return match.label;
       }
@@ -281,7 +359,7 @@ const ReportIssueScreen = ({ navigation }) => {
     return '';
   }, [selectedIssueType]);
 
-  const resolveCreatedJobPayload = (response) => {
+  const resolveCreatedJobPayload = response => {
     const root = response || {};
     const candidates = [
       root?.job,
@@ -294,12 +372,20 @@ const ReportIssueScreen = ({ navigation }) => {
 
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index];
-      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      if (
+        !candidate ||
+        typeof candidate !== 'object' ||
+        Array.isArray(candidate)
+      ) {
         continue;
       }
 
       const possibleId = String(
-        candidate?.id || candidate?._id || candidate?.job_id || candidate?.jobId || ''
+        candidate?.id ||
+          candidate?._id ||
+          candidate?.job_id ||
+          candidate?.jobId ||
+          '',
       ).trim();
 
       if (possibleId) {
@@ -317,7 +403,11 @@ const ReportIssueScreen = ({ navigation }) => {
     setIsPickingImage(true);
 
     try {
-      const { asset, cancelled, error: pickerError } = await pickSingleImageFromGallery();
+      const {
+        asset,
+        cancelled,
+        error: pickerError,
+      } = await pickSingleImageFromGallery();
 
       if (cancelled) {
         return;
@@ -329,7 +419,7 @@ const ReportIssueScreen = ({ navigation }) => {
       }
 
       if (asset?.uri) {
-        setImages((prev) =>
+        setImages(prev =>
           [
             ...prev,
             {
@@ -338,18 +428,21 @@ const ReportIssueScreen = ({ navigation }) => {
               fileName: asset.fileName || '',
               type: asset.type || '',
             },
-          ].slice(0, 2)
+          ].slice(0, 2),
         );
       }
     } catch {
-      AppAlert.alert('Upload failed', 'Could not open gallery. Please try again.');
+      AppAlert.alert(
+        'Upload failed',
+        'Could not open gallery. Please try again.',
+      );
     } finally {
       setIsPickingImage(false);
     }
   };
 
-  const handleRemoveImage = (imageId) => {
-    setImages((prev) => prev.filter((image) => image.id !== imageId));
+  const handleRemoveImage = imageId => {
+    setImages(prev => prev.filter(image => image.id !== imageId));
   };
 
   const handleFindMechanics = async () => {
@@ -357,22 +450,31 @@ const ReportIssueScreen = ({ navigation }) => {
     setSuccessMessage('');
 
     if (!selectedIssueType) {
-      setErrors((prev) => ({ ...prev, issue: 'Please select at least one issue.' }));
+      setErrors(prev => ({
+        ...prev,
+        issue: 'Please select at least one issue.',
+      }));
       return;
     }
 
     if (selectedIssueType === 'other' && !description.trim()) {
-      setErrors((prev) => ({ ...prev, description: 'Please describe the issue when selecting Other.' }));
+      setErrors(prev => ({
+        ...prev,
+        description: 'Please describe the issue when selecting Other.',
+      }));
       return;
     }
 
     if (!carMake.trim()) {
-      setErrors((prev) => ({ ...prev, carMake: 'Please enter your car make.' }));
+      setErrors(prev => ({ ...prev, carMake: 'Please enter your car make.' }));
       return;
     }
 
     if (!jobsContext?.createJob) {
-      setErrors((prev) => ({ ...prev, submit: 'Could not submit issue right now. Please try again.' }));
+      setErrors(prev => ({
+        ...prev,
+        submit: 'Could not submit issue right now. Please try again.',
+      }));
       return;
     }
 
@@ -388,7 +490,11 @@ const ReportIssueScreen = ({ navigation }) => {
 
       const responseJob = resolveCreatedJobPayload(response);
       const inferredJobId = String(
-        responseJob?.id || responseJob?._id || responseJob?.job_id || responseJob?.jobId || ''
+        responseJob?.id ||
+          responseJob?._id ||
+          responseJob?.job_id ||
+          responseJob?.jobId ||
+          '',
       ).trim();
       const isSuccessResponse =
         response?.success === true ||
@@ -396,9 +502,11 @@ const ReportIssueScreen = ({ navigation }) => {
         /created successfully/i.test(String(response?.message || ''));
 
       if (!isSuccessResponse) {
-        setErrors((prev) => ({
+        setErrors(prev => ({
           ...prev,
-          submit: response?.message || 'We could not submit your request. Please try again.',
+          submit:
+            response?.message ||
+            'We could not submit your request. Please try again.',
         }));
         return;
       }
@@ -407,137 +515,196 @@ const ReportIssueScreen = ({ navigation }) => {
 
       const jobPayload = responseJob;
       const jobId = String(
-        jobPayload?.id || jobPayload?._id || jobPayload?.job_id || jobPayload?.jobId || ''
+        jobPayload?.id ||
+          jobPayload?._id ||
+          jobPayload?.job_id ||
+          jobPayload?.jobId ||
+          '',
       ).trim();
       if (!jobId) {
-        setErrors((prev) => ({
+        setErrors(prev => ({
           ...prev,
-          submit: 'Job was created but no job ID was returned. Please try again.',
+          submit:
+            'Job was created but no job ID was returned. Please try again.',
         }));
         return;
       }
 
-      await promptPermissionIfNeeded?.('car_owner_job_created_navigate_find_mechanics');
+      await promptPermissionIfNeeded?.(
+        'car_owner_job_created_navigate_find_mechanics',
+      );
       navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DISCOVERY, {
         jobId,
         job: jobPayload || undefined,
       });
     } catch {
-      setErrors((prev) => ({ ...prev, submit: 'We could not submit your request. Please try again.' }));
+      setErrors(prev => ({
+        ...prev,
+        submit: 'We could not submit your request. Please try again.',
+      }));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} keyboardAware={false}>
-      <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <ScreenContainer
+      padded={false}
+      edges={['top', 'left', 'right', 'bottom']}
+      keyboardAware={false}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
-          </TouchableOpacity>
-          <AppText style={styles.headerTitle}>What is the issue</AppText>
-        </View>
-
-        <AppText variant="subtitle" style={styles.sectionTitle}>
-          Select an issue
-        </AppText>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabsRow}>
-          {ISSUE_GROUPS.map((group) => (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
             <TouchableOpacity
-              key={group.key}
+              style={styles.backButton}
               activeOpacity={0.85}
-              style={[styles.groupTab, activeGroupKey === group.key ? styles.groupTabActive : null]}
-              onPress={() => setActiveGroupKey(group.key)}
+              onPress={() => navigation.goBack()}
             >
-              <AppText style={[styles.groupTabText, activeGroupKey === group.key ? styles.groupTabTextActive : null]}>
-                {group.label}
-              </AppText>
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                size={20}
+                color={darkTheme.colors.text}
+                strokeWidth={2.1}
+              />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+            <AppText style={styles.headerTitle}>What is the issue</AppText>
+          </View>
 
-        <View style={styles.issueGrid}>
-          {activeGroup.issues.map((issue) => (
-            <IssueCard
-              key={issue.value}
-              label={issue.label}
-              icon={activeGroup.icon}
-              selected={selectedIssueType === issue.value}
-              onPress={() => {
-                setSelectedIssueType(issue.value);
-                setErrors((prev) => ({ ...prev, issue: '', submit: '' }));
-              }}
-            />
-          ))}
-        </View>
+          <AppText variant="subtitle" style={styles.sectionTitle}>
+            Select an issue
+          </AppText>
 
-        {errors.issue ? <AppText style={styles.errorText}>{errors.issue}</AppText> : null}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.groupTabsRow}
+          >
+            {ISSUE_GROUPS.map(group => (
+              <TouchableOpacity
+                key={group.key}
+                activeOpacity={0.85}
+                style={[
+                  styles.groupTab,
+                  activeGroupKey === group.key ? styles.groupTabActive : null,
+                ]}
+                onPress={() => setActiveGroupKey(group.key)}
+              >
+                <AppText
+                  style={[
+                    styles.groupTabText,
+                    activeGroupKey === group.key
+                      ? styles.groupTabTextActive
+                      : null,
+                  ]}
+                >
+                  {group.label}
+                </AppText>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-        <View>
-          <AppInput
-            label={selectedIssueType === 'other' ? 'Description (required)' : 'Description (optional)'}
-            placeholder={
-              selectedIssueType === 'other'
-                ? 'Please describe your issue'
-                : selectedIssueLabel
+          <View style={styles.issueGrid}>
+            {activeGroup.issues.map(issue => (
+              <IssueCard
+                key={issue.value}
+                label={issue.label}
+                icon={activeGroup.icon}
+                selected={selectedIssueType === issue.value}
+                onPress={() => {
+                  setSelectedIssueType(issue.value);
+                  setErrors(prev => ({ ...prev, issue: '', submit: '' }));
+                }}
+              />
+            ))}
+          </View>
+
+          {errors.issue ? (
+            <AppText style={styles.errorText}>{errors.issue}</AppText>
+          ) : null}
+
+          <View>
+            <AppInput
+              label={
+                selectedIssueType === 'other'
+                  ? 'Description (required)'
+                  : 'Description (optional)'
+              }
+              placeholder={
+                selectedIssueType === 'other'
+                  ? 'Please describe your issue'
+                  : selectedIssueLabel
                   ? `Describe your ${selectedIssueLabel.toLowerCase()} issue`
                   : 'Describe your problem here'
+              }
+              value={description}
+              onChangeText={text => {
+                setDescription(text);
+                setErrors(prev => ({ ...prev, description: '', submit: '' }));
+              }}
+              multiline
+              textAlignVertical="top"
+              inputStyle={styles.descriptionInput}
+            />
+          </View>
+          {errors.description ? (
+            <AppText style={styles.errorText}>{errors.description}</AppText>
+          ) : null}
+
+          <View>
+            <AppInput
+              label="Car make"
+              placeholder="Toyota Corolla"
+              value={carMake}
+              onChangeText={text => {
+                setCarMake(text);
+                setErrors(prev => ({ ...prev, carMake: '', submit: '' }));
+              }}
+              autoCapitalize="words"
+            />
+          </View>
+          {errors.carMake ? (
+            <AppText style={styles.errorText}>{errors.carMake}</AppText>
+          ) : null}
+
+          <UploadBox
+            images={images}
+            onAddPress={handleAddPhotos}
+            onRemoveImage={handleRemoveImage}
+            isPickingImage={isPickingImage}
+          />
+
+          <AppButton
+            label={
+              isSubmitting || isCreatingJob ? 'Submitting...' : 'Find mechanics'
             }
-            value={description}
-            onChangeText={(text) => {
-              setDescription(text);
-              setErrors((prev) => ({ ...prev, description: '', submit: '' }));
-            }}
-            multiline
-            textAlignVertical="top"
-            inputStyle={styles.descriptionInput}
+            onPress={handleFindMechanics}
+            style={styles.cta}
+            disabled={isSubmitting || isCreatingJob}
+            left={
+              isSubmitting || isCreatingJob ? (
+                <ActivityIndicator
+                  size="small"
+                  color={darkTheme.colors.background}
+                />
+              ) : null
+            }
           />
-        </View>
-        {errors.description ? <AppText style={styles.errorText}>{errors.description}</AppText> : null}
 
-        <View>
-          <AppInput
-            label="Car make"
-            placeholder="Toyota Corolla"
-            value={carMake}
-            onChangeText={(text) => {
-              setCarMake(text);
-              setErrors((prev) => ({ ...prev, carMake: '', submit: '' }));
-            }}
-            autoCapitalize="words"
-          />
-        </View>
-        {errors.carMake ? <AppText style={styles.errorText}>{errors.carMake}</AppText> : null}
-
-        <UploadBox
-          images={images}
-          onAddPress={handleAddPhotos}
-          onRemoveImage={handleRemoveImage}
-          isPickingImage={isPickingImage}
-        />
-
-        <AppButton
-          label={isSubmitting || isCreatingJob ? 'Submitting...' : 'Find mechanics'}
-          onPress={handleFindMechanics}
-          style={styles.cta}
-          disabled={isSubmitting || isCreatingJob}
-          left={
-            isSubmitting || isCreatingJob ? (
-              <ActivityIndicator size="small" color={darkTheme.colors.background} />
-            ) : null
-          }
-        />
-
-        {errors.submit ? <AppText style={styles.errorText}>{errors.submit}</AppText> : null}
-        {successMessage ? <AppText style={styles.successText}>{successMessage}</AppText> : null}
-      </ScrollView>
+          {errors.submit ? (
+            <AppText style={styles.errorText}>{errors.submit}</AppText>
+          ) : null}
+          {successMessage ? (
+            <AppText style={styles.successText}>{successMessage}</AppText>
+          ) : null}
+        </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
@@ -792,6 +959,3 @@ const styles = StyleSheet.create({
 });
 
 export default ReportIssueScreen;
-
-
-
