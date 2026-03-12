@@ -28,11 +28,47 @@ const normalizeCartItems = (payload) => {
     [];
   const list = Array.isArray(rawItems) ? rawItems : [];
   return list.map((item) => {
-    const product = item?.part || item?.product || item?.item || item?.spare_part || {};
+    const rawProduct = item?.part || item?.product || item?.item || item?.spare_part || {};
+    const fallbackImageObject = item?.part_image && typeof item.part_image === 'object' ? item.part_image : null;
+    const fallbackImageUri =
+      String(
+        fallbackImageObject?.url ||
+          fallbackImageObject?.secure_url ||
+          fallbackImageObject?.uri ||
+          fallbackImageObject?.path ||
+          ''
+      ).trim();
+    const productId =
+      normalizeProductId(rawProduct) || String(item?.part_id || item?.product_id || '').trim();
+    const normalizedProduct = {
+      ...rawProduct,
+      id: productId || String(rawProduct?.id || rawProduct?._id || '').trim(),
+      storeId: String(
+        rawProduct?.store_id ||
+          rawProduct?.storeId ||
+          item?.store_id ||
+          item?.storeId ||
+          ''
+      ).trim(),
+      name: String(rawProduct?.name || item?.part_name || item?.name || '').trim(),
+      price: toNumber(rawProduct?.price ?? item?.unit_price, 0),
+      shop: String(
+        rawProduct?.shop ||
+          rawProduct?.store_name ||
+          rawProduct?.store?.name ||
+          item?.store_name ||
+          ''
+      ).trim(),
+      images: Array.isArray(rawProduct?.images)
+        ? rawProduct.images
+        : fallbackImageUri
+          ? [fallbackImageUri]
+          : [],
+    };
     return {
       id: String(item?.id || item?._id || '').trim(),
-      productId: normalizeProductId(product) || String(item?.part_id || item?.product_id || '').trim(),
-      product,
+      productId,
+      product: normalizedProduct,
       quantity: toNumber(item?.quantity || item?.qty || 1, 1),
     };
   });

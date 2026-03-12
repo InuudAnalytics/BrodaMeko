@@ -336,13 +336,21 @@ const OrdersScreen = ({ navigation }) => {
 
                 {order.status === 'in_transit' ? (
                   <View style={styles.dualRow}>
-                    <TouchableOpacity
-                      style={styles.outlineButton}
-                      activeOpacity={0.85}
-                      onPress={() => handleCallBuyer(order)}
-                    >
-                      <AppText style={styles.outlineButtonText}>Call buyer</AppText>
-                    </TouchableOpacity>
+                    {order?.buyerPhone ? (
+                      <TouchableOpacity
+                        style={styles.outlineButton}
+                        activeOpacity={0.85}
+                        onPress={() => handleCallBuyer(order)}
+                      >
+                        <AppText style={styles.outlineButtonText}>Call buyer</AppText>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={[styles.outlineButton, styles.disabledButton]} activeOpacity={1}>
+                        <AppText style={[styles.outlineButtonText, styles.disabledButtonText]}>
+                          Buyer phone hidden
+                        </AppText>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity style={styles.outlineButton} activeOpacity={0.85}>
                       <AppText style={styles.outlineButtonText}>Track order</AppText>
                     </TouchableOpacity>
@@ -559,6 +567,12 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontSize: 12,
     fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  disabledButton: {
+    opacity: 0.45,
+  },
+  disabledButtonText: {
+    color: '#9CA3AF',
   },
 });
 

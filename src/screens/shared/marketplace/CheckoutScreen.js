@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
 import { MARKETPLACE_DELIVERY_FEE_NGN } from '../../../config/marketplacePricing';
-import { checkoutMarketplaceOrder } from '../../../services/marketplace.service';
+import { checkoutMarketplaceOrder, getMarketplacePart } from '../../../services/marketplace.service';
 import AppAlert from '../../../components/AppAlert';
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
@@ -33,6 +33,8 @@ const formatAddressObject = (value) => {
   const country = String(value?.country || '').trim();
   return [street, city, state, country].filter(Boolean).join(', ');
 };
+
+const pickFirstDefined = (...values) => values.find(value => value !== undefined && value !== null);
 
 const toFiniteNumber = (value) => {
   const parsed = Number(value);
@@ -76,6 +78,7 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [deliveryType, setDeliveryType] = useState('pickup');
   const [paymentMethod, setPaymentMethod] = useState('transfer');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hydratedPart, setHydratedPart] = useState(null);
 
   const directProduct = route?.params?.directProduct || null;
   const product = directProduct || items?.[0]?.product || {
@@ -97,19 +100,76 @@ const CheckoutScreen = ({ navigation, route }) => {
   const deliveryFee = deliveryType === 'delivery' ? MARKETPLACE_DELIVERY_FEE_NGN : 0;
   const serviceFee = 500;
   const total = subtotal + deliveryFee + serviceFee;
-  const storeName = String(product?.store?.name || product?.shop || 'Seller');
+  const productId = String(product?.id || product?._id || product?.part_id || '').trim();
+
+  useEffect(() => {
+    let active = true;
+    const hydratePart = async () => {
+      if (!productId) {
+        setHydratedPart(null);
+        return;
+      }
+      try {
+        const response = await getMarketplacePart(productId);
+        const payload = response?.data || response || {};
+        const part = payload?.part || payload?.data || payload;
+        if (active) {
+          setHydratedPart(part || null);
+        }
+      } catch {
+        if (active) {
+          setHydratedPart(null);
+        }
+      }
+    };
+    hydratePart();
+    return () => {
+      active = false;
+    };
+  }, [productId]);
+
+  const storeName = String(
+    pickFirstDefined(
+      product?.store?.name,
+      hydratedPart?.store_name,
+      hydratedPart?.store?.store_name,
+      hydratedPart?.store?.name,
+      product?.shop
+    ) || 'Seller'
+  );
   const storeAddress = String(
-    product?.store?.address ||
-      product?.storeAddress ||
-      formatAddressObject(product?.store_address) ||
+    pickFirstDefined(
+      product?.store?.address,
+      product?.storeAddress,
+      formatAddressObject(product?.store_address),
+      formatAddressObject(hydratedPart?.store_address),
+      hydratedPart?.store?.address,
+      hydratedPart?.store?.street
+        ? `${hydratedPart.store.street}, ${hydratedPart.store.city || ''}, ${hydratedPart.store.state || ''}, ${hydratedPart.store.country || ''}`
+        : ''
+    ) ||
       product?.location ||
       'Store address unavailable'
   );
   const storeInfo = String(
-    product?.store?.description ||
-      product?.store?.phone ||
+    pickFirstDefined(
+      product?.store?.description,
+      hydratedPart?.store?.description,
+      product?.store?.phone,
+      hydratedPart?.store?.phone,
+      hydratedPart?.store?.phone_number
+    ) ||
       'Store information unavailable.'
   );
+
+  const resolvedStorePhone = String(
+    pickFirstDefined(
+      product?.store?.phone,
+      hydratedPart?.store?.phone,
+      hydratedPart?.store?.phone_number,
+      product?.phone
+    ) || ''
+  ).trim();
 
   const handleCheckout = async () => {
     if (isSubmitting) {
@@ -132,9 +192,15 @@ const CheckoutScreen = ({ navigation, route }) => {
               delivery_country: 'Nigeria',
             }
           : {}),
-        contact_phone: String(user?.phone_number || user?.phone || '+2348012345678'),
+        contact_phone: String(user?.phone_number || user?.phone || '').trim(),
         email: String(user?.email || 'buyer@example.com'),
       };
+
+      if (!payload.contact_phone) {
+        AppAlert.alert('Phone required', 'Please add your phone number in profile before checkout.');
+        setIsSubmitting(false);
+        return;
+      }
 
       const checkoutResponse = await checkoutMarketplaceOrder(payload);
       await clearCart();
@@ -147,7 +213,26 @@ const CheckoutScreen = ({ navigation, route }) => {
         '';
       const pickupCode =
         String(responseData?.pickup_code || '').replace(/\D/g, '').slice(0, 4) || undefined;
-      const shopCoordinates = extractShopCoordinates(product);
+      const shopCoordinates = extractShopCoordinates({
+        ...product,
+        shopCoordinates:
+          product?.shopCoordinates ||
+          hydratedPart?.store?.coordinates ||
+          {
+            latitude: hydratedPart?.store?.latitude,
+            longitude: hydratedPart?.store?.longitude,
+          },
+        latitude: pickFirstDefined(
+          product?.latitude,
+          hydratedPart?.store?.latitude,
+          hydratedPart?.latitude
+        ),
+        longitude: pickFirstDefined(
+          product?.longitude,
+          hydratedPart?.store?.longitude,
+          hydratedPart?.longitude
+        ),
+      });
       navigation.navigate('PaymentSuccessScreen', {
         orderId: createdOrderId,
         fulfillmentType: deliveryType === 'pickup' ? 'pickup' : 'delivery',
@@ -164,8 +249,8 @@ const CheckoutScreen = ({ navigation, route }) => {
         },
         seller: {
           name: storeName,
-          avatar: product?.store?.logo || product?.store?.avatar || '',
-          phone: String(product?.store?.phone || product?.phone || '').trim(),
+          avatar: product?.store?.logo || product?.store?.avatar || hydratedPart?.store?.logo || '',
+          phone: resolvedStorePhone,
           isActive: true,
           coordinates: shopCoordinates,
         },
