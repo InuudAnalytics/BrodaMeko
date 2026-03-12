@@ -8,44 +8,6 @@ import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
-const ORDERS = [
-  {
-    id: '1',
-    status: 'new',
-    name: 'LED headlights',
-    qty: 2,
-    total: 7500,
-    orderedAt: 'Today 8:56 AM',
-    image: 'https://picsum.photos/120?random=91',
-  },
-  {
-    id: '2',
-    status: 'preparing',
-    name: 'LED headlights',
-    qty: 2,
-    total: 7500,
-    orderedAt: 'Today 8:56 AM',
-    image: 'https://picsum.photos/120?random=92',
-  },
-  {
-    id: '3',
-    status: 'in_transit',
-    name: 'LED headlights',
-    qty: 2,
-    total: 7500,
-    orderedAt: 'Today 8:56 AM',
-    image: 'https://picsum.photos/120?random=93',
-  },
-  {
-    id: '4',
-    status: 'completed',
-    name: 'LED headlights',
-    qty: 2,
-    total: 7500,
-    orderedAt: 'Today 8:56 AM',
-    image: 'https://picsum.photos/120?random=94',
-  },
-];
 
 const formatNaira = (value) => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
@@ -66,6 +28,15 @@ const normalizeOrderList = (payload) => {
   return [];
 };
 
+const resolveImageUri = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+  }
+  return '';
+};
+
 const toStatusKey = (value) => {
   const status = String(value || '').toLowerCase();
   if (['new', 'pending', 'confirmed'].includes(status)) return 'new';
@@ -77,7 +48,7 @@ const toStatusKey = (value) => {
 
 const OrdersScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('all');
-  const [orders, setOrders] = useState(ORDERS);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
   const pullDistance = useRef(new Animated.Value(0)).current;
@@ -100,6 +71,11 @@ const OrdersScreen = ({ navigation }) => {
         const detailItems = Array.isArray(detail?.items) ? detail.items : [];
         const firstItem = detailItems[0] || {};
         const orderId = String(order?.id || order?._id || '').trim();
+        const itemImage =
+          resolveImageUri(firstItem?.part_image) ||
+          resolveImageUri(firstItem?.part?.images?.[0]) ||
+          resolveImageUri(firstItem?.part?.image) ||
+          resolveImageUri(order?.image);
 
         return {
           id: orderId || `order-${index}`,
@@ -116,13 +92,13 @@ const OrdersScreen = ({ navigation }) => {
           deliveryType: String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase(),
           pickupCode: '',
           shopName: firstItem?.store_name || 'Spare parts shop',
-          image: 'https://picsum.photos/120?random=90',
+          image: itemImage,
         };
       });
-      setOrders(mapped.length ? mapped : []);
+      setOrders(mapped);
     } catch (error) {
       setErrorText(error?.message || 'Unable to load orders right now.');
-      setOrders(ORDERS);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -283,7 +259,11 @@ const OrdersScreen = ({ navigation }) => {
                 onPress={() => handleOpenOrder(order)}
               >
                 <View style={styles.cardTop}>
-                  <Image source={{ uri: order.image }} style={styles.cardImage} />
+                  {order.image ? (
+                    <Image source={{ uri: order.image }} style={styles.cardImage} />
+                  ) : (
+                    <View style={styles.cardImageFallback} />
+                  )}
                   <View style={styles.cardInfo}>
                     <AppText style={styles.cardTitle}>{order.name}</AppText>
                     <AppText style={styles.cardQty}>Qty: {order.qty}</AppText>
@@ -453,6 +433,11 @@ const styles = StyleSheet.create({
     columnGap: 10,
   },
   cardImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+  },
+  cardImageFallback: {
     width: 42,
     height: 42,
     borderRadius: 10,

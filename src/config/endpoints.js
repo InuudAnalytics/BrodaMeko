@@ -153,12 +153,10 @@ export const ENDPOINTS = {
     jobs: '/api/v1/admin/jobs',
   },
   marketplace: {
-    // TODO: Confirm marketplace order endpoints with backend (buyer vs seller + payload shapes).
     sellerStore: '/api/v1/marketplace/seller/store',
     sellerStoreMe: '/api/v1/marketplace/seller/store/me',
     sellerStoreLogo: '/api/v1/marketplace/seller/store/logo',
     sellerStoreBanner: '/api/v1/marketplace/seller/store/banner',
-    // TODO: Confirm seller orders response shape.
     sellerOrders: '/api/v1/marketplace/seller/orders',
     partsList: '/api/v1/marketplace/parts',
     partDetails: (partId) => `/api/v1/marketplace/parts/${encodeURIComponent(String(partId || ''))}`,
@@ -166,7 +164,6 @@ export const ENDPOINTS = {
     cartItems: '/api/v1/marketplace/cart/items',
     cartItem: (itemId) => `/api/v1/marketplace/cart/items/${encodeURIComponent(String(itemId || ''))}`,
     cartClear: '/api/v1/marketplace/cart/clear',
-    // TODO: Confirm order endpoints (buyer vs seller + payload shapes).
     orders: '/api/v1/marketplace/orders',
     orderDetails: (orderId) => `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}`,
     orderCancel: (orderId) => `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/cancel`,
