@@ -49,8 +49,7 @@ const CartScreen = ({ navigation, route }) => {
 
   const isMechanic = route?.params?.marketplaceRole === 'mechanic';
   const subtotal = calculateTotal();
-  const serviceFee = subtotal > 0 ? 500 : 0;
-  const total = subtotal + serviceFee;
+  const total = subtotal;
 
   const handleCarOwnerTabPress = routeName => {
     navigation.navigate(routeName);
@@ -262,14 +261,14 @@ const CartScreen = ({ navigation, route }) => {
                 </AppText>
               </View>
               <View style={styles.summaryRow}>
-                <AppText style={styles.summaryLabel}>Service fee</AppText>
+                <AppText style={styles.summaryLabel}>Service fee (backend)</AppText>
                 <AppText style={styles.summaryValue}>
-                  {formatNaira(serviceFee)}
+                  Calculated at checkout
                 </AppText>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryRow}>
-                <AppText style={styles.totalLabel}>Total</AppText>
+                <AppText style={styles.totalLabel}>Subtotal</AppText>
                 <AppText style={styles.totalValue}>
                   {formatNaira(total)}
                 </AppText>

@@ -11,6 +11,11 @@ const PANEL_MAX_DOWN = 360;
 
 const formatNaira = value => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
+const toMoney = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const resolveImageUri = value => {
   if (!value) return '';
   if (typeof value === 'string') return value;
@@ -75,6 +80,14 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const dragStartRef = useRef(0);
   const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
   const [resolvedPickupCode, setResolvedPickupCode] = React.useState('');
+  const [summary, setSummary] = React.useState({
+    subtotal: toMoney(route?.params?.subtotal),
+    serviceCharge: toMoney(route?.params?.serviceCharge),
+    totalAmount: toMoney(
+      route?.params?.totalAmount,
+      toMoney(route?.params?.subtotal) + toMoney(route?.params?.serviceCharge),
+    ),
+  });
 
   const incomingCode = String(route?.params?.pickupCode || '')
     .replace(/\D/g, '')
@@ -155,6 +168,21 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         const code = String(data?.pickup_code || '').replace(/\D/g, '').slice(0, 4);
         if (active && code.length === 4) {
           setResolvedPickupCode(code);
+        }
+
+        const items = data?.items || data?.order_items || data?.products || [];
+        const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
+        const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
+        const backendServiceCharge = toMoney(
+          data?.service_charge,
+          backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
+        );
+        if (active) {
+          setSummary((prev) => ({
+            subtotal: computedSubtotal || prev.subtotal,
+            serviceCharge: backendServiceCharge || prev.serviceCharge,
+            totalAmount: backendTotal || prev.totalAmount || computedSubtotal + backendServiceCharge,
+          }));
         }
       } catch {
         // No-op: keep fallback display when pickup code is unavailable.
@@ -257,6 +285,22 @@ const PickupTrackingScreen = ({ navigation, route }) => {
                 <AppText style={styles.productShop}>{product?.shop || 'Seller'}</AppText>
                 <AppText style={styles.productPrice}>{formatNaira(product?.price || 0)}</AppText>
                 <AppText style={styles.productAddress} numberOfLines={2}>{pickupAddress}</AppText>
+              </View>
+            </View>
+
+            <View style={styles.summaryCard}>
+              <AppText style={styles.summaryTitle}>Payment summary</AppText>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.summaryLabel}>Subtotal</AppText>
+                <AppText style={styles.summaryValue}>{formatNaira(summary.subtotal)}</AppText>
+              </View>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.summaryLabel}>Service fee</AppText>
+                <AppText style={styles.summaryValue}>{formatNaira(summary.serviceCharge)}</AppText>
+              </View>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.totalLabel}>Total paid</AppText>
+                <AppText style={styles.totalValue}>{formatNaira(summary.totalAmount)}</AppText>
               </View>
             </View>
 
@@ -444,6 +488,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     padding: 10,
     rowGap: 10,
+  },
+  summaryCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: 10,
+  },
+  summaryTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  summaryLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  summaryValue: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 15,
+  },
+  totalLabel: {
+    color: '#E6C714',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+  },
+  totalValue: {
+    color: '#E6C714',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
   },
   sellerLeft: {
     flexDirection: 'row',

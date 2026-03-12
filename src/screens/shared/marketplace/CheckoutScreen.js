@@ -4,7 +4,6 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
-import { MARKETPLACE_DELIVERY_FEE_NGN } from '../../../config/marketplacePricing';
 import { checkoutMarketplaceOrder, getMarketplaceOrder, getMarketplacePart } from '../../../services/marketplace.service';
 import AppAlert from '../../../components/AppAlert';
 import { getWalletBalance } from '../../../services/wallet.service';
@@ -121,6 +120,12 @@ const readOrderId = (responseData) => {
   return '';
 };
 
+const readSummaryAmount = (responseData, key, fallback = 0) => {
+  const payload = responseData?.data || responseData || {};
+  const parsed = Number(payload?.[key]);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const CheckoutScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { items, calculateTotal, clearCart, addToCart } = useCart();
@@ -153,9 +158,8 @@ const CheckoutScreen = ({ navigation, route }) => {
     }
     return calculateTotal();
   }, [calculateTotal, directProduct, product?.price, quantity]);
-  const deliveryFee = deliveryType === 'delivery' ? MARKETPLACE_DELIVERY_FEE_NGN : 0;
-  const serviceFee = 500;
-  const total = subtotal + deliveryFee + serviceFee;
+  const deliveryFee = 0;
+  const total = subtotal + deliveryFee;
   const productId = String(product?.id || product?._id || product?.part_id || '').trim();
 
   useEffect(() => {
@@ -320,13 +324,6 @@ const CheckoutScreen = ({ navigation, route }) => {
     if (isSubmitting) {
       return;
     }
-    if (paymentMethod === 'wallet' && walletBalance < total) {
-      AppAlert.alert(
-        'Insufficient wallet balance',
-        `Wallet balance is ${formatNaira(walletBalance)}. You need ${formatNaira(total)}.`,
-      );
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -358,6 +355,13 @@ const CheckoutScreen = ({ navigation, route }) => {
       const checkoutResponse = await checkoutMarketplaceOrder(payload);
       const responsePayload = checkoutResponse?.data || checkoutResponse || {};
       const responseData = responsePayload?.data || responsePayload || {};
+      const backendSubtotal = readSummaryAmount(responseData, 'subtotal', subtotal);
+      const backendServiceCharge = readSummaryAmount(responseData, 'service_charge', 0);
+      const backendTotal = readSummaryAmount(
+        responseData,
+        'total_amount',
+        backendSubtotal + backendServiceCharge,
+      );
       const createdOrderId = readOrderId(responseData);
       const pickupCode =
         String(responseData?.pickup_code || '').replace(/\D/g, '').slice(0, 4) || undefined;
@@ -407,6 +411,9 @@ const CheckoutScreen = ({ navigation, route }) => {
         storeInfo,
         shopCoordinates,
         deliveryAddress: 'No 1, Onireke street, Agbabiaka',
+        subtotal: backendSubtotal,
+        serviceCharge: backendServiceCharge,
+        totalAmount: backendTotal,
       };
 
       if (paymentMethod === 'wallet') {
@@ -490,18 +497,18 @@ const CheckoutScreen = ({ navigation, route }) => {
             <View style={styles.summaryRow}>
               <AppText style={styles.summaryLabel}>Delivery fee</AppText>
               <AppText style={styles.summaryValue}>
-                {formatNaira(deliveryFee)}
+                {deliveryType === 'pickup' ? 'Calculated at checkout' : 'Unavailable'}
               </AppText>
             </View>
             <View style={styles.summaryRow}>
-              <AppText style={styles.summaryLabel}>Service fee</AppText>
+              <AppText style={styles.summaryLabel}>Service fee (backend)</AppText>
               <AppText style={styles.summaryValue}>
-                {formatNaira(serviceFee)}
+                Calculated at checkout
               </AppText>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
-              <AppText style={styles.totalLabel}>Total</AppText>
+              <AppText style={styles.totalLabel}>Subtotal</AppText>
               <AppText style={styles.totalValue}>{formatNaira(total)}</AppText>
             </View>
           </View>
@@ -521,7 +528,7 @@ const CheckoutScreen = ({ navigation, route }) => {
               >
                 <AppText style={styles.deliveryTitle}>Request delivery</AppText>
                 <AppText style={styles.deliverySubtitle}>
-                  {`1-3 days - ${formatNaira(MARKETPLACE_DELIVERY_FEE_NGN)}`}
+                  Unavailable
                 </AppText>
                 {deliveryType === 'delivery' ? (
                   <View style={styles.deliveryCheck} />
@@ -637,11 +644,7 @@ const CheckoutScreen = ({ navigation, route }) => {
             >
               {walletLoading
                 ? 'Wallet balance: loading...'
-                : `Wallet balance: ${formatNaira(walletBalance)}${
-                    paymentMethod === 'wallet' && walletBalance < total
-                      ? ' (insufficient)'
-                      : ''
-                  }`}
+                : `Wallet balance: ${formatNaira(walletBalance)}`}
             </AppText>
           </View>
         </View>

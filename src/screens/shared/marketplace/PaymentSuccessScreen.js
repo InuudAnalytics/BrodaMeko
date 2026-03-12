@@ -10,6 +10,9 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
   const { role } = useAuth();
   const orderId = route?.params?.orderId;
   const fulfillmentType = String(route?.params?.fulfillmentType || 'delivery').toLowerCase();
+  const subtotal = Number(route?.params?.subtotal || 0);
+  const serviceCharge = Number(route?.params?.serviceCharge || 0);
+  const totalAmount = Number(route?.params?.totalAmount || subtotal + serviceCharge);
 
   const handleBackToMarketplace = () => {
     if (String(role || '').toLowerCase() === 'mech') {
@@ -45,6 +48,9 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
                       storeAddress: route?.params?.storeAddress,
                       storeInfo: route?.params?.storeInfo,
                       shopCoordinates: route?.params?.shopCoordinates,
+                      subtotal,
+                      serviceCharge,
+                      totalAmount,
                     })
                   : navigation.navigate('OrderTracking', {
                       orderId,
@@ -55,6 +61,9 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
                       storeAddress: route?.params?.storeAddress,
                       storeInfo: route?.params?.storeInfo,
                       shopCoordinates: route?.params?.shopCoordinates,
+                      subtotal,
+                      serviceCharge,
+                      totalAmount,
                     })
               }
             >

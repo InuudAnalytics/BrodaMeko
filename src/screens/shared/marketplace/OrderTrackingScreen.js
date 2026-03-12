@@ -52,6 +52,11 @@ const NIGERIA_FALLBACK_COORDS = { latitude: 9.0765, longitude: 7.3986 }; // Abuj
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
+const toMoney = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const toFiniteNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -149,11 +154,30 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       : fallbackTimeline,
     orderId: route?.params?.orderId || route?.params?.order_id || '',
     itemId: route?.params?.itemId || '',
+    subtotal: toMoney(route?.params?.subtotal),
+    serviceCharge: toMoney(route?.params?.serviceCharge),
+    totalAmount: toMoney(
+      route?.params?.totalAmount,
+      toMoney(route?.params?.subtotal) + toMoney(route?.params?.serviceCharge),
+    ),
   });
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [orderError, setOrderError] = useState('');
 
-  const { product, seller, deliveryAddress, storeName, storeAddress, storeInfo, statusTimeline, orderId, itemId } = orderState;
+  const {
+    product,
+    seller,
+    deliveryAddress,
+    storeName,
+    storeAddress,
+    storeInfo,
+    statusTimeline,
+    orderId,
+    itemId,
+    subtotal,
+    serviceCharge,
+    totalAmount,
+  } = orderState;
   const shopCoordinates = useMemo(
     () => buildStoreCoordinates({ route, orderState }),
     [orderState, route]
@@ -296,6 +320,12 @@ const OrderTrackingScreen = ({ navigation, route }) => {
         const item = items?.[0] || {};
         const part = item?.part || item?.product || item?.spare_part || {};
         const store = part?.store || data?.store || data?.seller || {};
+        const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
+        const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
+        const backendServiceCharge = toMoney(
+          data?.service_charge,
+          backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
+        );
 
         const resolvedProduct = {
           name: part?.name || item?.name || fallbackProduct.name,
@@ -333,6 +363,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           storeInfo: store?.description || store?.phone || prev.storeInfo,
           statusTimeline: extractTimeline(item?.status || data?.status),
           itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
+          subtotal: computedSubtotal || prev.subtotal,
+          serviceCharge: backendServiceCharge || prev.serviceCharge,
+          totalAmount: backendTotal || prev.totalAmount || computedSubtotal + backendServiceCharge,
         }));
       } catch (error) {
         setOrderError(error?.message || 'Could not load order details.');
@@ -411,6 +444,12 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                       const item = items?.[0] || {};
                       const part = item?.part || item?.product || item?.spare_part || {};
                       const store = part?.store || data?.store || data?.seller || {};
+                      const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
+                      const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
+                      const backendServiceCharge = toMoney(
+                        data?.service_charge,
+                        backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
+                      );
 
                       const resolvedProduct = {
                         name: part?.name || item?.name || fallbackProduct.name,
@@ -448,6 +487,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                         storeInfo: store?.description || store?.phone || prev.storeInfo,
                         statusTimeline: extractTimeline(item?.status || data?.status),
                         itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
+                        subtotal: computedSubtotal || prev.subtotal,
+                        serviceCharge: backendServiceCharge || prev.serviceCharge,
+                        totalAmount: backendTotal || prev.totalAmount || computedSubtotal + backendServiceCharge,
                       }));
                     } catch (error) {
                       setOrderError(error?.message || 'Could not load order details.');
@@ -545,6 +587,22 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <AppText style={styles.addressHint}>
                 You are currently seeing your live location and the store pin while delivery-driver routing is pending.
               </AppText>
+            </View>
+
+            <View style={styles.summaryCard}>
+              <AppText style={styles.summaryTitle}>Payment summary</AppText>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.summaryLabel}>Subtotal</AppText>
+                <AppText style={styles.summaryValue}>{formatNaira(subtotal)}</AppText>
+              </View>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.summaryLabel}>Service fee</AppText>
+                <AppText style={styles.summaryValue}>{formatNaira(serviceCharge)}</AppText>
+              </View>
+              <View style={styles.summaryRow}>
+                <AppText style={styles.totalLabel}>Total paid</AppText>
+                <AppText style={styles.totalValue}>{formatNaira(totalAmount)}</AppText>
+              </View>
             </View>
 
             <View style={styles.sellerCard}>
@@ -858,6 +916,42 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     marginBottom: 20,
+  },
+  summaryCard: {
+    backgroundColor: '#1A1A4A',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: darkTheme.spacing.lg,
+  },
+  summaryTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  summaryLabel: {
+    color: '#9CA3AF',
+    fontSize: 12,
+  },
+  summaryValue: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  totalLabel: {
+    color: '#E6C714',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  totalValue: {
+    color: '#E6C714',
+    fontSize: 13,
+    fontWeight: '700',
   },
   secondaryAction: {
     marginTop: 10,
