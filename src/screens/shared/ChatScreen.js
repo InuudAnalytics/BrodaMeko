@@ -15,6 +15,7 @@ import { darkTheme } from '../../theme';
 import { ROLES, ROUTES, useKeyboardLift } from '../../utils';
 import { useFocusEffect } from '@react-navigation/native';
 import AppAlert from '../../components/AppAlert';
+import { getWalletBalance } from '../../services/wallet.service';
 const hexToRgba = (hex, alpha) => {
   const cleaned = String(hex || '')
     .replace('#', '')
@@ -130,6 +131,18 @@ const normalizeQuotationDecision = value => {
 
 const getQuotationKey = item =>
   String(item?.quotation_id || item?.quote_id || item?.id || item?._id || '').trim();
+
+const readWalletAmount = (walletPayload) => {
+  const root = walletPayload?.data || walletPayload || {};
+  const value =
+    root?.balance ??
+    root?.available_balance ??
+    root?.wallet_balance ??
+    root?.amount ??
+    0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const MessageBubble = ({
   item,
@@ -306,6 +319,7 @@ const SharedChatScreen = ({
     sendTypingEvent,
     sendQuotation,
     respondQuotation,
+    initiatePaymentForJob,
     wsStatus,
     setChatActive,
   } = useChat();
@@ -328,6 +342,7 @@ const SharedChatScreen = ({
   const [showPriceConfirm, setShowPriceConfirm] = useState(false);
   const [quotationDecisions, setQuotationDecisions] = useState({});
   const [busyQuotationId, setBusyQuotationId] = useState('');
+  const [acceptingQuotationId, setAcceptingQuotationId] = useState('');
   const typingLastSentAtRef = useRef(0);
   const conversationUnavailableNotifiedRef = useRef(false);
   const onBackPressRef = useRef(onBackPress);
@@ -537,37 +552,108 @@ const SharedChatScreen = ({
     setIsSettingPrice(false);
   };
 
-  const handleAcceptPrice = message => {
+  const handleAcceptPrice = async message => {
     const quotationKey = getQuotationKey(message);
-    if (quotationKey && quotationDecisions[quotationKey]) {
+    if ((quotationKey && quotationDecisions[quotationKey]) || (quotationKey && acceptingQuotationId === quotationKey)) {
       return;
     }
 
     const quotationId = String(
       message?.quotation_id || message?.id || message?._id || '',
     ).trim();
+    const jobId = String(route?.params?.jobId || '').trim();
     if (!quotationId) {
       AppAlert.alert('Unable to continue', 'Quotation reference is missing.');
       return;
     }
-
-    if (quotationKey) {
-      setQuotationDecisions((prev) => ({ ...prev, [quotationKey]: 'accepted' }));
+    if (!jobId) {
+      AppAlert.alert('Unable to continue', 'Job reference is missing.');
+      return;
+    }
+    const quoteAmount = Number(message?.amount || 0);
+    if (!Number.isFinite(quoteAmount) || quoteAmount <= 0) {
+      AppAlert.alert('Unable to continue', 'Quotation amount is invalid.');
+      return;
     }
 
-    navigation.navigate(ROUTES.CAR_OWNER_ESCROW_FUNDING, {
-      quotationId,
-      quoteAmount: Number(message?.amount || 0),
-      conversationId,
-      jobId: route?.params?.jobId,
-      mechanicId: route?.params?.mechanicId,
-      mechanic: route?.params?.mechanic,
-      issueSummary: route?.params?.issueSummary,
-      vehicle:
-        route?.params?.issueSummary?.carMake ||
-        route?.params?.job?.car_make ||
-        '',
-    });
+    if (quotationKey) {
+      setAcceptingQuotationId(quotationKey);
+    }
+
+    try {
+      const wallet = await getWalletBalance();
+      const availableBalance = readWalletAmount(wallet);
+      if (availableBalance < quoteAmount) {
+        AppAlert.alert(
+          'Insufficient wallet balance',
+          `You need ₦${quoteAmount.toLocaleString('en-NG')} but have ₦${availableBalance.toLocaleString('en-NG')}. Please fund your wallet and retry.`,
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Fund wallet',
+              onPress: () =>
+                navigation.navigate(ROUTES.CAR_OWNER_FUND_WALLET, {
+                  source: 'chat_quote_accept',
+                  quotationId,
+                  conversationId,
+                  jobId,
+                }),
+            },
+          ],
+        );
+        return;
+      }
+
+      const quotationResponse = await respondQuotation(conversationId, {
+        quotation_id: quotationId,
+        action: 'accept',
+      });
+      if (!quotationResponse) {
+        AppAlert.alert('Error', 'Could not accept quotation.');
+        return;
+      }
+
+      const walletPaymentResponse = await initiatePaymentForJob(jobId, 'wallet');
+      const paymentPayload = walletPaymentResponse?.data || walletPaymentResponse || {};
+      const paymentCode = String(paymentPayload?.code || '').trim().toUpperCase();
+      if (paymentCode === 'INSUFFICIENT_BALANCE') {
+        const required = Number(paymentPayload?.required || quoteAmount);
+        const available = Number(paymentPayload?.available || availableBalance);
+        AppAlert.alert(
+          'Insufficient wallet balance',
+          `You need ₦${required.toLocaleString('en-NG')} but have ₦${available.toLocaleString('en-NG')}. Please fund your wallet and retry.`,
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Fund wallet',
+              onPress: () =>
+                navigation.navigate(ROUTES.CAR_OWNER_FUND_WALLET, {
+                  source: 'chat_quote_accept_wallet_initiate',
+                  quotationId,
+                  conversationId,
+                  jobId,
+                }),
+            },
+          ],
+        );
+        return;
+      }
+      if (!walletPaymentResponse) {
+        AppAlert.alert('Error', 'Could not secure payment in escrow.');
+        return;
+      }
+
+      if (quotationKey) {
+        setQuotationDecisions((prev) => ({ ...prev, [quotationKey]: 'accepted' }));
+      }
+      AppAlert.alert('Success', 'Quotation accepted and payment secured in escrow.');
+    } catch (acceptError) {
+      AppAlert.alert('Error', acceptError?.message || 'Could not process quotation acceptance.');
+    } finally {
+      if (quotationKey) {
+        setAcceptingQuotationId('');
+      }
+    }
   };
 
   const handleDeclinePrice = async message => {
@@ -720,7 +806,10 @@ const SharedChatScreen = ({
                   quotationDecisions[getQuotationKey(item)] ||
                   normalizeQuotationDecision(item?.quotation_status)
                 }
-                quotationBusy={busyQuotationId === getQuotationKey(item)}
+                quotationBusy={
+                  busyQuotationId === getQuotationKey(item) ||
+                  acceptingQuotationId === getQuotationKey(item)
+                }
                 onRetryPending={() =>
                   retryPendingMessage(conversationId, item?.id)
                 }

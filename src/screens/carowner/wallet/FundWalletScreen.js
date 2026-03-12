@@ -43,7 +43,7 @@ const FundWalletScreen = ({ navigation }) => {
   const [loadingVerify, setLoadingVerify] = useState(false);
 
   const canSubmit = useMemo(() => Number(amount) > 0, [amount]);
-  const canVerify = useMemo(() => reference.trim() && trxref.trim(), [reference, trxref]);
+  const canVerify = useMemo(() => reference.trim().length > 0, [reference]);
 
   const handleTopUp = async () => {
     if (!canSubmit || loadingTopUp) {
@@ -152,19 +152,6 @@ const FundWalletScreen = ({ navigation }) => {
           style={styles.secondaryBtn}
         />
 
-        <AppInput
-          label="Reference"
-          placeholder="payment reference"
-          value={reference}
-          onChangeText={setReference}
-        />
-        <AppInput
-          label="Trxref"
-          placeholder="trxref"
-          value={trxref}
-          onChangeText={setTrxref}
-        />
-
         <AppButton
           label={loadingVerify ? 'Verifying...' : 'Verify payment'}
           onPress={handleVerify}
@@ -175,6 +162,9 @@ const FundWalletScreen = ({ navigation }) => {
 
         {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
         {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
+        {reference.trim() ? (
+          <AppText style={styles.infoText}>Reference captured. Verify after completing checkout.</AppText>
+        ) : null}
       </View>
 
       <Modal visible={showCheckoutModal} animationType="slide" presentationStyle="fullScreen">

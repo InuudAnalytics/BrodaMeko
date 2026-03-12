@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
 import { MARKETPLACE_DELIVERY_FEE_NGN } from '../../../config/marketplacePricing';
-import { checkoutMarketplaceOrder, getMarketplacePart } from '../../../services/marketplace.service';
+import { checkoutMarketplaceOrder, getMarketplaceOrder, getMarketplacePart } from '../../../services/marketplace.service';
 import AppAlert from '../../../components/AppAlert';
+import { getWalletBalance } from '../../../services/wallet.service';
+import { WebView } from 'react-native-webview';
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
@@ -72,13 +74,67 @@ const extractShopCoordinates = (product) => {
   return NIGERIA_FALLBACK_COORDS;
 };
 
+const readWalletAmount = (walletPayload) => {
+  const root = walletPayload?.data || walletPayload || {};
+  const amount =
+    root?.balance ??
+    root?.available_balance ??
+    root?.wallet_balance ??
+    root?.amount ??
+    0;
+  const parsed = Number(amount);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const readAuthorizationUrl = (responseData) => {
+  const payload = responseData?.payment || responseData || {};
+  return String(
+    payload?.authorization_url ||
+      payload?.checkout_url ||
+      payload?.payment_url ||
+      payload?.data?.authorization_url ||
+      payload?.data?.checkout_url ||
+      payload?.data?.payment_url ||
+      '',
+  ).trim();
+};
+
+const readOrderId = (responseData) => {
+  const directId = String(
+    responseData?.order_id ||
+      responseData?.orderId ||
+      responseData?.id ||
+      '',
+  ).trim();
+  if (directId) {
+    return directId;
+  }
+
+  const reference = String(
+    responseData?.payment?.data?.reference ||
+      responseData?.payment?.reference ||
+      '',
+  ).trim();
+  if (reference.startsWith('ORDER-')) {
+    return reference.replace(/^ORDER-/, '');
+  }
+  return '';
+};
+
 const CheckoutScreen = ({ navigation, route }) => {
   const { user } = useAuth();
   const { items, calculateTotal, clearCart, addToCart } = useCart();
   const [deliveryType, setDeliveryType] = useState('pickup');
-  const [paymentMethod, setPaymentMethod] = useState('transfer');
+  const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hydratedPart, setHydratedPart] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [authorizationUrl, setAuthorizationUrl] = useState('');
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [pendingSuccessParams, setPendingSuccessParams] = useState(null);
+  const [verifyingPaystack, setVerifyingPaystack] = useState(false);
 
   const directProduct = route?.params?.directProduct || null;
   const product = directProduct || items?.[0]?.product || {
@@ -128,6 +184,34 @@ const CheckoutScreen = ({ navigation, route }) => {
     };
   }, [productId]);
 
+  useEffect(() => {
+    let active = true;
+    const loadWalletBalance = async () => {
+      setWalletLoading(true);
+      try {
+        const wallet = await getWalletBalance();
+        if (!active) {
+          return;
+        }
+        setWalletBalance(readWalletAmount(wallet));
+      } catch {
+        if (!active) {
+          return;
+        }
+        setWalletBalance(0);
+      } finally {
+        if (active) {
+          setWalletLoading(false);
+        }
+      }
+    };
+
+    loadWalletBalance();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const storeName = String(
     pickFirstDefined(
       product?.store?.name,
@@ -171,10 +255,79 @@ const CheckoutScreen = ({ navigation, route }) => {
     ) || ''
   ).trim();
 
+  const closeCheckoutModal = () => {
+    setShowCheckoutModal(false);
+  };
+
+  const finalizeOrderSuccess = async (successParams) => {
+    await clearCart();
+    navigation.navigate('PaymentSuccessScreen', successParams);
+  };
+
+  const verifyPaystackOrderAndContinue = async (orderId, successParams) => {
+    if (!successParams) {
+      return;
+    }
+    if (!orderId) {
+      // TODO: backend should expose a dedicated marketplace payment verify endpoint for deterministic client verification.
+      AppAlert.alert(
+        'Payment submitted',
+        'Payment verification is still syncing. Continuing for testing.',
+      );
+      await finalizeOrderSuccess(successParams);
+      return;
+    }
+
+    setVerifyingPaystack(true);
+    try {
+      let paid = false;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const orderResponse = await getMarketplaceOrder(orderId);
+        const payload = orderResponse?.data || orderResponse || {};
+        const data = payload?.data || payload || {};
+        const paymentStatus = String(data?.payment_status || '').trim().toLowerCase();
+        if (paymentStatus === 'paid') {
+          paid = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+
+      if (!paid) {
+        // TODO: Replace this testing fallback with strict verification once backend adds an explicit verification endpoint.
+        AppAlert.alert(
+          'Verification pending',
+          'Payment has not been confirmed yet on the server. Continuing for testing.',
+        );
+      }
+      await finalizeOrderSuccess(successParams);
+    } catch {
+      // TODO: Replace this fallback once backend verification endpoint is available.
+      AppAlert.alert(
+        'Verification unavailable',
+        'Could not verify payment right now. Continuing for testing.',
+      );
+      await finalizeOrderSuccess(successParams);
+    } finally {
+      setVerifyingPaystack(false);
+      setShowCheckoutModal(false);
+      setAuthorizationUrl('');
+      setPendingSuccessParams(null);
+    }
+  };
+
   const handleCheckout = async () => {
     if (isSubmitting) {
       return;
     }
+    if (paymentMethod === 'wallet' && walletBalance < total) {
+      AppAlert.alert(
+        'Insufficient wallet balance',
+        `Wallet balance is ${formatNaira(walletBalance)}. You need ${formatNaira(total)}.`,
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (directProduct) {
@@ -182,7 +335,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       }
 
       const payload = {
-        payment_method: paymentMethod === 'card' ? 'paystack' : 'paystack',
+        payment_method: paymentMethod === 'wallet' ? 'wallet' : 'paystack',
         fulfillment_type: deliveryType === 'pickup' ? 'pickup' : 'delivery',
         ...(deliveryType === 'delivery'
           ? {
@@ -203,14 +356,9 @@ const CheckoutScreen = ({ navigation, route }) => {
       }
 
       const checkoutResponse = await checkoutMarketplaceOrder(payload);
-      await clearCart();
       const responsePayload = checkoutResponse?.data || checkoutResponse || {};
       const responseData = responsePayload?.data || responsePayload || {};
-      const createdOrderId =
-        responseData?.order_id ||
-        responseData?.orderId ||
-        responseData?.id ||
-        '';
+      const createdOrderId = readOrderId(responseData);
       const pickupCode =
         String(responseData?.pickup_code || '').replace(/\D/g, '').slice(0, 4) || undefined;
       const shopCoordinates = extractShopCoordinates({
@@ -233,7 +381,7 @@ const CheckoutScreen = ({ navigation, route }) => {
           hydratedPart?.longitude
         ),
       });
-      navigation.navigate('PaymentSuccessScreen', {
+      const successParams = {
         orderId: createdOrderId,
         fulfillmentType: deliveryType === 'pickup' ? 'pickup' : 'delivery',
         pickupCode,
@@ -259,7 +407,28 @@ const CheckoutScreen = ({ navigation, route }) => {
         storeInfo,
         shopCoordinates,
         deliveryAddress: 'No 1, Onireke street, Agbabiaka',
-      });
+      };
+
+      if (paymentMethod === 'wallet') {
+        await finalizeOrderSuccess(successParams);
+        return;
+      }
+
+      const paystackUrl = readAuthorizationUrl(responseData);
+      if (!paystackUrl) {
+        // TODO: backend should always return Paystack authorization URL for paystack payment_method.
+        AppAlert.alert(
+          'Checkout pending',
+          'Payment link is unavailable. Continuing for testing.',
+        );
+        await finalizeOrderSuccess(successParams);
+        return;
+      }
+
+      setPendingSuccessParams(successParams);
+      setAuthorizationUrl(paystackUrl);
+      setCheckoutError('');
+      setShowCheckoutModal(true);
     } catch (error) {
       AppAlert.alert('Checkout failed', error?.message || 'Could not process checkout.');
     } finally {
@@ -402,6 +571,25 @@ const CheckoutScreen = ({ navigation, route }) => {
             <TouchableOpacity
               style={[
                 styles.paymentCard,
+                paymentMethod === 'wallet' && styles.paymentCardActive,
+              ]}
+              onPress={() => setPaymentMethod('wallet')}
+              activeOpacity={0.85}
+            >
+              <View>
+                <AppText style={styles.paymentTitle}>Pay with wallet</AppText>
+                <AppText style={styles.paymentSubtitle}>Use your wallet balance</AppText>
+              </View>
+              <View
+                style={[
+                  styles.radio,
+                  paymentMethod === 'wallet' && styles.radioActive,
+                ]}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.paymentCard,
                 paymentMethod === 'transfer' && styles.paymentCardActive,
               ]}
               onPress={() => setPaymentMethod('transfer')}
@@ -439,6 +627,22 @@ const CheckoutScreen = ({ navigation, route }) => {
                 ]}
               />
             </TouchableOpacity>
+            <AppText
+              style={[
+                styles.walletBalanceText,
+                paymentMethod === 'wallet' && walletBalance < total
+                  ? styles.walletBalanceInsufficient
+                  : null,
+              ]}
+            >
+              {walletLoading
+                ? 'Wallet balance: loading...'
+                : `Wallet balance: ${formatNaira(walletBalance)}${
+                    paymentMethod === 'wallet' && walletBalance < total
+                      ? ' (insufficient)'
+                      : ''
+                  }`}
+            </AppText>
           </View>
         </View>
       </ScrollView>
@@ -450,6 +654,85 @@ const CheckoutScreen = ({ navigation, route }) => {
           disabled={isSubmitting}
         />
       </View>
+
+      <Modal visible={showCheckoutModal} animationType="slide" presentationStyle="fullScreen">
+        <View style={styles.checkoutScreen}>
+          <View style={styles.checkoutHeader}>
+            <TouchableOpacity style={styles.checkoutCloseBtn} activeOpacity={0.85} onPress={closeCheckoutModal}>
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#FFFFFF" strokeWidth={2.2} />
+            </TouchableOpacity>
+            <AppText style={styles.checkoutTitle}>Checkout</AppText>
+            <View style={styles.checkoutCloseBtn} />
+          </View>
+
+          {authorizationUrl ? (
+            <WebView
+              source={{ uri: authorizationUrl }}
+              originWhitelist={['*']}
+              javaScriptEnabled
+              domStorageEnabled
+              thirdPartyCookiesEnabled
+              sharedCookiesEnabled
+              onError={(event) => {
+                const description = String(event?.nativeEvent?.description || 'Could not load checkout.');
+                setCheckoutError(description);
+              }}
+              onHttpError={(event) => {
+                const statusCode = Number(event?.nativeEvent?.statusCode || 0);
+                if (statusCode) {
+                  setCheckoutError(`Checkout request failed (${statusCode}).`);
+                }
+              }}
+              onShouldStartLoadWithRequest={(request) => {
+                const nextUrl = String(request?.url || '').toLowerCase();
+                if (
+                  nextUrl.includes('status=success') ||
+                  nextUrl.includes('payment/success') ||
+                  nextUrl.includes('/success') ||
+                  nextUrl.includes('trxref=') ||
+                  nextUrl.includes('reference=')
+                ) {
+                  const orderId = pendingSuccessParams?.orderId || '';
+                  verifyPaystackOrderAndContinue(orderId, pendingSuccessParams);
+                }
+                if (
+                  nextUrl.includes('status=failed') ||
+                  nextUrl.includes('status=cancelled') ||
+                  nextUrl.includes('status=canceled') ||
+                  nextUrl.includes('/cancel')
+                ) {
+                  AppAlert.alert('Payment not completed', 'You can retry checkout.');
+                }
+                return true;
+              }}
+            />
+          ) : (
+            <View style={styles.webLoadingWrap}>
+              <AppText style={styles.errorText}>No checkout URL available.</AppText>
+            </View>
+          )}
+
+          {checkoutError ? (
+            <View style={styles.checkoutErrorWrap}>
+              <AppText style={styles.errorText}>{checkoutError}</AppText>
+            </View>
+          ) : null}
+
+          <View style={styles.checkoutFooter}>
+            <AppButton
+              label={verifyingPaystack ? 'Verifying payment...' : 'Done, verify payment'}
+              onPress={() =>
+                verifyPaystackOrderAndContinue(
+                  pendingSuccessParams?.orderId || '',
+                  pendingSuccessParams,
+                )
+              }
+              disabled={verifyingPaystack || !pendingSuccessParams}
+              left={verifyingPaystack ? <ActivityIndicator size="small" color="#000033" /> : null}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 };
@@ -665,11 +948,63 @@ const styles = StyleSheet.create({
   radioActive: {
     backgroundColor: '#E6C714',
   },
+  walletBalanceText: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  walletBalanceInsufficient: {
+    color: '#FF6B6B',
+  },
   bottomAction: {
     position: 'absolute',
     left: 20,
     right: 20,
     bottom: 16,
+  },
+  checkoutScreen: {
+    flex: 1,
+    backgroundColor: '#000033',
+  },
+  checkoutHeader: {
+    minHeight: 48,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+  },
+  checkoutCloseBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkoutTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+  },
+  webLoadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkoutErrorWrap: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  checkoutFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  errorText: {
+    color: '#FF7F7F',
   },
 });
 
