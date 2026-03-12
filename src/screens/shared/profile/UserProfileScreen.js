@@ -339,10 +339,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                   return;
                 }
                 if (row.key === 'legal_documents') {
-                  navigation.navigate('Placeholder', {
-                    title: 'Legal Documents',
-                    subtitle: 'Legal documents will be available soon.',
-                  });
+                  navigation.navigate(ROUTES.PRIVACY_POLICY, { documentType: 'privacy' });
                   return;
                 }
                 if (row.key === 'logout') {

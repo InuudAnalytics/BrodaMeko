@@ -46,6 +46,7 @@ import {
   validatePasswordRules,
   withNigerianCountryCode,
 } from '../../utils';
+import { TERMS_SIGNUP_SUMMARY } from '../../content/legalContent';
 
 const ERROR_COLOR = '#FF7B8A';
 const SUCCESS_COLOR = '#40C67A';
@@ -513,11 +514,28 @@ const SignUpScreen = ({ navigation, route }) => {
                   <AppText style={styles.closeText}>x</AppText>
                 </TouchableOpacity>
               </View>
-              <View style={styles.termsBody}>
-                <AppText style={styles.termsComingSoon}>
-                  Terms and condition coming soon
-                </AppText>
-              </View>
+              <ScrollView style={styles.termsBody} showsVerticalScrollIndicator={false}>
+                <AppText style={styles.termsSheetTitle}>Terms and Conditions</AppText>
+                {TERMS_SIGNUP_SUMMARY.map(section => (
+                  <View key={section.title} style={styles.termsSection}>
+                    <AppText style={styles.termsSectionTitle}>{section.title}</AppText>
+                    <AppText style={styles.termsSectionBody}>{section.body}</AppText>
+                  </View>
+                ))}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    closeTermsSheet();
+                    navigation.navigate(ROUTES.PRIVACY_POLICY, {
+                      documentType: 'terms',
+                    });
+                  }}
+                >
+                  <AppText style={styles.termsOpenFullLink}>
+                    Open full legal document
+                  </AppText>
+                </TouchableOpacity>
+              </ScrollView>
             </Animated.View>
           </Pressable>
         </Pressable>
@@ -661,13 +679,34 @@ const styles = StyleSheet.create({
   },
   termsBody: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingTop: darkTheme.spacing.md,
   },
-  termsComingSoon: {
+  termsSheetTitle: {
     color: darkTheme.colors.text,
-    textAlign: 'center',
-    fontSize: darkTheme.typography.fontSizes.md,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    marginBottom: darkTheme.spacing.sm,
+  },
+  termsSection: {
+    marginBottom: darkTheme.spacing.md,
+  },
+  termsSectionTitle: {
+    color: darkTheme.colors.accent,
+    fontSize: darkTheme.typography.fontSizes.sm,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    marginBottom: 4,
+  },
+  termsSectionBody: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: darkTheme.typography.fontSizes.sm,
+    lineHeight: 20,
+  },
+  termsOpenFullLink: {
+    color: darkTheme.colors.accent,
+    fontSize: darkTheme.typography.fontSizes.sm,
+    textDecorationLine: 'underline',
+    marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.md,
   },
 });
 
