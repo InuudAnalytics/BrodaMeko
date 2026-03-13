@@ -130,7 +130,7 @@ const normalizeQuotationDecision = value => {
 };
 
 const getQuotationKey = item =>
-  String(item?.quotation_id || item?.quote_id || item?.id || item?._id || '').trim();
+  String(item?.quotation_id || item?.quote_id || '').trim();
 
 const readWalletAmount = (walletPayload) => {
   const root = walletPayload?.data || walletPayload || {};
@@ -559,7 +559,7 @@ const SharedChatScreen = ({
     }
 
     const quotationId = String(
-      message?.quotation_id || message?.id || message?._id || '',
+      message?.quotation_id || message?.quote_id || '',
     ).trim();
     const jobId = String(route?.params?.jobId || '').trim();
     if (!quotationId) {
@@ -663,7 +663,7 @@ const SharedChatScreen = ({
     }
 
     const quotationId = String(
-      message?.quotation_id || message?.id || message?._id || '',
+      message?.quotation_id || message?.quote_id || '',
     ).trim();
     if (!quotationId) {
       AppAlert.alert('Unable to continue', 'Quotation reference is missing.');
