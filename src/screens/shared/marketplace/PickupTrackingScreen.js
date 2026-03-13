@@ -168,29 +168,41 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         const firstItem = items?.[0] || {};
         const part = firstItem?.part || firstItem?.product || firstItem?.spare_part || {};
         const store = part?.store || data?.store || data?.seller || {};
+        const itemStoreName = String(firstItem?.store_name || '').trim();
+        const itemStorePhone = String(firstItem?.store_phone || '').trim();
+        const itemStoreLat = Number.isFinite(Number(firstItem?.store_latitude))
+          ? Number(firstItem.store_latitude)
+          : null;
+        const itemStoreLng = Number.isFinite(Number(firstItem?.store_longitude))
+          ? Number(firstItem.store_longitude)
+          : null;
 
         if (active) {
           if (!product) {
             setProduct({
               id: String(part?.id || firstItem?.id || '').trim(),
               storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
-              name: String(part?.name || firstItem?.name || '').trim(),
-              shop: String(store?.store_name || store?.name || '').trim(),
+              name: String(part?.name || firstItem?.part_name || firstItem?.name || '').trim(),
+              shop: String(itemStoreName || store?.store_name || store?.name || '').trim(),
               price: Number(part?.price || firstItem?.price || 0),
               images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
-              shopCoordinates: store?.coordinates || null,
-              latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
-              longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
+              shopCoordinates: itemStoreLat !== null && itemStoreLng !== null
+                ? { latitude: itemStoreLat, longitude: itemStoreLng }
+                : (store?.coordinates || null),
+              latitude: itemStoreLat ?? store?.coordinates?.latitude ?? part?.latitude ?? null,
+              longitude: itemStoreLng ?? store?.coordinates?.longitude ?? part?.longitude ?? null,
             });
           }
           if (!seller) {
             setSeller({
               storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
-              name: String(store?.store_name || store?.name || '').trim(),
+              name: String(itemStoreName || store?.store_name || store?.name || '').trim(),
               avatar: store?.logo || store?.avatar || '',
-              phone: String(store?.phone || store?.phone_number || '').trim(),
+              phone: itemStorePhone || String(store?.phone || store?.phone_number || '').trim(),
               isActive: Boolean(store?.is_active ?? true),
-              coordinates: store?.coordinates || null,
+              coordinates: itemStoreLat !== null && itemStoreLng !== null
+                ? { latitude: itemStoreLat, longitude: itemStoreLng }
+                : (store?.coordinates || null),
             });
           }
           if (!pickupAddress) {

@@ -35,26 +35,42 @@ const formatStoreAddress = (value) => {
   return [street, city, state, country].filter(Boolean).join(', ');
 };
 
-const mapPartToProduct = (part) => ({
-  id: String(part?.id || part?._id || ''),
-  storeId: String(part?.store_id || part?.store?.id || '').trim(),
-  name: String(part?.name || part?.title || 'Spare part'),
-  price: Number(part?.price || 0),
-  shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
-  location: formatStoreAddress(part?.store_address),
-  storeAddress: formatStoreAddress(part?.store_address),
-  rating: Number(part?.rating ?? part?.average_rating ?? 0),
-  reviews: Number(part?.reviews || part?.review_count || 0),
-  images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
-  store: {
-    ...(part?.store || {}),
-    name: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
-    address: String(part?.store?.address || formatStoreAddress(part?.store_address) || '').trim(),
-  },
-  shopCoordinates: part?.store?.coordinates || null,
-  latitude: part?.store?.coordinates?.latitude ?? part?.latitude ?? null,
-  longitude: part?.store?.coordinates?.longitude ?? part?.longitude ?? null,
-});
+const mapPartToProduct = (part) => {
+  const latitude = Number.isFinite(Number(part?.store_latitude))
+    ? Number(part.store_latitude)
+    : (part?.store?.coordinates?.latitude ?? part?.latitude ?? null);
+  const longitude = Number.isFinite(Number(part?.store_longitude))
+    ? Number(part.store_longitude)
+    : (part?.store?.coordinates?.longitude ?? part?.longitude ?? null);
+  const storePhone = String(
+    part?.store_phone || part?.store?.phone || part?.store?.phone_number || ''
+  ).trim();
+
+  return {
+    id: String(part?.id || part?._id || ''),
+    storeId: String(part?.store_id || part?.store?.id || '').trim(),
+    name: String(part?.name || part?.title || 'Spare part'),
+    price: Number(part?.price || 0),
+    shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+    location: formatStoreAddress(part?.store_address),
+    storeAddress: formatStoreAddress(part?.store_address),
+    rating: Number(part?.rating ?? part?.average_rating ?? 0),
+    reviews: Number(part?.reviews || part?.review_count || 0),
+    images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+    storePhone,
+    store: {
+      ...(part?.store || {}),
+      name: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+      address: String(part?.store?.address || formatStoreAddress(part?.store_address) || '').trim(),
+      phone: storePhone || undefined,
+    },
+    shopCoordinates: Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))
+      ? { latitude: Number(latitude), longitude: Number(longitude) }
+      : (part?.store?.coordinates || null),
+    latitude,
+    longitude,
+  };
+};
 
 const SKELETON_ITEMS = Array.from({ length: 6 }).map((_, index) => ({
   id: `skeleton-${index}`,

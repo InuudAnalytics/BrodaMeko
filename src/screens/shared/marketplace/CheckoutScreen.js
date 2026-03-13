@@ -56,12 +56,14 @@ const extractShopCoordinates = (product) => {
   const latitude =
     toFiniteNumber(source?.latitude) ??
     toFiniteNumber(source?.lat) ??
+    toFiniteNumber(product?.storeLatitude) ??
     toFiniteNumber(product?.latitude) ??
     toFiniteNumber(product?.lat);
   const longitude =
     toFiniteNumber(source?.longitude) ??
     toFiniteNumber(source?.lng) ??
     toFiniteNumber(source?.lon) ??
+    toFiniteNumber(product?.storeLongitude) ??
     toFiniteNumber(product?.longitude) ??
     toFiniteNumber(product?.lng);
 
@@ -243,6 +245,8 @@ const CheckoutScreen = ({ navigation, route }) => {
     pickFirstDefined(
       product?.store?.description,
       hydratedPart?.store?.description,
+      product?.storePhone,
+      hydratedPart?.store_phone,
       product?.store?.phone,
       hydratedPart?.store?.phone,
       hydratedPart?.store?.phone_number
@@ -252,6 +256,8 @@ const CheckoutScreen = ({ navigation, route }) => {
 
   const resolvedStorePhone = String(
     pickFirstDefined(
+      product?.storePhone,
+      hydratedPart?.store_phone,
       product?.store?.phone,
       hydratedPart?.store?.phone,
       hydratedPart?.store?.phone_number,
@@ -371,16 +377,20 @@ const CheckoutScreen = ({ navigation, route }) => {
           product?.shopCoordinates ||
           hydratedPart?.store?.coordinates ||
           {
-            latitude: hydratedPart?.store?.latitude,
-            longitude: hydratedPart?.store?.longitude,
+            latitude: pickFirstDefined(hydratedPart?.store_latitude, hydratedPart?.store?.latitude),
+            longitude: pickFirstDefined(hydratedPart?.store_longitude, hydratedPart?.store?.longitude),
           },
+        storeLatitude: pickFirstDefined(product?.storeLatitude, hydratedPart?.store_latitude),
+        storeLongitude: pickFirstDefined(product?.storeLongitude, hydratedPart?.store_longitude),
         latitude: pickFirstDefined(
           product?.latitude,
+          hydratedPart?.store_latitude,
           hydratedPart?.store?.latitude,
           hydratedPart?.latitude
         ),
         longitude: pickFirstDefined(
           product?.longitude,
+          hydratedPart?.store_longitude,
           hydratedPart?.store?.longitude,
           hydratedPart?.longitude
         ),

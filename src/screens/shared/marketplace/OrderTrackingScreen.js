@@ -17,6 +17,7 @@ import {
   receivedMarketplaceOrderItem,
 } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 const PANEL_MAX_DOWN = 520;
@@ -113,7 +114,7 @@ const readItemId = (item) => String(item?.id || item?._id || '').trim();
 
 const readItemName = (item) => {
   const part = item?.part || item?.product || item?.spare_part || {};
-  return String(part?.name || item?.name || 'Item').trim() || 'Item';
+  return String(part?.name || item?.part_name || item?.name || 'Item').trim() || 'Item';
 };
 
 const readItemStatus = (item) => String(item?.status || '').trim().toLowerCase();
@@ -133,6 +134,14 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
   const itemId = readItemId(activeItem) || preferredItemId;
   const part = activeItem?.part || activeItem?.product || activeItem?.spare_part || {};
   const store = part?.store || data?.store || data?.seller || {};
+  const itemStoreName = String(activeItem?.store_name || '').trim();
+  const itemStorePhone = String(activeItem?.store_phone || '').trim();
+  const itemStoreLat = Number.isFinite(Number(activeItem?.store_latitude))
+    ? Number(activeItem.store_latitude)
+    : null;
+  const itemStoreLng = Number.isFinite(Number(activeItem?.store_longitude))
+    ? Number(activeItem.store_longitude)
+    : null;
   const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
   const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
   const backendServiceCharge = toMoney(
@@ -143,21 +152,25 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
   const resolvedProduct = {
     name: part?.name || activeItem?.name || fallbackProduct.name,
     price: part?.price || activeItem?.price || fallbackProduct.price,
-    shop: store?.store_name || store?.name || fallbackProduct.shop,
+    shop: itemStoreName || store?.store_name || store?.name || fallbackProduct.shop,
     storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
     images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
-    latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
-    longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
-    shopCoordinates: store?.coordinates || null,
+    latitude: itemStoreLat ?? store?.coordinates?.latitude ?? part?.latitude ?? null,
+    longitude: itemStoreLng ?? store?.coordinates?.longitude ?? part?.longitude ?? null,
+    shopCoordinates: itemStoreLat !== null && itemStoreLng !== null
+      ? { latitude: itemStoreLat, longitude: itemStoreLng }
+      : (store?.coordinates || null),
   };
 
   const resolvedSeller = {
-    name: store?.store_name || store?.name || fallbackSeller.name,
+    name: itemStoreName || store?.store_name || store?.name || fallbackSeller.name,
     storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
     avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
-    phone: String(store?.phone || store?.phone_number || '').trim(),
+    phone: itemStorePhone || String(store?.phone || store?.phone_number || '').trim(),
     isActive: Boolean(store?.is_active ?? true),
-    coordinates: store?.coordinates || null,
+    coordinates: itemStoreLat !== null && itemStoreLng !== null
+      ? { latitude: itemStoreLat, longitude: itemStoreLng }
+      : (store?.coordinates || null),
   };
 
   const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
@@ -173,7 +186,7 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
     deliveryAddress: resolvedAddress,
     storeName: resolvedSeller.name,
     storeAddress: store?.address || resolvedAddress || prev?.storeAddress,
-    storeInfo: store?.description || store?.phone || prev?.storeInfo,
+    storeInfo: store?.description || itemStorePhone || store?.phone || prev?.storeInfo,
     statusTimeline: extractTimeline(readItemStatus(activeItem) || data?.status),
     itemId: itemId || prev?.itemId || '',
     orderItems: trackingItems,
@@ -387,6 +400,16 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     AppAlert.alert('Report issue', 'Issue reporting will be wired soon.');
   };
 
+  const handleOpenStoreDetails = () => {
+    const storeId = String(
+      product?.storeId || seller?.storeId || route?.params?.storeId || route?.params?.store_id || ''
+    ).trim();
+    if (!storeId) {
+      return;
+    }
+    navigation.navigate(ROUTES.STORE_DETAILS, { storeId });
+  };
+
   const applyOrderData = useMemo(
     () => (data, selectedId = '') => {
       setOrderState((prev) => mapOrderToState({ data, prev, selectedItemId: selectedId }));
@@ -563,12 +586,12 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <AppText style={styles.addressLabel}>Delivery address</AppText>
               <AppText style={styles.addressValue}>{deliveryAddress}</AppText>
             </View>
-            <View style={styles.addressRow}>
+            <TouchableOpacity style={styles.addressRow} activeOpacity={0.88} onPress={handleOpenStoreDetails}>
               <AppText style={styles.addressLabel}>Store</AppText>
               <AppText style={styles.addressValue}>{storeName}</AppText>
               <AppText style={styles.addressSubValue}>{storeAddress}</AppText>
               <AppText style={styles.addressHint}>{storeInfo}</AppText>
-            </View>
+            </TouchableOpacity>
             <View style={styles.addressRow}>
               <AppText style={styles.addressHint}>
                 You are currently seeing your live location and the store pin while delivery-driver routing is pending.
@@ -617,23 +640,25 @@ const OrderTrackingScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.sellerCard}>
-              <View style={styles.sellerAvatarWrap}>
-                {seller?.avatar ? (
-                  <Image
-                    source={{ uri: resolveImageUri(seller.avatar) }}
-                    style={styles.sellerAvatar}
-                  />
-                ) : (
-                  <View style={styles.sellerAvatarPlaceholder} />
-                )}
-                {seller?.isActive ? <View style={styles.activeDot} /> : null}
-              </View>
-              <View style={styles.sellerInfo}>
-                <AppText style={styles.sellerName}>
-                  {seller?.name || 'Seller'}
-                </AppText>
-                <AppText style={styles.sellerStatus}>Active now</AppText>
-              </View>
+              <TouchableOpacity style={styles.sellerInfoTap} activeOpacity={0.88} onPress={handleOpenStoreDetails}>
+                <View style={styles.sellerAvatarWrap}>
+                  {seller?.avatar ? (
+                    <Image
+                      source={{ uri: resolveImageUri(seller.avatar) }}
+                      style={styles.sellerAvatar}
+                    />
+                  ) : (
+                    <View style={styles.sellerAvatarPlaceholder} />
+                  )}
+                  {seller?.isActive ? <View style={styles.activeDot} /> : null}
+                </View>
+                <View style={styles.sellerInfo}>
+                  <AppText style={styles.sellerName}>
+                    {seller?.name || 'Seller'}
+                  </AppText>
+                  <AppText style={styles.sellerStatus}>Active now</AppText>
+                </View>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.messageBtn}
                 onPress={handleCallSeller}
@@ -913,6 +938,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: darkTheme.spacing.lg,
+  },
+  sellerInfoTap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sellerAvatarWrap: {
     position: 'relative',

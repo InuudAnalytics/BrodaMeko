@@ -173,6 +173,7 @@ const normalizeApiMessage = (item, fallbackConversationId = '') => {
   ).trim();
   const rawAmountValue = Number(
     item?.amount ??
+      item?.quotation_amount ??
       item?.quoted_amount ??
       item?.quote_amount ??
       item?.price ??

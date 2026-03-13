@@ -119,6 +119,16 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             }
           }
 
+          const storeLatitude = Number.isFinite(Number(part?.store_latitude))
+            ? Number(part.store_latitude)
+            : (part?.store?.coordinates?.latitude ?? part?.latitude ?? null);
+          const storeLongitude = Number.isFinite(Number(part?.store_longitude))
+            ? Number(part.store_longitude)
+            : (part?.store?.coordinates?.longitude ?? part?.longitude ?? null);
+          const storePhone = String(
+            part?.store_phone || part?.store?.phone || part?.store?.phone_number || ''
+          ).trim();
+
           setProduct({
             id: String(part?.id || part?._id || id),
             storeId: resolvedStoreId,
@@ -133,10 +143,16 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             delivery: String(part?.delivery || '').trim(),
             description: String(part?.description || ''),
             images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
-            store: part?.store || null,
-            shopCoordinates: part?.store?.coordinates || null,
-            latitude: part?.store?.coordinates?.latitude ?? part?.latitude ?? null,
-            longitude: part?.store?.coordinates?.longitude ?? part?.longitude ?? null,
+            storePhone,
+            store: {
+              ...(part?.store || {}),
+              phone: storePhone || part?.store?.phone || part?.store?.phone_number,
+            },
+            shopCoordinates: Number.isFinite(Number(storeLatitude)) && Number.isFinite(Number(storeLongitude))
+              ? { latitude: Number(storeLatitude), longitude: Number(storeLongitude) }
+              : (part?.store?.coordinates || null),
+            latitude: storeLatitude,
+            longitude: storeLongitude,
           });
           setLoadError('');
         } else if (active) {
