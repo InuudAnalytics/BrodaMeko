@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, Linking, PanResponder, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -104,6 +104,85 @@ const normalizeOrderPayload = (payload) => {
   return payload;
 };
 
+const extractOrderItems = (data) => {
+  const items = data?.items || data?.order_items || data?.products || [];
+  return Array.isArray(items) ? items : [];
+};
+
+const readItemId = (item) => String(item?.id || item?._id || '').trim();
+
+const readItemName = (item) => {
+  const part = item?.part || item?.product || item?.spare_part || {};
+  return String(part?.name || item?.name || 'Item').trim() || 'Item';
+};
+
+const readItemStatus = (item) => String(item?.status || '').trim().toLowerCase();
+
+const toTrackingItem = (item, index) => ({
+  id: readItemId(item) || `item-${index}`,
+  name: readItemName(item),
+  status: readItemStatus(item),
+});
+
+const mapOrderToState = ({ data, prev, selectedItemId }) => {
+  const items = extractOrderItems(data);
+  const trackingItems = items.map(toTrackingItem);
+  const preferredItemId = String(selectedItemId || prev?.itemId || '').trim();
+  const activeItem =
+    items.find((entry) => readItemId(entry) === preferredItemId) || items[0] || {};
+  const itemId = readItemId(activeItem) || preferredItemId;
+  const part = activeItem?.part || activeItem?.product || activeItem?.spare_part || {};
+  const store = part?.store || data?.store || data?.seller || {};
+  const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
+  const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
+  const backendServiceCharge = toMoney(
+    data?.service_charge,
+    backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
+  );
+
+  const resolvedProduct = {
+    name: part?.name || activeItem?.name || fallbackProduct.name,
+    price: part?.price || activeItem?.price || fallbackProduct.price,
+    shop: store?.store_name || store?.name || fallbackProduct.shop,
+    storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
+    images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
+    latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
+    longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
+    shopCoordinates: store?.coordinates || null,
+  };
+
+  const resolvedSeller = {
+    name: store?.store_name || store?.name || fallbackSeller.name,
+    storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
+    avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
+    phone: String(store?.phone || store?.phone_number || '').trim(),
+    isActive: Boolean(store?.is_active ?? true),
+    coordinates: store?.coordinates || null,
+  };
+
+  const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
+  const resolvedAddress =
+    addressPayload?.street
+      ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
+      : data?.delivery_address_text || fallbackAddress;
+
+  return {
+    ...prev,
+    product: resolvedProduct,
+    seller: resolvedSeller,
+    deliveryAddress: resolvedAddress,
+    storeName: resolvedSeller.name,
+    storeAddress: store?.address || resolvedAddress || prev?.storeAddress,
+    storeInfo: store?.description || store?.phone || prev?.storeInfo,
+    statusTimeline: extractTimeline(readItemStatus(activeItem) || data?.status),
+    itemId: itemId || prev?.itemId || '',
+    orderItems: trackingItems,
+    subtotal: computedSubtotal || prev?.subtotal || 0,
+    serviceCharge: backendServiceCharge || prev?.serviceCharge || 0,
+    totalAmount: backendTotal || prev?.totalAmount || computedSubtotal + backendServiceCharge,
+  };
+};
+
 const extractTimeline = (statusValue) => {
   const status = String(statusValue || '').toLowerCase();
   const steps = [
@@ -154,6 +233,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       : fallbackTimeline,
     orderId: route?.params?.orderId || route?.params?.order_id || '',
     itemId: route?.params?.itemId || '',
+    orderItems: [],
     subtotal: toMoney(route?.params?.subtotal),
     serviceCharge: toMoney(route?.params?.serviceCharge),
     totalAmount: toMoney(
@@ -161,6 +241,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       toMoney(route?.params?.subtotal) + toMoney(route?.params?.serviceCharge),
     ),
   });
+  const [orderData, setOrderData] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [orderError, setOrderError] = useState('');
 
@@ -174,6 +255,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     statusTimeline,
     orderId,
     itemId,
+    orderItems,
     subtotal,
     serviceCharge,
     totalAmount,
@@ -210,14 +292,14 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   };
   const imageUri = resolveImageUri(product?.images?.[0]);
 
-  const animatePanelTo = toValue => {
+  const animatePanelTo = useCallback((toValue) => {
     Animated.spring(panelY, {
       toValue,
       useNativeDriver: true,
       friction: 9,
       tension: 55,
     }).start();
-  };
+  }, [panelY]);
 
   const panResponder = useMemo(
     () =>
@@ -242,7 +324,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
           }
         },
       }),
-    [panelY],
+    [animatePanelTo, panelY],
   );
 
   useEffect(() => {
@@ -305,8 +387,15 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     AppAlert.alert('Report issue', 'Issue reporting will be wired soon.');
   };
 
-  useEffect(() => {
-    const fetchOrder = async () => {
+  const applyOrderData = useMemo(
+    () => (data, selectedId = '') => {
+      setOrderState((prev) => mapOrderToState({ data, prev, selectedItemId: selectedId }));
+    },
+    []
+  );
+
+  const fetchOrderDetails = useMemo(
+    () => async (preferredItemId = '') => {
       if (!orderId) {
         return;
       }
@@ -316,66 +405,28 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       try {
         const response = await getMarketplaceOrder(orderId);
         const data = normalizeOrderPayload(response);
-        const items = data?.items || data?.order_items || data?.products || [];
-        const item = items?.[0] || {};
-        const part = item?.part || item?.product || item?.spare_part || {};
-        const store = part?.store || data?.store || data?.seller || {};
-        const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
-        const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
-        const backendServiceCharge = toMoney(
-          data?.service_charge,
-          backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
-        );
-
-        const resolvedProduct = {
-          name: part?.name || item?.name || fallbackProduct.name,
-          price: part?.price || item?.price || fallbackProduct.price,
-          shop: store?.store_name || store?.name || fallbackProduct.shop,
-          storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
-          images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
-          latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
-          longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
-          shopCoordinates: store?.coordinates || null,
-        };
-
-        const resolvedSeller = {
-          name: store?.store_name || store?.name || fallbackSeller.name,
-          storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
-          avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
-          phone: String(store?.phone || store?.phone_number || '').trim(),
-          isActive: Boolean(store?.is_active ?? true),
-          coordinates: store?.coordinates || null,
-        };
-
-        const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
-        const resolvedAddress =
-          addressPayload?.street
-            ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
-            : data?.delivery_address_text || fallbackAddress;
-
-        setOrderState((prev) => ({
-          ...prev,
-          product: resolvedProduct,
-          seller: resolvedSeller,
-          deliveryAddress: resolvedAddress,
-          storeName: resolvedSeller.name,
-          storeAddress: store?.address || resolvedAddress || prev.storeAddress,
-          storeInfo: store?.description || store?.phone || prev.storeInfo,
-          statusTimeline: extractTimeline(item?.status || data?.status),
-          itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
-          subtotal: computedSubtotal || prev.subtotal,
-          serviceCharge: backendServiceCharge || prev.serviceCharge,
-          totalAmount: backendTotal || prev.totalAmount || computedSubtotal + backendServiceCharge,
-        }));
+        setOrderData(data);
+        applyOrderData(data, preferredItemId || itemId);
       } catch (error) {
         setOrderError(error?.message || 'Could not load order details.');
       } finally {
         setLoadingOrder(false);
       }
-    };
+    },
+    [applyOrderData, itemId, orderId]
+  );
 
-    fetchOrder();
-  }, [orderId]);
+  const handleSelectOrderItem = (selectedId) => {
+    const safeSelectedId = String(selectedId || '').trim();
+    if (!safeSelectedId || !orderData) {
+      return;
+    }
+    applyOrderData(orderData, safeSelectedId);
+  };
+
+  useEffect(() => {
+    fetchOrderDetails(itemId);
+  }, [fetchOrderDetails, itemId]);
 
   return (
     <View style={styles.root}>
@@ -431,72 +482,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               refreshControl={
                 <RefreshControl
                   refreshing={loadingOrder}
-                  onRefresh={async () => {
-                    if (!orderId) {
-                      return;
-                    }
-                    setLoadingOrder(true);
-                    setOrderError('');
-                    try {
-                      const response = await getMarketplaceOrder(orderId);
-                      const data = normalizeOrderPayload(response);
-                      const items = data?.items || data?.order_items || data?.products || [];
-                      const item = items?.[0] || {};
-                      const part = item?.part || item?.product || item?.spare_part || {};
-                      const store = part?.store || data?.store || data?.seller || {};
-                      const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
-                      const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
-                      const backendServiceCharge = toMoney(
-                        data?.service_charge,
-                        backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
-                      );
-
-                      const resolvedProduct = {
-                        name: part?.name || item?.name || fallbackProduct.name,
-                        price: part?.price || item?.price || fallbackProduct.price,
-                        shop: store?.store_name || store?.name || fallbackProduct.shop,
-                        storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
-                        images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
-                        latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
-                        longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
-                        shopCoordinates: store?.coordinates || null,
-                      };
-
-                      const resolvedSeller = {
-                        name: store?.store_name || store?.name || fallbackSeller.name,
-                        storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
-                        avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
-                        phone: String(store?.phone || store?.phone_number || '').trim(),
-                        isActive: Boolean(store?.is_active ?? true),
-                        coordinates: store?.coordinates || null,
-                      };
-
-                      const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
-                      const resolvedAddress =
-                        addressPayload?.street
-                          ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
-                          : data?.delivery_address_text || fallbackAddress;
-
-                      setOrderState((prev) => ({
-                        ...prev,
-                        product: resolvedProduct,
-                        seller: resolvedSeller,
-                        deliveryAddress: resolvedAddress,
-                        storeName: resolvedSeller.name,
-                        storeAddress: store?.address || resolvedAddress || prev.storeAddress,
-                        storeInfo: store?.description || store?.phone || prev.storeInfo,
-                        statusTimeline: extractTimeline(item?.status || data?.status),
-                        itemId: String(item?.id || item?._id || prev.itemId || '').trim(),
-                        subtotal: computedSubtotal || prev.subtotal,
-                        serviceCharge: backendServiceCharge || prev.serviceCharge,
-                        totalAmount: backendTotal || prev.totalAmount || computedSubtotal + backendServiceCharge,
-                      }));
-                    } catch (error) {
-                      setOrderError(error?.message || 'Could not load order details.');
-                    } finally {
-                      setLoadingOrder(false);
-                    }
-                  }}
+                  onRefresh={() => fetchOrderDetails(itemId)}
                   tintColor="transparent"
                   colors={['transparent']}
                 />
@@ -588,6 +574,31 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                 You are currently seeing your live location and the store pin while delivery-driver routing is pending.
               </AppText>
             </View>
+            {orderItems.length > 1 ? (
+              <View style={styles.itemSelectorBlock}>
+                <AppText style={styles.itemSelectorTitle}>Order items</AppText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.itemSelectorWrap}>
+                  {orderItems.map((entry) => {
+                    const selected = entry.id === itemId;
+                    return (
+                      <TouchableOpacity
+                        key={entry.id}
+                        style={[styles.itemChip, selected ? styles.itemChipActive : null]}
+                        activeOpacity={0.85}
+                        onPress={() => handleSelectOrderItem(entry.id)}
+                      >
+                        <AppText style={[styles.itemChipName, selected ? styles.itemChipNameActive : null]} numberOfLines={1}>
+                          {entry.name}
+                        </AppText>
+                        <AppText style={[styles.itemChipStatus, selected ? styles.itemChipStatusActive : null]}>
+                          {entry.status || 'pending'}
+                        </AppText>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : null}
 
             <View style={styles.summaryCard}>
               <AppText style={styles.summaryTitle}>Payment summary</AppText>
@@ -642,7 +653,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <AppButton
                 label="Confirm delivery"
                 onPress={handleConfirmDelivery}
-                disabled={loadingOrder}
+                disabled={loadingOrder || !itemId}
               />
               <TouchableOpacity
                 style={styles.secondaryAction}
@@ -828,6 +839,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginTop: 6,
+  },
+  itemSelectorBlock: {
+    marginBottom: darkTheme.spacing.md,
+  },
+  itemSelectorTitle: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  itemSelectorWrap: {
+    columnGap: 8,
+    paddingRight: 10,
+  },
+  itemChip: {
+    minWidth: 124,
+    maxWidth: 180,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  itemChipActive: {
+    borderColor: 'rgba(230,199,20,0.75)',
+    backgroundColor: 'rgba(230,199,20,0.14)',
+  },
+  itemChipName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  itemChipNameActive: {
+    color: '#F4DE7A',
+  },
+  itemChipStatus: {
+    marginTop: 3,
+    color: '#9CA3AF',
+    fontSize: 11,
+    textTransform: 'capitalize',
+  },
+  itemChipStatusActive: {
+    color: '#F4DE7A',
   },
   addressRow: {
     marginBottom: darkTheme.spacing.lg,
