@@ -18,6 +18,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = BrodaMekoBare/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = BrodaMekoBare/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = BrodaMekoBare/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1A5D8F3E6B2C4D7E8F901234 /* BrodaMekoBare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = BrodaMekoBare.entitlements; path = BrodaMekoBare/BrodaMekoBare.entitlements; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-BrodaMekoBare.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BrodaMekoBare.debug.xcconfig"; path = "Target Support Files/Pods-BrodaMekoBare/Pods-BrodaMekoBare.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-BrodaMekoBare.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-BrodaMekoBare.release.xcconfig"; path = "Target Support Files/Pods-BrodaMekoBare/Pods-BrodaMekoBare.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-BrodaMekoBare.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BrodaMekoBare.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -46,6 +47,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				1A5D8F3E6B2C4D7E8F901234 /* BrodaMekoBare.entitlements */,
 			);
 			name = BrodaMekoBare;
 			sourceTree = "<group>";
@@ -257,6 +259,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BrodaMekoBare/BrodaMekoBare.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = BrodaMekoBare/Info.plist;
@@ -285,6 +288,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BrodaMekoBare/BrodaMekoBare.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = BrodaMekoBare/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
