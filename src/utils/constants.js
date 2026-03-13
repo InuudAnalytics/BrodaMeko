@@ -42,6 +42,7 @@ export const ROUTES = {
   CAR_OWNER_RATE_MECHANIC: 'CarOwnerRateMechanic',
   CAR_OWNER_MECHANIC_DETAILS: 'CarOwnerMechanicDetails',
   CAR_OWNER_MECHANIC_REVIEWS: 'CarOwnerMechanicReviews',
+  STORE_DETAILS: 'StoreDetails',
   CAR_OWNER_PICKUP_TRACKING: 'CarOwnerPickupTracking',
   CAR_OWNER_EDIT_JOB: 'CarOwnerEditJob',
   CHANGE_PASSWORD: 'ChangePassword',

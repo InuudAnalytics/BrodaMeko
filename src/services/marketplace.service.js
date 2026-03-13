@@ -18,6 +18,19 @@ export const getMarketplacePart = async (partId) => {
   return response.data;
 };
 
+export const getMarketplaceStore = async (storeId) => {
+  const safeId = String(storeId || '').trim();
+  if (!safeId) {
+    const error = new Error('storeId is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.get(ENDPOINTS.marketplace.storeDetails(safeId));
+  return response.data;
+};
+
 export const getMarketplaceCart = async () => {
   const response = await api.get(ENDPOINTS.marketplace.cart);
   return response.data;
@@ -140,6 +153,7 @@ export const sellerConfirmMarketplacePickup = async (orderId, pickupCode) => {
 export default {
   getMarketplaceParts,
   getMarketplacePart,
+  getMarketplaceStore,
   getMarketplaceCart,
   addMarketplaceCartItem,
   updateMarketplaceCartItem,
