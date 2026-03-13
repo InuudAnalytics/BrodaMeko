@@ -44,6 +44,7 @@ import MarketplacePaymentSuccessScreen from '../screens/shared/marketplace/Payme
 import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
 import OrderTrackingScreen from '../screens/shared/marketplace/OrderTrackingScreen';
 import PickupTrackingScreen from '../screens/shared/marketplace/PickupTrackingScreen';
+import StoreDetailsScreen from '../screens/shared/marketplace/StoreDetailsScreen';
 import RateProductScreen from '../screens/shared/marketplace/RateProductScreen';
 import OrderDeliveredSuccessScreen from '../screens/shared/marketplace/OrderDeliveredSuccessScreen';
 import ProductFeedbackSuccessScreen from '../screens/shared/marketplace/ProductFeedbackSuccessScreen';
@@ -84,6 +85,7 @@ const CarOwnerStack = () => {
       />
       <Stack.Screen name="Favorites" component={FavoritesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.STORE_DETAILS} component={StoreDetailsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="Cart"
         component={CartScreen}

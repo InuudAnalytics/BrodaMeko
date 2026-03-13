@@ -1,4 +1,3 @@
-export { default as AnimatedLogo } from './AnimatedLogo';
 export { default as AppBottomNav } from './AppBottomNav';
 export { default as AppAlert } from './AppAlert';
 export { AppAlertProvider } from './AppAlert';
@@ -13,7 +12,6 @@ export { default as LiftableTextInput } from './LiftableTextInput';
 export { default as AuthMethodToggle } from './AuthMethodToggle';
 export { default as DividerOr } from './DividerOr';
 export { default as GoogleButton } from './GoogleButton';
-export { default as LogoLockup } from './LogoLockup';
 export { default as OpenStreetMapView } from './OpenStreetMapView';
 export { default as ScreenContainer } from './ScreenContainer';
 export { default as NigerianPhoneInput } from './NigerianPhoneInput';

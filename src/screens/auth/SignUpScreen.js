@@ -419,13 +419,31 @@ const SignUpScreen = ({ navigation, route }) => {
                       ) : null}
                     </View>
                   </TouchableOpacity>
-                  <AppText variant="muted">I accept our </AppText>
+                  <AppText variant="muted" style={styles.acceptTermsText}>
+                    I agree to the
+                  </AppText>
                   <TouchableOpacity
                     onPress={openTermsSheet}
                     activeOpacity={0.85}
                   >
                     <AppText variant="muted" style={styles.termsLink}>
-                      terms and conditions
+                      Terms & Conditions
+                    </AppText>
+                  </TouchableOpacity>
+                  <AppText variant="muted" style={styles.acceptTermsText}>
+                    {' '}
+                    and{' '}
+                  </AppText>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      navigation.navigate(ROUTES.PRIVACY_POLICY, {
+                        documentType: 'privacy',
+                      })
+                    }
+                  >
+                    <AppText variant="muted" style={styles.termsLink}>
+                      Privacy Policy
                     </AppText>
                   </TouchableOpacity>
                 </View>
@@ -636,7 +654,11 @@ const styles = StyleSheet.create({
     marginTop: darkTheme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+  },
+  acceptTermsText: {
+    fontSize: 12,
+    lineHeight: 14,
   },
   acceptTermsCheckbox: {
     marginRight: darkTheme.spacing.xs,
@@ -644,8 +666,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   acceptTermsCheckboxBox: {
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: darkTheme.colors.muted,
@@ -657,6 +679,8 @@ const styles = StyleSheet.create({
     borderColor: darkTheme.colors.accent,
   },
   termsLink: {
+    fontSize: 11,
+    lineHeight: 14,
     color: darkTheme.colors.accent,
     textDecorationLine: 'none',
   },
