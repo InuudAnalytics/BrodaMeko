@@ -30,7 +30,12 @@ import {
 import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
 import { BASE_URL } from '../../../config/endpoints';
 import { useAuth } from '../../../context';
-import { deleteAccount as deleteAccountService } from '../../../services/auth.service';
+import {
+  addRecoveryEmail as addRecoveryEmailService,
+  deleteAccount as deleteAccountService,
+  removeRecoveryEmail as removeRecoveryEmailService,
+  verifyRecoveryEmail as verifyRecoveryEmailService,
+} from '../../../services/auth.service';
 import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
@@ -39,6 +44,7 @@ const getSettingsRows = (role) => {
   const rows = [
     { key: 'personal', label: 'Personal information', icon: User02Icon },
     { key: 'bank', label: 'Bank details', icon: BankIcon },
+    { key: 'recovery_email', label: 'Recovery email', icon: Alert01Icon },
     { key: 'address', label: 'Address', icon: Location01Icon },
   ];
 
@@ -121,11 +127,17 @@ const SettingRow = ({ label, icon, onPress, isLast, tone }) => {
 };
 
 const UserProfileScreen = ({ navigation, onBack }) => {
-  const { user, role, signOut, isLoading } = useAuth();
+  const { user, role, signOut, isLoading, refreshUserProfile } = useAuth();
   const [totalJobs, setTotalJobs] = useState(0);
   const [rating, setRating] = useState(0);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showSupportSheet, setShowSupportSheet] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryEmailInput, setRecoveryEmailInput] = useState('');
+  const [recoveryOtpInput, setRecoveryOtpInput] = useState('');
+  const [recoveryStatusText, setRecoveryStatusText] = useState('');
+  const [recoveryError, setRecoveryError] = useState('');
+  const [isRecoveryBusy, setIsRecoveryBusy] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -138,6 +150,10 @@ const UserProfileScreen = ({ navigation, onBack }) => {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join('') || 'U';
+  const currentRecoveryEmail = String(user?.recovery_email || user?.recoveryEmail || '').trim();
+  const currentRecoveryVerified = Boolean(
+    user?.recovery_email_verified ?? user?.recoveryEmailVerified ?? false
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -215,6 +231,76 @@ const UserProfileScreen = ({ navigation, onBack }) => {
     }
   };
 
+  const handleOpenRecoveryModal = () => {
+    setRecoveryEmailInput(currentRecoveryEmail);
+    setRecoveryOtpInput('');
+    setRecoveryError('');
+    setRecoveryStatusText('');
+    setShowRecoveryModal(true);
+  };
+
+  const handleSendRecoveryOtp = async () => {
+    const safeEmail = String(recoveryEmailInput || '').trim().toLowerCase();
+    if (!safeEmail) {
+      setRecoveryError('Recovery email is required.');
+      return;
+    }
+
+    setIsRecoveryBusy(true);
+    setRecoveryError('');
+    setRecoveryStatusText('');
+
+    try {
+      const response = await addRecoveryEmailService({ recoveryEmail: safeEmail });
+      setRecoveryStatusText(response?.message || 'OTP sent to recovery email.');
+      await refreshUserProfile?.();
+    } catch (error) {
+      setRecoveryError(error?.message || 'Could not add recovery email.');
+    } finally {
+      setIsRecoveryBusy(false);
+    }
+  };
+
+  const handleVerifyRecoveryOtp = async () => {
+    const safeOtp = String(recoveryOtpInput || '').trim();
+    if (!safeOtp) {
+      setRecoveryError('OTP is required.');
+      return;
+    }
+
+    setIsRecoveryBusy(true);
+    setRecoveryError('');
+    setRecoveryStatusText('');
+
+    try {
+      const response = await verifyRecoveryEmailService({ otp: safeOtp });
+      setRecoveryStatusText(response?.message || 'Recovery email verified.');
+      setRecoveryOtpInput('');
+      await refreshUserProfile?.();
+    } catch (error) {
+      setRecoveryError(error?.message || 'Could not verify recovery email.');
+    } finally {
+      setIsRecoveryBusy(false);
+    }
+  };
+
+  const handleRemoveRecoveryEmail = async () => {
+    setIsRecoveryBusy(true);
+    setRecoveryError('');
+    setRecoveryStatusText('');
+
+    try {
+      const response = await removeRecoveryEmailService();
+      setRecoveryEmailInput('');
+      setRecoveryOtpInput('');
+      setRecoveryStatusText(response?.message || 'Recovery email removed.');
+      await refreshUserProfile?.();
+    } catch (error) {
+      setRecoveryError(error?.message || 'Could not remove recovery email.');
+    } finally {
+      setIsRecoveryBusy(false);
+    }
+  };
 
   const handlePersonalInfo = () => {
     if (role === ROLES.MECH) {
@@ -323,6 +409,10 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                   navigation.navigate(ROUTES.PROFILE_BANK_DETAILS);
                   return;
                 }
+                if (row.key === 'recovery_email') {
+                  handleOpenRecoveryModal();
+                  return;
+                }
                 if (row.key === 'address') {
                   if (role === ROLES.MECH) {
                     navigation.navigate(ROUTES.MECH_ADDRESS);
@@ -395,6 +485,94 @@ const UserProfileScreen = ({ navigation, onBack }) => {
             <SettingRow label="Support center" icon={HelpCircleIcon} onPress={() => handleSupportAction('support_center')} />
             <SettingRow label="Chat with BrodaMeko" icon={Notification01Icon} onPress={() => handleSupportAction('chat')} />
             <SettingRow label="Privacy policy" icon={User02Icon} onPress={() => handleSupportAction('privacy')} isLast />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showRecoveryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRecoveryModal(false)}
+      >
+        <View style={styles.deleteModalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowRecoveryModal(false)} />
+          <View style={styles.recoveryCard}>
+            <AppText style={styles.recoveryTitle}>Recovery email</AppText>
+            <AppText style={styles.recoverySubtitle}>
+              Add a backup email for password recovery.
+            </AppText>
+
+            <View style={styles.recoveryStatusRow}>
+              <AppText style={styles.recoveryStatusLabel}>Current</AppText>
+              <AppText style={styles.recoveryStatusValue}>
+                {currentRecoveryEmail || 'Not set'}
+              </AppText>
+              <AppText style={styles.recoveryStatusBadge}>
+                {currentRecoveryVerified ? 'Verified' : currentRecoveryEmail ? 'Pending verification' : 'None'}
+              </AppText>
+            </View>
+
+            <AppInput
+              value={recoveryEmailInput}
+              onChangeText={(value) => {
+                setRecoveryEmailInput(value);
+                setRecoveryError('');
+                setRecoveryStatusText('');
+              }}
+              placeholder="Enter recovery email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <AppButton
+              label={isRecoveryBusy ? 'Sending...' : 'Send OTP'}
+              onPress={handleSendRecoveryOtp}
+              disabled={isRecoveryBusy}
+              style={styles.recoveryActionButton}
+            />
+
+            <AppInput
+              value={recoveryOtpInput}
+              onChangeText={(value) => {
+                setRecoveryOtpInput(value);
+                setRecoveryError('');
+                setRecoveryStatusText('');
+              }}
+              placeholder="Enter OTP"
+              keyboardType="number-pad"
+            />
+
+            <AppButton
+              label={isRecoveryBusy ? 'Verifying...' : 'Verify OTP'}
+              onPress={handleVerifyRecoveryOtp}
+              disabled={isRecoveryBusy}
+              style={styles.recoveryActionButton}
+            />
+
+            {currentRecoveryEmail ? (
+              <TouchableOpacity
+                style={styles.recoveryRemoveBtn}
+                activeOpacity={0.85}
+                onPress={handleRemoveRecoveryEmail}
+                disabled={isRecoveryBusy}
+              >
+                <AppText style={styles.recoveryRemoveText}>
+                  {isRecoveryBusy ? 'Working...' : 'Remove recovery email'}
+                </AppText>
+              </TouchableOpacity>
+            ) : null}
+
+            {recoveryStatusText ? <AppText style={styles.recoverySuccess}>{recoveryStatusText}</AppText> : null}
+            {recoveryError ? <AppText style={styles.recoveryError}>{recoveryError}</AppText> : null}
+
+            <TouchableOpacity
+              style={styles.cancelDeleteBtn}
+              activeOpacity={0.85}
+              onPress={() => setShowRecoveryModal(false)}
+            >
+              <AppText style={styles.cancelDeleteText}>Close</AppText>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -674,6 +852,81 @@ const styles = StyleSheet.create({
     color: '#FF7B8A',
     marginTop: -6,
     marginBottom: 8,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  recoveryCard: {
+    backgroundColor: '#11112E',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  recoveryTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    textAlign: 'center',
+  },
+  recoverySubtitle: {
+    marginTop: 6,
+    marginBottom: 12,
+    color: darkTheme.colors.muted,
+    textAlign: 'center',
+    fontSize: 13,
+  },
+  recoveryStatusRow: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  recoveryStatusLabel: {
+    color: darkTheme.colors.muted,
+    fontSize: 12,
+  },
+  recoveryStatusValue: {
+    marginTop: 2,
+    color: darkTheme.colors.text,
+    fontSize: 13,
+  },
+  recoveryStatusBadge: {
+    marginTop: 3,
+    color: darkTheme.colors.accent,
+    fontSize: 12,
+  },
+  recoveryActionButton: {
+    marginTop: 10,
+    minHeight: 42,
+  },
+  recoveryRemoveBtn: {
+    marginTop: 10,
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255,123,138,0.48)',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recoveryRemoveText: {
+    color: '#FF7B8A',
+    fontSize: 13,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  recoverySuccess: {
+    marginTop: 10,
+    color: '#85E786',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  recoveryError: {
+    marginTop: 10,
+    color: '#FF7B8A',
     fontSize: 12,
     textAlign: 'center',
   },

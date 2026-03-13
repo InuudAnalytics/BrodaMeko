@@ -15,6 +15,9 @@ export const ENDPOINTS = {
     deleteUser: '/api/v1/auth/users/delete',
     uploadAvatar: '/api/v1/auth/upload-avatar',
     contactStatus: '/api/v1/auth/users/contact-status',
+    recoveryEmail: '/api/v1/auth/users/recovery-email',
+    recoveryEmailVerify: '/api/v1/auth/users/recovery-email/verify',
+    recoveryEmailRemove: '/api/v1/auth/users/recovery-email/remove',
     verifyAddContact: '/api/v1/auth/verify/add-contact',
     verifyConfirmContact: '/api/v1/auth/verify/confirm-contact',
     devices: {

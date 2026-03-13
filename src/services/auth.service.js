@@ -206,6 +206,42 @@ export const verifyConfirmContact = async ({ otp }) => {
   return response.data;
 };
 
+export const addRecoveryEmail = async ({ recoveryEmail }) => {
+  const safeRecoveryEmail = String(recoveryEmail || '').trim().toLowerCase();
+
+  if (!safeRecoveryEmail) {
+    const error = new Error('recovery_email is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.post(ENDPOINTS.auth.recoveryEmail, {
+    recovery_email: safeRecoveryEmail,
+  });
+
+  return response.data;
+};
+
+export const verifyRecoveryEmail = async ({ otp }) => {
+  const safeOtp = String(otp || '').trim();
+
+  if (!safeOtp) {
+    const error = new Error('otp is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const response = await api.post(ENDPOINTS.auth.recoveryEmailVerify, { otp: safeOtp });
+  return response.data;
+};
+
+export const removeRecoveryEmail = async () => {
+  const response = await api.delete(ENDPOINTS.auth.recoveryEmailRemove);
+  return response.data;
+};
+
 export const googleLogin = async ({ idToken, role }) => {
   const payload = {
     id_token: idToken,
@@ -235,4 +271,7 @@ export default {
   uploadAvatar,
   verifyAddContact,
   verifyConfirmContact,
+  addRecoveryEmail,
+  verifyRecoveryEmail,
+  removeRecoveryEmail,
 };
