@@ -60,15 +60,14 @@ export const ENDPOINTS = {
       bankSetPrimary: (bankId) => `/api/v1/me/car-owner/bank/${encodeURIComponent(String(bankId || ''))}/primary`,
     },
     spareParts: {
-      // TODO: Confirm spare parts address endpoints with backend.
-      addressList: '/api/v1/me/seller/address',
-      addressAdd: '/api/v1/me/seller/address',
-      addressUpdate: (addressId) =>
-        `/api/v1/me/seller/address/${encodeURIComponent(String(addressId || ''))}`,
-      addressListLegacy: '/api/v1/me/spare-parts/address',
-      addressAddLegacy: '/api/v1/me/spare-parts/address',
-      addressUpdateLegacy: (addressId) =>
-        `/api/v1/me/spare-parts/address/${encodeURIComponent(String(addressId || ''))}`,
+      // Seller shop address is stored on seller_stores, managed via marketplace store endpoints.
+      addressList: '/api/v1/marketplace/seller/store/me',
+      addressAdd: '/api/v1/marketplace/seller/store',
+      addressUpdate: () => '/api/v1/marketplace/seller/store',
+      // Legacy aliases retained to avoid runtime breaks in older callers.
+      addressListLegacy: '/api/v1/marketplace/seller/store/me',
+      addressAddLegacy: '/api/v1/marketplace/seller/store',
+      addressUpdateLegacy: () => '/api/v1/marketplace/seller/store',
       bankAdd: '/api/v1/seller/me/bank',
       bankGet: '/api/v1/seller/me/bank',
       bankVerify: '/api/v1/seller/me/bank/verify',
@@ -173,6 +172,7 @@ export const ENDPOINTS = {
     sellerStoreBanner: '/api/v1/marketplace/seller/store/banner',
     sellerOrders: '/api/v1/marketplace/seller/orders',
     partsList: '/api/v1/marketplace/parts',
+    storeDetails: (storeId) => `/api/v1/marketplace/stores/${encodeURIComponent(String(storeId || ''))}`,
     partDetails: (partId) => `/api/v1/marketplace/parts/${encodeURIComponent(String(partId || ''))}`,
     cart: '/api/v1/marketplace/cart',
     cartItems: '/api/v1/marketplace/cart/items',
