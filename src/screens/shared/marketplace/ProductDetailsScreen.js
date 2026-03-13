@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -19,6 +19,7 @@ import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useCart } from '../../../context';
 import { getMarketplacePart } from '../../../services/marketplace.service';
 import { getStoreReviews } from '../../../services/store-reviews.service';
+import { ROUTES } from '../../../utils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -83,7 +84,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
     }
 
     if (!id) {
-      setLoadError('Product details are unavailable.');
+      setLoadError('Product ID is missing.');
       return;
     }
 
@@ -121,15 +122,15 @@ const ProductDetailsScreen = ({ navigation, route }) => {
           setProduct({
             id: String(part?.id || part?._id || id),
             storeId: resolvedStoreId,
-            name: String(part?.name || part?.title || 'Spare part'),
+            name: String(part?.name || part?.title || '').trim(),
             price: Number(part?.price || 0),
-            shop: String(part?.store?.name || part?.store_name || part?.seller_name || "Seller's store"),
+            shop: String(part?.store?.name || part?.store_name || part?.seller_name || '').trim(),
             rating: averageRating,
             reviews: reviewCount,
             stock: Number(part?.stock_quantity || part?.stock || 0),
-            location: buildStoreLocationLabel(part),
-            compatibility: String(part?.compatibility || 'Compatible'),
-            delivery: String(part?.delivery || 'Delivery date'),
+            location: buildStoreLocationLabel(part) || '',
+            compatibility: String(part?.compatibility || '').trim(),
+            delivery: String(part?.delivery || '').trim(),
             description: String(part?.description || ''),
             images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
             store: part?.store || null,
@@ -139,11 +140,11 @@ const ProductDetailsScreen = ({ navigation, route }) => {
           });
           setLoadError('');
         } else if (active) {
-          setLoadError('Product details are unavailable.');
+          setLoadError('Product details are unavailable from backend.');
         }
       } catch {
         if (active) {
-          setLoadError('Failed to load product details.');
+          setLoadError('Could not load product details.');
         }
       } finally {
         if (active) {
@@ -183,6 +184,14 @@ const ProductDetailsScreen = ({ navigation, route }) => {
     navigation.navigate('Checkout', {
       directProduct: { ...product, quantity },
     });
+  };
+
+  const handleOpenStoreDetails = () => {
+    const storeId = String(product?.storeId || product?.store?.id || '').trim();
+    if (!storeId) {
+      return;
+    }
+    navigation.navigate(ROUTES.STORE_DETAILS, { storeId });
   };
 
   const decrement = () => setQuantity(prev => Math.max(1, prev - 1));
@@ -257,7 +266,7 @@ const ProductDetailsScreen = ({ navigation, route }) => {
 
         <View style={styles.section}>
           <AppText style={styles.productName}>
-            {product?.name || 'Product'}
+            {product?.name || 'Product name unavailable'}
           </AppText>
           <View style={styles.ratingRow}>
             <HugeiconsIcon
@@ -283,10 +292,10 @@ const ProductDetailsScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        <View style={styles.sellerCard}>
+        <TouchableOpacity style={styles.sellerCard} activeOpacity={0.88} onPress={handleOpenStoreDetails}>
           <View>
             <AppText style={styles.sellerName}>
-              {product?.shop || 'Seller'}
+              {product?.shop || 'Store unavailable'}
             </AppText>
             <View style={styles.sellerRow}>
               <View style={styles.sellerBadge}>
@@ -295,7 +304,8 @@ const ProductDetailsScreen = ({ navigation, route }) => {
               <AppText style={styles.sellerSubtitle}>Top rated seller</AppText>
             </View>
           </View>
-        </View>
+          <AppText style={styles.storeLinkText}>View store</AppText>
+        </TouchableOpacity>
 
         <View style={styles.section}>
           <AppText style={styles.sectionTitle}>Description</AppText>
@@ -317,16 +327,33 @@ const ProductDetailsScreen = ({ navigation, route }) => {
 
         <View style={styles.infoGrid}>
           {[
-            { label: 'Compatibility', value: product?.compatibility || 'N/A' },
-            { label: 'Location', value: product?.location || 'N/A' },
-            { label: 'Delivery', value: product?.delivery || 'N/A' },
-            { label: 'Estimated date', value: product?.delivery || 'N/A' },
-          ].map(item => (
-            <View key={item.label} style={styles.infoCard}>
-              <AppText style={styles.infoLabel}>{item.label}</AppText>
-              <AppText style={styles.infoValue}>{item.value}</AppText>
-            </View>
-          ))}
+            { label: 'Compatibility', value: product?.compatibility || 'Unavailable' },
+            { label: 'Location', value: product?.location || 'Unavailable' },
+            { label: 'Delivery', value: product?.delivery || 'Unavailable' },
+            { label: 'Estimated date', value: product?.delivery || 'Unavailable' },
+          ].map(item => {
+            const isLocation = item.label === 'Location';
+            if (isLocation) {
+              return (
+                <TouchableOpacity
+                  key={item.label}
+                  style={styles.infoCard}
+                  activeOpacity={0.88}
+                  onPress={handleOpenStoreDetails}
+                >
+                  <AppText style={styles.infoLabel}>{item.label}</AppText>
+                  <AppText style={styles.infoValue}>{item.value}</AppText>
+                </TouchableOpacity>
+              );
+            }
+
+            return (
+              <View key={item.label} style={styles.infoCard}>
+                <AppText style={styles.infoLabel}>{item.label}</AppText>
+                <AppText style={styles.infoValue}>{item.value}</AppText>
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.section}>
@@ -515,6 +542,12 @@ const styles = StyleSheet.create({
   sellerSubtitle: {
     color: '#9CA3AF',
     fontSize: 12,
+  },
+  storeLinkText: {
+    marginTop: 10,
+    color: '#E6C714',
+    fontSize: 12,
+    fontWeight: '600',
   },
   sectionTitle: {
     color: '#E6C714',

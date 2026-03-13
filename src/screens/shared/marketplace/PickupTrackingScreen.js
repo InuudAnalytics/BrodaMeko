@@ -5,6 +5,7 @@ import { ArrowLeft01Icon, CallIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
 import { getMarketplaceOrder } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 const PANEL_MAX_DOWN = 360;
@@ -80,6 +81,12 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const dragStartRef = useRef(0);
   const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
   const [resolvedPickupCode, setResolvedPickupCode] = React.useState('');
+  const [isHydratingOrder, setIsHydratingOrder] = React.useState(false);
+  const [product, setProduct] = React.useState(route?.params?.product || null);
+  const [seller, setSeller] = React.useState(route?.params?.seller || null);
+  const [pickupAddress, setPickupAddress] = React.useState(
+    route?.params?.storeAddress || route?.params?.deliveryAddress || ''
+  );
   const [summary, setSummary] = React.useState({
     subtotal: toMoney(route?.params?.subtotal),
     serviceCharge: toMoney(route?.params?.serviceCharge),
@@ -94,20 +101,6 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     .slice(0, 4);
   const orderId = String(route?.params?.orderId || route?.params?.order_id || '').trim();
   const pickupCode = resolvedPickupCode || incomingCode;
-
-  const product = route?.params?.product || {
-    name: 'LED headlights',
-    price: 2500,
-    shop: 'Okon spare part hub',
-    images: ['https://picsum.photos/300?random=31'],
-  };
-  const seller = route?.params?.seller || {
-    name: product?.shop || 'Okon spare part hub',
-    avatar: 'https://i.pravatar.cc/100?img=12',
-    phone: '',
-    isActive: true,
-  };
-  const pickupAddress = route?.params?.storeAddress || route?.params?.deliveryAddress || 'No 1, Onireke street, Agbabiaka';
 
   const shopCoordinates = useMemo(() => {
     // TODO: backend should provide shop coordinates for pickup navigation
@@ -158,9 +151,10 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   useEffect(() => {
     let active = true;
     const hydratePickupCode = async () => {
-      if (incomingCode.length === 4 || !orderId) {
+      if (!orderId) {
         return;
       }
+      setIsHydratingOrder(true);
       try {
         const response = await getMarketplaceOrder(orderId);
         const payload = response?.data || response || {};
@@ -171,6 +165,43 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         }
 
         const items = data?.items || data?.order_items || data?.products || [];
+        const firstItem = items?.[0] || {};
+        const part = firstItem?.part || firstItem?.product || firstItem?.spare_part || {};
+        const store = part?.store || data?.store || data?.seller || {};
+
+        if (active) {
+          if (!product) {
+            setProduct({
+              id: String(part?.id || firstItem?.id || '').trim(),
+              storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
+              name: String(part?.name || firstItem?.name || '').trim(),
+              shop: String(store?.store_name || store?.name || '').trim(),
+              price: Number(part?.price || firstItem?.price || 0),
+              images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+              shopCoordinates: store?.coordinates || null,
+              latitude: store?.coordinates?.latitude ?? part?.latitude ?? null,
+              longitude: store?.coordinates?.longitude ?? part?.longitude ?? null,
+            });
+          }
+          if (!seller) {
+            setSeller({
+              storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
+              name: String(store?.store_name || store?.name || '').trim(),
+              avatar: store?.logo || store?.avatar || '',
+              phone: String(store?.phone || store?.phone_number || '').trim(),
+              isActive: Boolean(store?.is_active ?? true),
+              coordinates: store?.coordinates || null,
+            });
+          }
+          if (!pickupAddress) {
+            const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
+            const resolvedAddress = addressPayload?.street
+              ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
+              : String(data?.delivery_address_text || '').trim();
+            setPickupAddress(resolvedAddress);
+          }
+        }
+
         const computedSubtotal = items.reduce((sum, entry) => sum + toMoney(entry?.subtotal), 0);
         const backendTotal = toMoney(data?.total_amount, toMoney(data?.amount, 0));
         const backendServiceCharge = toMoney(
@@ -185,7 +216,11 @@ const PickupTrackingScreen = ({ navigation, route }) => {
           }));
         }
       } catch {
-        // No-op: keep fallback display when pickup code is unavailable.
+        // No-op: show explicit unavailable text when backend payload is missing.
+      } finally {
+        if (active) {
+          setIsHydratingOrder(false);
+        }
       }
     };
 
@@ -193,7 +228,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     return () => {
       active = false;
     };
-  }, [incomingCode.length, orderId]);
+  }, [incomingCode.length, orderId, pickupAddress, product, seller]);
 
   const panResponder = useMemo(
     () =>
@@ -241,6 +276,20 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     AppAlert.alert('Report issue', 'Issue reporting for pickup orders will be wired soon.');
   };
 
+  const handleOpenStoreDetails = () => {
+    const storeId = String(
+      route?.params?.storeId ||
+        route?.params?.store_id ||
+        seller?.storeId ||
+        product?.storeId ||
+        ''
+    ).trim();
+    if (!storeId) {
+      return;
+    }
+    navigation.navigate(ROUTES.STORE_DETAILS, { storeId });
+  };
+
   return (
     <View style={styles.root}>
       <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
@@ -278,15 +327,28 @@ const PickupTrackingScreen = ({ navigation, route }) => {
               </AppText>
             </View>
 
-            <View style={styles.productCard}>
-              {imageUri ? <Image source={{ uri: imageUri }} style={styles.productImage} /> : <View style={styles.imagePlaceholder} />}
-              <View style={styles.productInfo}>
-                <AppText style={styles.productName} numberOfLines={1}>{product?.name || 'Product'}</AppText>
-                <AppText style={styles.productShop}>{product?.shop || 'Seller'}</AppText>
-                <AppText style={styles.productPrice}>{formatNaira(product?.price || 0)}</AppText>
-                <AppText style={styles.productAddress} numberOfLines={2}>{pickupAddress}</AppText>
+            {isHydratingOrder ? (
+              <View style={styles.productCard}>
+                <View style={styles.imagePlaceholder} />
+                <View style={styles.productInfo}>
+                  <View style={styles.skeletonLine} />
+                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                  <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={styles.productCard}>
+                {imageUri ? <Image source={{ uri: imageUri }} style={styles.productImage} /> : <View style={styles.imagePlaceholder} />}
+                <View style={styles.productInfo}>
+                  <AppText style={styles.productName} numberOfLines={1}>{product?.name || 'Product details unavailable'}</AppText>
+                  <TouchableOpacity activeOpacity={0.85} onPress={handleOpenStoreDetails}>
+                    <AppText style={styles.productShop}>{product?.shop || 'Store unavailable'}</AppText>
+                  </TouchableOpacity>
+                  <AppText style={styles.productPrice}>{formatNaira(product?.price || 0)}</AppText>
+                  <AppText style={styles.productAddress} numberOfLines={2}>{pickupAddress || 'Pickup address unavailable'}</AppText>
+                </View>
+              </View>
+            )}
 
             <View style={styles.summaryCard}>
               <AppText style={styles.summaryTitle}>Payment summary</AppText>
@@ -305,7 +367,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.sellerCard}>
-              <View style={styles.sellerLeft}>
+              <TouchableOpacity style={styles.sellerLeft} activeOpacity={0.88} onPress={handleOpenStoreDetails}>
                 {avatarUri ? (
                   <Image source={{ uri: avatarUri }} style={styles.sellerAvatar} />
                 ) : (
@@ -320,7 +382,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
                     <AppText style={styles.sellerStatusText}>{seller?.isActive ? 'Active now' : 'Offline'}</AppText>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
               <AppButton
                 label="Call seller"
                 onPress={handleCallSeller}
@@ -455,6 +517,19 @@ const styles = StyleSheet.create({
   },
   productInfo: {
     flex: 1,
+  },
+  skeletonLine: {
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginTop: 6,
+    width: '92%',
+  },
+  skeletonLineShort: {
+    width: '64%',
+  },
+  skeletonLineTiny: {
+    width: '46%',
   },
   productName: {
     color: '#FFFFFF',
