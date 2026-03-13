@@ -39,6 +39,7 @@ const PAYMENT_TYPES = new Set([
 ]);
 
 const JOB_TYPES = new Set(['job_request', 'job_accepted', 'job_declined', 'job_cancelled', 'job_completed']);
+const PAGE_SIZE = 10;
 
 const formatRelativeTime = (value) => {
   const date = new Date(value || '');
@@ -103,6 +104,9 @@ const NotificationsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
 
   const hasPendingProfileReminder = role === ROLES.MECH && !mechanicProfileComplete;
@@ -110,25 +114,91 @@ const NotificationsScreen = ({ navigation }) => {
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     setError('');
+    setPage(1);
+    setHasMore(false);
 
     try {
       const tab = TABS.find((item) => item.key === activeTab) || TABS[0];
       const response = await getNotifications({
         page: 1,
-        limit: 50,
+        limit: PAGE_SIZE,
         category: tab.category || undefined,
       });
       const payload = response?.data || response || {};
       const data = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+      const meta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+      const currentPage = Number(payload?.page || payload?.current_page || meta?.page || 1);
+      const totalPages = Number(payload?.total_pages || payload?.last_page || meta?.total_pages || meta?.last_page || 0);
+      const pageSize = Number(payload?.limit || payload?.per_page || meta?.limit || meta?.per_page || PAGE_SIZE);
+      const hasMoreByPage = Number.isFinite(totalPages) && totalPages > 0 && currentPage < totalPages;
+      const hasMoreByCount = Array.isArray(data) && data.length >= pageSize;
 
       setNotifications(data);
+      setPage(1);
+      setHasMore(hasMoreByPage || hasMoreByCount);
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load notifications.');
       setNotifications([]);
+      setPage(1);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
   }, [activeTab]);
+
+  const loadMoreNotifications = useCallback(async () => {
+    if (loading || loadingMore || !hasMore || error) {
+      return;
+    }
+
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const tab = TABS.find((item) => item.key === activeTab) || TABS[0];
+      const response = await getNotifications({
+        page: nextPage,
+        limit: PAGE_SIZE,
+        category: tab.category || undefined,
+      });
+      const payload = response?.data || response || {};
+      const data = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+      const meta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+      const currentPage = Number(payload?.page || payload?.current_page || meta?.page || nextPage);
+      const totalPages = Number(payload?.total_pages || payload?.last_page || meta?.total_pages || meta?.last_page || 0);
+      const pageSize = Number(payload?.limit || payload?.per_page || meta?.limit || meta?.per_page || PAGE_SIZE);
+      const hasMoreByPage = Number.isFinite(totalPages) && totalPages > 0 && currentPage < totalPages;
+      const hasMoreByCount = Array.isArray(data) && data.length >= pageSize;
+
+      setNotifications((prev) => {
+        if (!Array.isArray(data) || !data.length) {
+          return prev;
+        }
+        const seen = new Set(prev.map((item) => String(item?.id || '').trim()).filter(Boolean));
+        const incoming = data.filter((item) => !seen.has(String(item?.id || '').trim()));
+        return incoming.length ? [...prev, ...incoming] : prev;
+      });
+      setPage(nextPage);
+      setHasMore(hasMoreByPage || hasMoreByCount);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeTab, error, hasMore, loading, loadingMore, page]);
+
+  const handleScrollEndReached = useCallback(
+    ({ nativeEvent }) => {
+      const yOffset = Number(nativeEvent?.contentOffset?.y || 0);
+      const contentHeight = Number(nativeEvent?.contentSize?.height || 0);
+      const viewportHeight = Number(nativeEvent?.layoutMeasurement?.height || 0);
+      const remaining = contentHeight - (yOffset + viewportHeight);
+
+      if (remaining <= 120) {
+        loadMoreNotifications();
+      }
+    },
+    [loadMoreNotifications]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -269,6 +339,8 @@ const NotificationsScreen = ({ navigation }) => {
           <ScrollView
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            onScroll={handleScrollEndReached}
+            scrollEventThrottle={150}
             refreshControl={
               <RefreshControl
                 refreshing={loading}
@@ -309,6 +381,11 @@ const NotificationsScreen = ({ navigation }) => {
             {!list.length ? (
               <View style={styles.centerState}>
                 <AppText style={styles.emptyText}>No notifications yet.</AppText>
+              </View>
+            ) : null}
+            {loadingMore ? (
+              <View style={styles.loadMoreWrap}>
+                <ActivityIndicator size="small" color={darkTheme.colors.accent} />
               </View>
             ) : null}
           </ScrollView>
@@ -428,6 +505,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: darkTheme.colors.muted,
+  },
+  loadMoreWrap: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
