@@ -25,6 +25,7 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
+import UserReviewsScreen from '../screens/shared/profile/UserReviewsScreen';
 import AddContactSuccessScreen from '../screens/carowner/profile/AddContactSuccessScreen';
 import PickupOrderDetailsScreen from '../screens/spareparts/orders/PickupOrderDetailsScreen';
 import { useAuth, useSparePartsProfile } from '../context';
@@ -108,6 +109,7 @@ const SparePartsStack = () => {
       <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.USER_PROFILE} component={UserProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.USER_REVIEWS} component={UserReviewsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.PROFILE_BANK_DETAILS}
         component={ProfileBankDetailsScreen}

@@ -24,6 +24,7 @@ import SetServicesScreen from '../screens/mech/home/SetServicesScreen';
 import UserProfileScreen from '../screens/shared/profile/UserProfileScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
 import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
+import UserReviewsScreen from '../screens/shared/profile/UserReviewsScreen';
 import { useAuth, useMechanicProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
@@ -161,6 +162,11 @@ const MechStack = () => {
       <Stack.Screen
         name={ROUTES.USER_PROFILE}
         component={UserProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name={ROUTES.USER_REVIEWS}
+        component={UserReviewsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

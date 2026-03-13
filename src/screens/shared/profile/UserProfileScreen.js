@@ -46,6 +46,10 @@ const getSettingsRows = (role) => {
     rows.push({ key: 'services', label: 'Services offered', icon: Wrench01Icon });
   }
 
+  if (role === ROLES.MECH || role === ROLES.SPARE_PARTS_SELLER) {
+    rows.push({ key: 'reviews', label: 'View reviews', icon: StarIcon });
+  }
+
   rows.push(
     { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
     { key: 'legal_documents', label: 'Legal documents', icon: Briefcase01Icon },
@@ -211,6 +215,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
     }
   };
 
+
   const handlePersonalInfo = () => {
     if (role === ROLES.MECH) {
       navigation.navigate(ROUTES.MECH_EDIT_PROFILE);
@@ -332,6 +337,10 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                 }
                 if (row.key === 'services') {
                   navigation.navigate(ROUTES.MECH_SET_SERVICES);
+                  return;
+                }
+                if (row.key === 'reviews') {
+                  navigation.navigate(ROUTES.USER_REVIEWS);
                   return;
                 }
                 if (row.key === 'notifications') {

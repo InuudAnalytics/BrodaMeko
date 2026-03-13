@@ -66,6 +66,7 @@ export const ROUTES = {
   MECH_LIVE_TRACKING: 'MechanicLiveTracking',
   MECH_PICKUP_TRACKING: 'MechanicPickupTracking',
   USER_PROFILE: 'UserProfile',
+  USER_REVIEWS: 'UserReviews',
   ADMIN_DASHBOARD: 'AdminDashboard',
 
   SPARE_PARTS_DASHBOARD: 'SparePartsDashboard',
