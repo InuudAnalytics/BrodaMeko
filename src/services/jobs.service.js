@@ -198,7 +198,7 @@ export const updateCarOwnerJob = async (jobId, { description, car_make, imagesTo
   }
 
   const formData = buildFormData(payload);
-  const response = await api.post(ENDPOINTS.jobs.carOwnerUpdate(safeJobId), formData, {
+  const response = await api.patch(ENDPOINTS.jobs.carOwnerUpdate(safeJobId), formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 

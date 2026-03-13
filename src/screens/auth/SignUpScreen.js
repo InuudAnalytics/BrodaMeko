@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   BackHandler,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -31,7 +32,6 @@ import {
   AuthMethodToggle,
   DividerOr,
   GoogleButton,
-  LogoLockup,
   NigerianPhoneInput,
   ScreenContainer,
 } from '../../components';
@@ -260,7 +260,11 @@ const SignUpScreen = ({ navigation, route }) => {
           >
             <Animated.View ref={targetRef} style={animatedStyle}>
               <View style={styles.logoWrap}>
-                <LogoLockup style={styles.logoScale} markSize={44} stacked />
+                <Image
+                  source={require('../../../assets/logo.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
               </View>
 
               <AppText variant="title" style={styles.heading}>
@@ -514,12 +518,21 @@ const SignUpScreen = ({ navigation, route }) => {
                   <AppText style={styles.closeText}>x</AppText>
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.termsBody} showsVerticalScrollIndicator={false}>
-                <AppText style={styles.termsSheetTitle}>Terms and Conditions</AppText>
+              <ScrollView
+                style={styles.termsBody}
+                showsVerticalScrollIndicator={false}
+              >
+                <AppText style={styles.termsSheetTitle}>
+                  Terms and Conditions
+                </AppText>
                 {TERMS_SIGNUP_SUMMARY.map(section => (
                   <View key={section.title} style={styles.termsSection}>
-                    <AppText style={styles.termsSectionTitle}>{section.title}</AppText>
-                    <AppText style={styles.termsSectionBody}>{section.body}</AppText>
+                    <AppText style={styles.termsSectionTitle}>
+                      {section.title}
+                    </AppText>
+                    <AppText style={styles.termsSectionBody}>
+                      {section.body}
+                    </AppText>
                   </View>
                 ))}
                 <TouchableOpacity
@@ -552,10 +565,14 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     alignItems: 'center',
+    alignSelf: 'center',
     marginTop: darkTheme.spacing.md,
-    marginBottom: darkTheme.spacing.xl,
+    marginBottom: darkTheme.spacing.xs,
   },
-  logoScale: { transform: [{ scale: 1.4 }] },
+  logoImage: {
+    width: 240,
+    height: 90,
+  },
   heading: {
     fontSize: darkTheme.typography.fontSizes.xl,
     color: darkTheme.colors.text,

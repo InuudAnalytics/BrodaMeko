@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -7,7 +7,7 @@ import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../..
 import { useAuth } from '../../../context';
 import { getMechanicReviews, replyToMechanicReview } from '../../../services/mechanic-reviews.service';
 import { getSellerStore } from '../../../services/spareParts.service';
-import { getStoreReviews, replyToStoreReview } from '../../../services/store-reviews.service';
+import { getStoreReviewReplies, getStoreReviews, replyToStoreReview } from '../../../services/store-reviews.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { ROLES } from '../../../utils';
 
@@ -110,6 +110,7 @@ const UserReviewsScreen = ({ navigation }) => {
   const [replyDraft, setReplyDraft] = useState('');
   const [replyError, setReplyError] = useState('');
   const [replying, setReplying] = useState(false);
+  const [storeRepliesByReviewId, setStoreRepliesByReviewId] = useState({});
 
   const loadReviews = useCallback(async () => {
     if (!isReviewRole(role)) {
@@ -122,6 +123,7 @@ const UserReviewsScreen = ({ navigation }) => {
     setLoading(true);
     setError('');
     setReplyError('');
+    setStoreRepliesByReviewId({});
 
     try {
       if (role === ROLES.MECH) {
@@ -173,6 +175,67 @@ const UserReviewsScreen = ({ navigation }) => {
     () => reviews.find((item) => item.id === selectedReviewId) || null,
     [reviews, selectedReviewId]
   );
+  const selectedReviewReplies = useMemo(() => {
+    if (!selectedReview?.id) {
+      return [];
+    }
+
+    if (role === ROLES.SPARE_PARTS_SELLER && storeRepliesByReviewId[selectedReview.id]) {
+      return storeRepliesByReviewId[selectedReview.id];
+    }
+
+    return Array.isArray(selectedReview.replies) ? selectedReview.replies : [];
+  }, [role, selectedReview, storeRepliesByReviewId]);
+
+  useEffect(() => {
+    if (role !== ROLES.SPARE_PARTS_SELLER || !selectedReview?.id) {
+      return;
+    }
+
+    if (storeRepliesByReviewId[selectedReview.id]) {
+      return;
+    }
+
+    let active = true;
+
+    const loadStoreReplies = async () => {
+      try {
+        const response = await getStoreReviewReplies(selectedReview.id);
+        const root = response?.data || response || {};
+        const list = Array.isArray(root)
+          ? root
+          : Array.isArray(root?.replies)
+            ? root.replies
+            : Array.isArray(root?.data)
+              ? root.data
+              : [];
+
+        if (!active) {
+          return;
+        }
+
+        setStoreRepliesByReviewId((prev) => ({
+          ...prev,
+          [selectedReview.id]: list,
+        }));
+      } catch (_) {
+        if (!active) {
+          return;
+        }
+
+        setStoreRepliesByReviewId((prev) => ({
+          ...prev,
+          [selectedReview.id]: [],
+        }));
+      }
+    };
+
+    loadStoreReplies();
+
+    return () => {
+      active = false;
+    };
+  }, [role, selectedReview?.id, storeRepliesByReviewId]);
 
   const handleSendReply = async () => {
     if (!selectedReview?.id) {
@@ -330,9 +393,9 @@ const UserReviewsScreen = ({ navigation }) => {
                 Replying to {selectedReview.reviewerName} ({selectedReview.rating} stars)
               </AppText>
 
-              {selectedReview.replies.length ? (
+              {selectedReviewReplies.length ? (
                 <View style={styles.replyThread}>
-                  {selectedReview.replies.map((reply, index) => (
+                  {selectedReviewReplies.map((reply, index) => (
                     <View key={`${selectedReview.id}-reply-${index}`} style={styles.replyBubble}>
                       <AppText style={styles.replyAuthor} numberOfLines={1}>
                         {String(reply?.author_name || reply?.author_role || 'User')}

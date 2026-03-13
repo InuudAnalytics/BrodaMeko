@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   BackHandler,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -22,7 +23,6 @@ import {
   AuthMethodToggle,
   DividerOr,
   GoogleButton,
-  LogoLockup,
   NigerianPhoneInput,
   ScreenContainer,
 } from '../../components';
@@ -149,7 +149,11 @@ const LoginScreen = ({ navigation, route }) => {
           >
             <Animated.View ref={targetRef} style={animatedStyle}>
               <View style={styles.logoWrap}>
-                <LogoLockup style={styles.logoScale} markSize={44} stacked />
+                <Image
+                  source={require('../../../assets/logo.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
               </View>
 
               <AppText variant="title" style={styles.heading}>
@@ -321,10 +325,14 @@ const styles = StyleSheet.create({
   },
   logoWrap: {
     alignItems: 'center',
+    alignSelf: 'center',
     marginTop: darkTheme.spacing.md,
-    marginBottom: darkTheme.spacing.xl,
+    marginBottom: darkTheme.spacing.sm,
   },
-  logoScale: { transform: [{ scale: 1.4 }] },
+  logoImage: {
+    width: 200,
+    height: 90,
+  },
   heading: {
     fontSize: darkTheme.typography.fontSizes.xl,
     color: darkTheme.colors.text,

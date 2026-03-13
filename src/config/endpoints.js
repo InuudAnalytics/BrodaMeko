@@ -106,7 +106,6 @@ export const ENDPOINTS = {
     delete: (notificationId) => `/api/v1/notifications/${encodeURIComponent(String(notificationId || ''))}`,
   },
   wallet: {
-    balance: '/api/v1/wallet/balance',
     topUp: '/api/v1/wallets/top-up',
     verifyPayment: '/api/v1/wallets/verify/payment',
     withdrawRequest: '/api/v1/wallets/request',

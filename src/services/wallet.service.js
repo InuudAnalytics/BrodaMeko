@@ -46,18 +46,21 @@ export const verifyWalletPayment = async (referenceInput, trxrefInput) => {
 
 export const getWalletBalance = async () => {
   const me = await getCurrentUser();
+  const root = me?.data && typeof me.data === 'object' ? me.data : me;
   const wallet =
-    (me?.wallet && typeof me.wallet === 'object' ? me.wallet : null) ||
-    (me?.data?.wallet && typeof me.data.wallet === 'object' ? me.data.wallet : null) ||
+    (root?.wallet && typeof root.wallet === 'object' ? root.wallet : null) ||
     null;
 
   if (wallet) {
     return wallet;
   }
 
-  // Fallback for legacy backend shape/rollout windows.
-  const response = await api.get(ENDPOINTS.wallet.balance);
-  return response.data;
+  // Wallet balance is sourced from /auth/me on current backend.
+  return {
+    balance: Number(root?.balance || root?.available_balance || root?.wallet_balance || 0),
+    available_balance: Number(root?.available_balance || root?.balance || root?.wallet_balance || 0),
+    currency: String(root?.currency || root?.wallet_currency || 'NGN'),
+  };
 };
 
 export const requestWithdrawal = async (amount) => {

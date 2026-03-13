@@ -13,6 +13,7 @@ import {
   ScreenContainer,
 } from '../../../components';
 import {
+  cancelMarketplaceOrder,
   getMarketplaceOrder,
   receivedMarketplaceOrderItem,
 } from '../../../services/marketplace.service';
@@ -193,6 +194,7 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
     subtotal: computedSubtotal || prev?.subtotal || 0,
     serviceCharge: backendServiceCharge || prev?.serviceCharge || 0,
     totalAmount: backendTotal || prev?.totalAmount || computedSubtotal + backendServiceCharge,
+    orderStatus: String(data?.status || readItemStatus(activeItem) || '').trim().toLowerCase(),
   };
 };
 
@@ -253,6 +255,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       route?.params?.totalAmount,
       toMoney(route?.params?.subtotal) + toMoney(route?.params?.serviceCharge),
     ),
+    orderStatus: String(route?.params?.status || '').trim().toLowerCase(),
   });
   const [orderData, setOrderData] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
@@ -272,7 +275,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     subtotal,
     serviceCharge,
     totalAmount,
+    orderStatus,
   } = orderState;
+  const isOrderCompleted = orderStatus === 'completed';
   const shopCoordinates = useMemo(
     () => buildStoreCoordinates({ route, orderState }),
     [orderState, route]
@@ -398,6 +403,35 @@ const OrderTrackingScreen = ({ navigation, route }) => {
 
   const handleReportIssue = () => {
     AppAlert.alert('Report issue', 'Issue reporting will be wired soon.');
+  };
+
+  const handleCancelOrder = () => {
+    if (!orderId) {
+      AppAlert.alert('Missing order info', 'Could not cancel this order right now.');
+      return;
+    }
+
+    AppAlert.alert(
+      'Cancel order',
+      'Are you sure you want to cancel this order?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelMarketplaceOrder(orderId);
+              AppAlert.alert('Cancelled', 'Order cancelled successfully.', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            } catch (error) {
+              AppAlert.alert('Could not cancel order', error?.message || 'Please try again.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleOpenStoreDetails = () => {
@@ -682,11 +716,11 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               />
               <TouchableOpacity
                 style={styles.secondaryAction}
-                onPress={handleReportIssue}
+                onPress={isOrderCompleted ? handleReportIssue : handleCancelOrder}
                 activeOpacity={0.85}
               >
                 <AppText style={styles.secondaryActionText}>
-                  Report an issue
+                  {isOrderCompleted ? 'Report an issue' : 'Cancel order'}
                 </AppText>
               </TouchableOpacity>
             </View>

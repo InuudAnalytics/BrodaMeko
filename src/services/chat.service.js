@@ -141,21 +141,9 @@ export const uploadConversationImages = async (conversationId, images) => {
   });
 
   let response;
-  try {
-    response = await api.post(ENDPOINTS.chat.uploadConversationImages(safeConversationId), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  } catch (error) {
-    const statusCode = Number(error?.statusCode || 0);
-    if (statusCode !== 404) {
-      throw error;
-    }
-
-    const fallbackEndpoint = `/api/v1/chat/conversation/${encodeURIComponent(String(safeConversationId || ''))}/images`;
-    response = await api.post(fallbackEndpoint, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  }
+  response = await api.post(ENDPOINTS.chat.uploadConversationImages(safeConversationId), formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 
   return response.data;
 };

@@ -1,19 +1,49 @@
 import React, { useEffect, useRef } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
-import AnimatedLogo from '../../components/AnimatedLogo';
-import { AppText, ScreenContainer } from '../../components';
+import {
+  Animated,
+  Easing,
+  Image,
+  StatusBar,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { ScreenContainer } from '../../components';
 import { useAuth } from '../../context';
 import { darkTheme } from '../../theme';
 import { ROUTES } from '../../utils';
 
 const SPLASH_DURATION_MS = 3000;
+const QUICK_SPLASH_DURATION_MS = 900;
+const LOGO_ANIMATION_DURATION_MS = 700;
 
 const SplashScreen = ({ navigation }) => {
   const { selectedRole, hasSeenOnboarding } = useAuth();
   const hasNavigated = useRef(false);
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoTranslateY = useRef(new Animated.Value(18)).current;
   const shouldSkipOnboarding = Boolean(selectedRole || hasSeenOnboarding);
 
   useEffect(() => {
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: LOGO_ANIMATION_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(logoTranslateY, {
+        toValue: 0,
+        duration: LOGO_ANIMATION_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [logoOpacity, logoTranslateY]);
+
+  useEffect(() => {
+    const delay = shouldSkipOnboarding
+      ? QUICK_SPLASH_DURATION_MS
+      : SPLASH_DURATION_MS;
     const timer = setTimeout(() => {
       if (hasNavigated.current) {
         return;
@@ -21,12 +51,15 @@ const SplashScreen = ({ navigation }) => {
 
       hasNavigated.current = true;
       if (shouldSkipOnboarding) {
-        navigation.replace(ROUTES.LOGIN, selectedRole ? { role: selectedRole } : undefined);
+        navigation.replace(
+          ROUTES.LOGIN,
+          selectedRole ? { role: selectedRole } : undefined,
+        );
         return;
       }
 
       navigation.replace(ROUTES.ONBOARDING_CAROUSEL);
-    }, shouldSkipOnboarding ? 300 : SPLASH_DURATION_MS);
+    }, delay);
 
     return () => {
       clearTimeout(timer);
@@ -35,17 +68,27 @@ const SplashScreen = ({ navigation }) => {
 
   return (
     <ScreenContainer padded={false} style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={darkTheme.colors.background}
+      />
 
       <View style={styles.centerContent}>
-        <AnimatedLogo size={92} />
-
-        <AppText variant="subtitle" style={styles.wordmark}>
-          Broda
-          <AppText variant="subtitle" color={darkTheme.colors.accent} style={styles.wordmarkAccent}>
-            Meko
-          </AppText>
-        </AppText>
+        <Animated.View
+          style={[
+            styles.logoAnimationWrap,
+            {
+              opacity: logoOpacity,
+              transform: [{ translateY: logoTranslateY }],
+            },
+          ]}
+        >
+          <Image
+            source={require('../../../assets/brodamekoLogo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </Animated.View>
       </View>
     </ScreenContainer>
   );
@@ -63,13 +106,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  wordmark: {
-    marginTop: darkTheme.spacing.lg,
-    color: darkTheme.colors.text,
-    fontWeight: darkTheme.typography.fontWeights.medium,
+  logoAnimationWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  wordmarkAccent: {
-    fontWeight: darkTheme.typography.fontWeights.medium,
+  logo: {
+    width: 140,
+    height: 140,
   },
 });
 

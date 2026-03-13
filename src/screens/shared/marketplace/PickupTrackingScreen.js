@@ -3,7 +3,7 @@ import { Animated, Image, Linking, PanResponder, ScrollView, StyleSheet, Touchab
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, CallIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
-import { getMarketplaceOrder } from '../../../services/marketplace.service';
+import { cancelMarketplaceOrder, getMarketplaceOrder } from '../../../services/marketplace.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
@@ -95,12 +95,16 @@ const PickupTrackingScreen = ({ navigation, route }) => {
       toMoney(route?.params?.subtotal) + toMoney(route?.params?.serviceCharge),
     ),
   });
+  const [orderStatus, setOrderStatus] = React.useState(
+    String(route?.params?.status || '').trim().toLowerCase()
+  );
 
   const incomingCode = String(route?.params?.pickupCode || '')
     .replace(/\D/g, '')
     .slice(0, 4);
   const orderId = String(route?.params?.orderId || route?.params?.order_id || '').trim();
   const pickupCode = resolvedPickupCode || incomingCode;
+  const isOrderCompleted = orderStatus === 'completed';
 
   const shopCoordinates = useMemo(() => {
     // TODO: backend should provide shop coordinates for pickup navigation
@@ -162,6 +166,9 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         const code = String(data?.pickup_code || '').replace(/\D/g, '').slice(0, 4);
         if (active && code.length === 4) {
           setResolvedPickupCode(code);
+        }
+        if (active) {
+          setOrderStatus(String(data?.status || '').trim().toLowerCase());
         }
 
         const items = data?.items || data?.order_items || data?.products || [];
@@ -288,6 +295,35 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     AppAlert.alert('Report issue', 'Issue reporting for pickup orders will be wired soon.');
   };
 
+  const handleCancelOrder = () => {
+    if (!orderId) {
+      AppAlert.alert('Missing order info', 'Could not cancel this order right now.');
+      return;
+    }
+
+    AppAlert.alert(
+      'Cancel order',
+      'Are you sure you want to cancel this order?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelMarketplaceOrder(orderId);
+              AppAlert.alert('Cancelled', 'Order cancelled successfully.', [
+                { text: 'OK', onPress: () => navigation.goBack() },
+              ]);
+            } catch (error) {
+              AppAlert.alert('Could not cancel order', error?.message || 'Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleOpenStoreDetails = () => {
     const storeId = String(
       route?.params?.storeId ||
@@ -403,8 +439,13 @@ const PickupTrackingScreen = ({ navigation, route }) => {
               />
             </View>
 
-            <TouchableOpacity activeOpacity={0.85} onPress={handleReportIssue}>
-              <AppText style={styles.reportText}>Report an issue</AppText>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={isOrderCompleted ? handleReportIssue : handleCancelOrder}
+            >
+              <AppText style={styles.reportText}>
+                {isOrderCompleted ? 'Report an issue' : 'Cancel order'}
+              </AppText>
             </TouchableOpacity>
           </ScrollView>
         </Animated.View>
