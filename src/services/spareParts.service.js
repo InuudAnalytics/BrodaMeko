@@ -1,6 +1,17 @@
 import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 
+const normalizePartCondition = (condition) => {
+  const safe = String(condition || '').trim().toLowerCase();
+  if (!safe) {
+    return 'new';
+  }
+  if (safe === 'used' || safe === 'used/refurbished') {
+    return 'refurbished';
+  }
+  return safe === 'refurbished' ? 'refurbished' : 'new';
+};
+
 const toId = (value, fieldName) => {
   const safe = String(value || '').trim();
   if (!safe) {
@@ -113,7 +124,7 @@ export const createSellerPart = async ({ name, description, price, stock_quantit
   if (price !== undefined) formData.append('price', String(price));
   if (stock_quantity !== undefined) formData.append('stock_quantity', String(stock_quantity));
   if (category) formData.append('category', String(category));
-  if (condition) formData.append('condition', String(condition));
+  formData.append('condition', normalizePartCondition(condition));
 
   if (Array.isArray(images)) {
     images.forEach((img) => {
@@ -141,7 +152,11 @@ export const getSellerParts = async () => {
 
 export const updateSellerPart = async (partId, payload = {}) => {
   const safePartId = toId(partId, 'partId');
-  const response = await api.patch(ENDPOINTS.marketplace.sellerPartDetails(safePartId), payload);
+  const nextPayload = { ...payload };
+  if (Object.prototype.hasOwnProperty.call(nextPayload, 'condition')) {
+    nextPayload.condition = normalizePartCondition(nextPayload.condition);
+  }
+  const response = await api.patch(ENDPOINTS.marketplace.sellerPartDetails(safePartId), nextPayload);
   return response.data;
 };
 

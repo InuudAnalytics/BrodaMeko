@@ -12,6 +12,7 @@ const MAX_IMAGES = 5;
 const SCREEN_BG = '#000033';
 
 const sanitizeDigits = (value) => String(value || '').replace(/\D/g, '');
+const REFURBISHED_CONDITION = 'refurbished';
 
 const AddProductScreen = ({ navigation }) => {
   const { addProduct } = useSellerStore();
@@ -193,11 +194,11 @@ const AddProductScreen = ({ navigation }) => {
                 <AppText style={[styles.toggleText, condition === 'new' ? styles.toggleTextActive : null]}>New</AppText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.toggleButton, condition === 'used' ? styles.toggleActive : null]}
+                style={[styles.toggleButton, condition === REFURBISHED_CONDITION ? styles.toggleActive : null]}
                 activeOpacity={0.85}
-                onPress={() => setCondition('used')}
+                onPress={() => setCondition(REFURBISHED_CONDITION)}
               >
-                <AppText style={[styles.toggleText, condition === 'used' ? styles.toggleTextActive : null]}>
+                <AppText style={[styles.toggleText, condition === REFURBISHED_CONDITION ? styles.toggleTextActive : null]}>
                   Used/Refurbished
                 </AppText>
               </TouchableOpacity>

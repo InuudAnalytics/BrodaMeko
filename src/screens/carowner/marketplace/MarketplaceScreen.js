@@ -94,7 +94,7 @@ const SkeletonCard = () => (
 );
 
 const MarketplaceScreen = ({ navigation }) => {
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -128,6 +128,11 @@ const MarketplaceScreen = ({ navigation }) => {
     const q = search.trim().toLowerCase();
     return products.filter((item) => item.name.toLowerCase().includes(q));
   }, [products, search]);
+  const cartCount = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item?.quantity || 0), 0),
+    [items]
+  );
+  const cartCountLabel = cartCount > 99 ? '99+' : String(cartCount);
   const listData = loading ? SKELETON_ITEMS : visibleProducts;
 
   const handleOpenProduct = (product) => {
@@ -221,6 +226,11 @@ const MarketplaceScreen = ({ navigation }) => {
 
         <Pressable style={styles.floatingCart} onPress={() => navigation.navigate('Cart')}>
           <HugeiconsIcon icon={ShoppingCart02Icon} size={20} color="#000033" strokeWidth={2} />
+          {cartCount > 0 ? (
+            <View style={styles.cartBadge}>
+              <AppText style={styles.cartBadgeText}>{cartCountLabel}</AppText>
+            </View>
+          ) : null}
         </Pressable>
       </ScreenContainer>
       <AppBottomNav activeTab={ROUTES.CAR_OWNER_MARKETPLACE} onTabPress={handleTabPress} />
@@ -373,6 +383,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
+    overflow: 'visible',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#000033',
+  },
+  cartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.bold,
   },
   root: {
     flex: 1,

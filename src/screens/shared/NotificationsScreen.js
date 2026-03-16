@@ -21,6 +21,7 @@ import { getConversationByJobId } from '../../services/jobs.service';
 import { getMessages as getConversationMessages } from '../../services/chat.service';
 import { darkTheme, withAlpha } from '../../theme';
 import { ROLES, ROUTES } from '../../utils';
+import { resolveNotificationRoute } from '../../utils/notificationRouting';
 import AppAlert from '../../components/AppAlert';
 const TABS = [
   { key: 'all', label: 'All', category: '' },
@@ -208,6 +209,12 @@ const NotificationsScreen = ({ navigation }) => {
 
   const handleNavigateFromNotification = async (item) => {
     const payloadData = item?.data && typeof item.data === 'object' ? item.data : {};
+    const deepLink = resolveNotificationRoute({ notification: item, role });
+    if (deepLink?.route) {
+      navigation.navigate(deepLink.route, deepLink.params || {});
+      return;
+    }
+
     const actionRequired = String(payloadData?.action_required || '').trim().toLowerCase();
     const conversationId = String(payloadData?.conversation_id || '').trim();
     const jobId = String(payloadData?.job_id || '').trim();

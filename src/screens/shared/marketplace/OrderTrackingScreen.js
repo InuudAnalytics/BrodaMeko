@@ -278,6 +278,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     orderStatus,
   } = orderState;
   const isOrderCompleted = orderStatus === 'completed';
+  const isOrderDisputed = orderStatus === 'disputed';
   const shopCoordinates = useMemo(
     () => buildStoreCoordinates({ route, orderState }),
     [orderState, route]
@@ -402,7 +403,33 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   };
 
   const handleReportIssue = () => {
-    AppAlert.alert('Report issue', 'Issue reporting will be wired soon.');
+    if (!orderId) {
+      AppAlert.alert('Missing order info', 'Could not open dispute form for this order.');
+      return;
+    }
+
+    navigation.navigate(ROUTES.ORDER_DISPUTE, {
+      orderId,
+      itemId,
+      orderItems: orderItems.map((entry) => ({
+        id: entry?.id,
+        name: entry?.name,
+        status: entry?.status,
+      })),
+    });
+  };
+
+  const handleOpenDisputeDetail = () => {
+    if (!orderId) {
+      AppAlert.alert('Missing order info', 'Could not open dispute detail for this order.');
+      return;
+    }
+
+    navigation.navigate(ROUTES.DISPUTE_DETAIL, {
+      disputeType: 'order',
+      sourceOrderId: orderId,
+      sourceOrderItemId: itemId || '',
+    });
   };
 
   const handleCancelOrder = () => {
@@ -709,6 +736,16 @@ const OrderTrackingScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.actionsRow}>
+              {isOrderDisputed ? (
+                <TouchableOpacity
+                  style={styles.disputeStatusCard}
+                  activeOpacity={0.88}
+                  onPress={handleOpenDisputeDetail}
+                >
+                  <AppText style={styles.disputeStatusTitle}>Order is disputed</AppText>
+                  <AppText style={styles.disputeStatusBody}>View dispute status and support follow-up.</AppText>
+                </TouchableOpacity>
+              ) : null}
               <AppButton
                 label="Confirm delivery"
                 onPress={handleConfirmDelivery}
@@ -716,11 +753,11 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               />
               <TouchableOpacity
                 style={styles.secondaryAction}
-                onPress={isOrderCompleted ? handleReportIssue : handleCancelOrder}
+                onPress={isOrderDisputed ? handleOpenDisputeDetail : (isOrderCompleted ? handleReportIssue : handleCancelOrder)}
                 activeOpacity={0.85}
               >
                 <AppText style={styles.secondaryActionText}>
-                  {isOrderCompleted ? 'Report an issue' : 'Cancel order'}
+                  {isOrderDisputed ? 'View dispute status' : (isOrderCompleted ? 'Report an issue' : 'Cancel order')}
                 </AppText>
               </TouchableOpacity>
             </View>
@@ -1034,6 +1071,26 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     marginBottom: 20,
+  },
+  disputeStatusCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(230,199,20,0.45)',
+    backgroundColor: 'rgba(230,199,20,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  disputeStatusTitle: {
+    color: '#F4DE7A',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  disputeStatusBody: {
+    marginTop: 4,
+    color: '#E5E7EB',
+    fontSize: 12,
+    lineHeight: 16,
   },
   summaryCard: {
     backgroundColor: '#1A1A4A',

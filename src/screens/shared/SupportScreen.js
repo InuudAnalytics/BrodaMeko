@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../components';
+import { createSupportTicket, sendSupportTicketImages } from '../../services/support.service';
 import { darkTheme, withAlpha } from '../../theme';
-import { pickSingleImageFromGallery } from '../../utils';
+import { pickSingleImageFromGallery, ROUTES } from '../../utils';
 import AppAlert from '../../components/AppAlert';
 const UploadImageGlyph = ({ color }) => (
   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
@@ -24,6 +25,7 @@ const SupportScreen = ({ navigation }) => {
   const [description, setDescription] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handlePickAttachment = async () => {
     if (isPickingImage) {
@@ -58,8 +60,47 @@ const SupportScreen = ({ navigation }) => {
     }
   };
 
-  const handleSubmit = () => {
-    AppAlert.alert('Submitted', 'Your support request has been sent.');
+  const handleSubmit = async () => {
+    if (submitting) {
+      return;
+    }
+
+    const safeDescription = String(description || '').trim();
+    if (!safeDescription) {
+      AppAlert.alert('Missing details', 'Please enter a description before submitting.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const subject = safeDescription.length > 80 ? `${safeDescription.slice(0, 80)}...` : safeDescription;
+      const ticketResponse = await createSupportTicket({
+        subject,
+        category: 'other',
+        priority: 'normal',
+      });
+      const ticket = ticketResponse?.data || ticketResponse || {};
+      const ticketId = String(ticket?.id || '').trim();
+
+      if (!ticketId) {
+        AppAlert.alert('Error', 'Ticket was created but ID was missing from response.');
+        return;
+      }
+
+      if (attachment?.uri) {
+        try {
+          await sendSupportTicketImages(ticketId, [attachment]);
+        } catch {
+          AppAlert.alert('Ticket created', 'Support ticket created, but attachment upload failed.');
+        }
+      }
+
+      navigation.navigate(ROUTES.SUPPORT_CHAT, { ticketId, ticketSubject: subject });
+    } catch (submitError) {
+      AppAlert.alert('Submit failed', submitError?.message || 'Could not submit support request.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -107,7 +148,13 @@ const SupportScreen = ({ navigation }) => {
           </TouchableOpacity>
         ) : null}
 
-        <AppButton label="Submit" onPress={handleSubmit} style={styles.submitButton} />
+        <AppButton
+          label={submitting ? 'Submitting...' : 'Submit'}
+          onPress={handleSubmit}
+          disabled={submitting}
+          left={submitting ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
+          style={styles.submitButton}
+        />
       </View>
     </ScreenContainer>
   );
@@ -238,6 +285,7 @@ const styles = StyleSheet.create({
 });
 
 export default SupportScreen;
+
 
 
 

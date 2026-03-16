@@ -93,7 +93,7 @@ const SkeletonCard = () => (
 );
 
 const MechanicMarketplaceScreen = ({ navigation }) => {
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -127,16 +127,12 @@ const MechanicMarketplaceScreen = ({ navigation }) => {
     const q = search.trim().toLowerCase();
     return products.filter((item) => item.name.toLowerCase().includes(q));
   }, [products, search]);
+  const cartCount = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item?.quantity || 0), 0),
+    [items]
+  );
+  const cartCountLabel = cartCount > 99 ? '99+' : String(cartCount);
   const listData = loading ? SKELETON_ITEMS : visibleProducts;
-  const handleTabPress = tabKey => {
-    if (tabKey === 'profile') {
-      navigation.navigate(ROUTES.USER_PROFILE);
-      return;
-    }
-
-    navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: tabKey });
-  };
-
   const handleOpenProduct = product => {
     navigation.navigate('ProductDetails', { productId: product.id });
   };
@@ -203,6 +199,11 @@ const MechanicMarketplaceScreen = ({ navigation }) => {
                 color="#000033"
                 strokeWidth={2}
               />
+              {cartCount > 0 ? (
+                <View style={styles.cartBadge}>
+                  <AppText style={styles.cartBadgeText}>{cartCountLabel}</AppText>
+                </View>
+              ) : null}
             </Pressable>
           </View>
 
@@ -324,6 +325,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6C714',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#000033',
+  },
+  cartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.bold,
   },
   listContent: {
     paddingBottom: 80,

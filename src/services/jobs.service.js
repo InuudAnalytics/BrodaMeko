@@ -1,5 +1,7 @@
 import { ENDPOINTS } from '../config/endpoints';
+import { isDisputeV2EnabledForRole } from '../config/featureFlags';
 import api from './api';
+import { fileJobDisputeV2 } from './dispute.service';
 
 const buildServiceError = (message) => {
   const error = new Error(message);
@@ -259,7 +261,7 @@ export const confirmJob = async (jobId) => {
   return response.data;
 };
 
-export const fileJobDispute = async (jobId, reason) => {
+export const fileJobDispute = async (jobId, reason, { role } = {}) => {
   const safeJobId = assertJobId(jobId);
   const safeReason = String(reason || '').trim();
 
@@ -267,8 +269,26 @@ export const fileJobDispute = async (jobId, reason) => {
     buildServiceError('reason is required.');
   }
 
-  const response = await api.post(ENDPOINTS.jobs.dispute(safeJobId), { reason: safeReason });
-  return response.data;
+  const allowV2 = isDisputeV2EnabledForRole(role);
+
+  // Prefer the dedicated dispute module endpoint when enabled.
+  // Fall back to legacy jobs endpoint to avoid blocking users during rollout.
+  if (!allowV2) {
+    const response = await api.post(ENDPOINTS.jobs.dispute(safeJobId), { reason: safeReason });
+    return response.data;
+  }
+
+  try {
+    return await fileJobDisputeV2(safeJobId, { reason: safeReason });
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 0);
+    if (statusCode !== 404 && statusCode !== 405) {
+      throw error;
+    }
+
+    const response = await api.post(ENDPOINTS.jobs.dispute(safeJobId), { reason: safeReason });
+    return response.data;
+  }
 };
 
 export const getMechanicsForJob = async (jobId) => {

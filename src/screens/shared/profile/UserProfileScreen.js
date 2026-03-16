@@ -320,8 +320,12 @@ const UserProfileScreen = ({ navigation, onBack }) => {
       navigation.navigate(ROUTES.SUPPORT);
       return;
     }
+    if (target === 'disputes') {
+      navigation.navigate(ROUTES.DISPUTES);
+      return;
+    }
     if (target === 'chat') {
-      navigation.navigate(ROUTES.SUPPORT_CHAT_MOCK);
+      navigation.navigate(ROUTES.SUPPORT_CHAT);
       return;
     }
     navigation.navigate(ROUTES.PRIVACY_POLICY);
@@ -483,6 +487,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
             </View>
 
             <SettingRow label="Support center" icon={HelpCircleIcon} onPress={() => handleSupportAction('support_center')} />
+            <SettingRow label="My disputes" icon={Alert01Icon} onPress={() => handleSupportAction('disputes')} />
             <SettingRow label="Chat with BrodaMeko" icon={Notification01Icon} onPress={() => handleSupportAction('chat')} />
             <SettingRow label="Privacy policy" icon={User02Icon} onPress={() => handleSupportAction('privacy')} isLast />
           </View>
@@ -974,3 +979,4 @@ const styles = StyleSheet.create({
 });
 
 export default UserProfileScreen;
+

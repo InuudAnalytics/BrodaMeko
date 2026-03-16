@@ -4,7 +4,10 @@ import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
-import SupportChatMockScreen from '../screens/shared/SupportChatMockScreen';
+import SupportTicketListScreen from '../screens/shared/SupportTicketListScreen';
+import SupportChatScreen from '../screens/shared/SupportChatScreen';
+import DisputeListScreen from '../screens/shared/DisputeListScreen';
+import DisputeDetailScreen from '../screens/shared/DisputeDetailScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import {
   SparePartsBankDetailsScreen,
@@ -104,8 +107,11 @@ const SparePartsStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name={ROUTES.CHANGE_PASSWORD} component={ChangePasswordScreen} options={{ headerShown: false }} />
-      <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
-      <Stack.Screen name={ROUTES.SUPPORT_CHAT_MOCK} component={SupportChatMockScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT} component={SupportTicketListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT_CREATE} component={SupportScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT_CHAT} component={SupportChatScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.DISPUTES} component={DisputeListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.DISPUTE_DETAIL} component={DisputeDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.USER_PROFILE} component={UserProfileScreen} options={{ headerShown: false }} />
@@ -125,3 +131,5 @@ const SparePartsStack = () => {
 };
 
 export default SparePartsStack;
+
+

@@ -261,7 +261,7 @@ const CartScreen = ({ navigation, route }) => {
                 </AppText>
               </View>
               <View style={styles.summaryRow}>
-                <AppText style={styles.summaryLabel}>Service fee (backend)</AppText>
+                <AppText style={styles.summaryLabel}>Service fee</AppText>
                 <AppText style={styles.summaryValue}>
                   Calculated at checkout
                 </AppText>

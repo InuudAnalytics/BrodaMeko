@@ -32,7 +32,11 @@ import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import PlaceholderScreen from '../screens/shared/PlaceholderScreen';
 import ChangePasswordScreen from '../screens/shared/ChangePasswordScreen';
 import SupportScreen from '../screens/shared/SupportScreen';
-import SupportChatMockScreen from '../screens/shared/SupportChatMockScreen';
+import SupportTicketListScreen from '../screens/shared/SupportTicketListScreen';
+import SupportChatScreen from '../screens/shared/SupportChatScreen';
+import DisputeListScreen from '../screens/shared/DisputeListScreen';
+import DisputeDetailScreen from '../screens/shared/DisputeDetailScreen';
+import JobDisputeScreen from '../screens/shared/JobDisputeScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 import PersonalInfoScreen from '../screens/shared/profile/PersonalInfoScreen';
 import ProfileBankDetailsScreen from '../screens/shared/profile/ProfileBankDetailsScreen';
@@ -43,6 +47,7 @@ import CheckoutScreen from '../screens/shared/marketplace/CheckoutScreen';
 import MarketplacePaymentSuccessScreen from '../screens/shared/marketplace/PaymentSuccessScreen';
 import FavoritesScreen from '../screens/carowner/marketplace/FavoritesScreen';
 import OrderTrackingScreen from '../screens/shared/marketplace/OrderTrackingScreen';
+import OrderDisputeScreen from '../screens/shared/marketplace/OrderDisputeScreen';
 import PickupTrackingScreen from '../screens/shared/marketplace/PickupTrackingScreen';
 import StoreDetailsScreen from '../screens/shared/marketplace/StoreDetailsScreen';
 import RateProductScreen from '../screens/shared/marketplace/RateProductScreen';
@@ -99,6 +104,8 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.ORDER_DISPUTE} component={OrderDisputeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.JOB_DISPUTE} component={JobDisputeScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.CAR_OWNER_PICKUP_TRACKING}
         component={PickupTrackingScreen}
@@ -260,8 +267,11 @@ const CarOwnerStack = () => {
         component={ChangePasswordScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name={ROUTES.SUPPORT} component={SupportScreen} options={{ headerShown: false }} />
-      <Stack.Screen name={ROUTES.SUPPORT_CHAT_MOCK} component={SupportChatMockScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT} component={SupportTicketListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT_CREATE} component={SupportScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.SUPPORT_CHAT} component={SupportChatScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.DISPUTES} component={DisputeListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.DISPUTE_DETAIL} component={DisputeDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
@@ -269,3 +279,5 @@ const CarOwnerStack = () => {
 };
 
 export default CarOwnerStack;
+
+

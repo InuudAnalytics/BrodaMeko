@@ -1,5 +1,6 @@
 export const BASE_URL = 'https://brodameko-server-50cv.onrender.com';
 export const CHAT_WS_URL = 'wss://brodameko-server-50cv.onrender.com/api/v1/chat/ws';
+export const SUPPORT_WS_URL = 'wss://brodameko-server-50cv.onrender.com/api/v1/support/ws';
 
 export const ENDPOINTS = {
   auth: {
@@ -125,6 +126,23 @@ export const ENDPOINTS = {
       `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/quotation`,
     respondToQuotation: (conversationId) =>
       `/api/v1/chat/conversations/${encodeURIComponent(String(conversationId || ''))}/quotation/respond`,
+  },
+  support: {
+    ws: SUPPORT_WS_URL,
+    tickets: '/api/v1/support/tickets',
+    ticketDetails: (ticketId) => `/api/v1/support/tickets/${encodeURIComponent(String(ticketId || ''))}`,
+    ticketMessages: (ticketId) =>
+      `/api/v1/support/tickets/${encodeURIComponent(String(ticketId || ''))}/messages`,
+    ticketImages: (ticketId) =>
+      `/api/v1/support/tickets/${encodeURIComponent(String(ticketId || ''))}/messages/images`,
+    ticketRead: (ticketId) => `/api/v1/support/tickets/${encodeURIComponent(String(ticketId || ''))}/read`,
+    disputeTicket: '/api/v1/support/dispute-ticket',
+  },
+  dispute: {
+    fileJob: (jobId) => `/api/v1/dispute/jobs/${encodeURIComponent(String(jobId || ''))}/dispute`,
+    fileOrder: (orderId) => `/api/v1/dispute/orders/${encodeURIComponent(String(orderId || ''))}/dispute`,
+    myJobDisputes: '/api/v1/dispute/disputes/jobs',
+    myOrderDisputes: '/api/v1/dispute/disputes/orders',
   },
   mechanicReviews: {
     leave: (mechanicId) =>

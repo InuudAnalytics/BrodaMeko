@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, TouchableOpacit
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
+  Alert01Icon,
   ArrowLeft01Icon,
   Camera01Icon,
   Cancel01Icon,
@@ -371,11 +372,19 @@ const EditProfileScreen = ({ navigation }) => {
               }}
             />
             <SupportActionRow
+              label="My disputes"
+              icon={Alert01Icon}
+              onPress={() => {
+                setShowSupportSheet(false);
+                navigation.navigate(ROUTES.DISPUTES);
+              }}
+            />
+            <SupportActionRow
               label="Chat with BrodaMeko"
               icon={Notification01Icon}
               onPress={() => {
                 setShowSupportSheet(false);
-                navigation.navigate(ROUTES.SUPPORT_CHAT_MOCK);
+                navigation.navigate(ROUTES.SUPPORT_CHAT);
               }}
             />
             <SupportActionRow
@@ -580,6 +589,7 @@ const styles = StyleSheet.create({
 });
 
 export default EditProfileScreen;
+
 
 
 

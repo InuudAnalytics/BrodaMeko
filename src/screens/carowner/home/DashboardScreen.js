@@ -20,7 +20,6 @@ import { useAuth, useChat, useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 import {
   confirmJob,
-  fileJobDispute,
   getCarOwnerJob,
   getLatestJobLocation,
   updateJobLocation,
@@ -38,6 +37,7 @@ const TRACKER_STEPS = [
   { key: 'arrived', label: 'Arrived' },
   { key: 'in_progress', label: 'Repairing' },
   { key: 'completed', label: 'Completed' },
+  { key: 'disputed', label: 'Disputed' },
 ];
 
 const normalizeProgressStatus = (value) => {
@@ -69,6 +69,10 @@ const normalizeProgressStatus = (value) => {
 
   if (status === 'completed' || status === 'done') {
     return 'completed';
+  }
+
+  if (status === 'disputed') {
+    return 'disputed';
   }
 
   return 'accepted';
@@ -196,7 +200,6 @@ const DashboardScreen = ({ navigation, route }) => {
   const [activeSession, setActiveSession] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [disputing, setDisputing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [trackedLocation, setTrackedLocation] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -634,28 +637,10 @@ const DashboardScreen = ({ navigation, route }) => {
     const jobId = String(activeSession?.jobId || '').trim();
     const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
 
-    if (!jobId || disputing || progressStatus !== 'completed') {
+    if (!jobId || progressStatus !== 'completed') {
       return;
     }
-
-    const submitDispute = async (reason) => {
-      setDisputing(true);
-      try {
-        await fileJobDispute(jobId, reason);
-        AppAlert.alert('Dispute submitted', 'Your dispute has been logged for review.');
-      } catch (error) {
-        AppAlert.alert('Error', error?.message || 'Could not submit dispute.');
-      } finally {
-        setDisputing(false);
-      }
-    };
-
-    AppAlert.alert('Open dispute', 'Select the reason for this dispute.', [
-      { text: 'Work not completed', onPress: () => submitDispute('Work not completed') },
-      { text: 'Overcharged', onPress: () => submitDispute('Overcharged') },
-      { text: 'Other issue', onPress: () => submitDispute('Other issue') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    navigation.navigate(ROUTES.JOB_DISPUTE, { jobId });
   };
 
   const renderDefaultContent = () => (
@@ -678,6 +663,7 @@ const DashboardScreen = ({ navigation, route }) => {
     const currentStepIndex = TRACKER_STEPS.findIndex((item) => item.key === progressStatus);
     const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
     const isCompleted = progressStatus === 'completed';
+    const isDisputed = progressStatus === 'disputed';
     const canOwnerCancel = progressStatus === 'pending' || progressStatus === 'accepted';
     const isTransitOrRepair = progressStatus === 'en_route' || progressStatus === 'arrived' || progressStatus === 'in_progress';
 
@@ -738,24 +724,36 @@ const DashboardScreen = ({ navigation, route }) => {
               </AppText>
             </View>
           ) : null}
+          {isDisputed ? (
+            <TouchableOpacity
+              style={styles.secondaryAction}
+              activeOpacity={0.88}
+              onPress={() =>
+                navigation.navigate(ROUTES.DISPUTE_DETAIL, {
+                  disputeType: 'job',
+                  sourceJobId: activeSession?.jobId || '',
+                })
+              }
+            >
+              <AppText style={styles.secondaryActionText}>View dispute status</AppText>
+            </TouchableOpacity>
+          ) : null}
           {isCompleted ? (
             <>
               <View style={styles.postCompleteRow}>
                 <AppButton
                   label={syncing ? 'Confirming...' : 'Confirm completion'}
                   onPress={handleConfirmCompletion}
-                  disabled={syncing || disputing}
+                  disabled={syncing}
                   style={styles.trackBtn}
                 />
                 <TouchableOpacity
-                  style={[styles.secondaryActionHalf, disputing ? styles.actionDisabled : null]}
+                  style={styles.secondaryActionHalf}
                   activeOpacity={0.88}
                   onPress={handleDisputeJob}
-                  disabled={disputing || syncing}
+                  disabled={syncing}
                 >
-                  <AppText style={styles.secondaryActionText}>
-                    {disputing ? 'Submitting...' : 'Dispute'}
-                  </AppText>
+                  <AppText style={styles.secondaryActionText}>Dispute</AppText>
                 </TouchableOpacity>
               </View>
               <View style={styles.postCompleteRow}>

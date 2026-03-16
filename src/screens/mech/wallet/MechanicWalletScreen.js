@@ -23,8 +23,6 @@ import {
   SentIcon,
   ViewIcon,
   ViewOffIcon,
-  WalletAdd02Icon,
-  Wrench01Icon,
 } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, NoInternetState, ScreenContainer } from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
@@ -169,12 +167,12 @@ const resolveDateRangeFromOption = optionKey => {
   return { fromMs: now - option.days * DAY_MS, toMs: now };
 };
 
-const ActionButton = ({ label, icon, onPress }) => {
+const ActionButton = ({ label, icon, onPress, buttonStyle }) => {
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
-      style={styles.actionButton}
+      style={[styles.actionButton, buttonStyle]}
     >
       <HugeiconsIcon
         icon={icon}
@@ -626,13 +624,7 @@ const MechanicWalletScreen = ({
               label="Withdraw"
               icon={SentIcon}
               onPress={openWithdrawModal}
-            />
-            <ActionButton
-              label="Fund wallet"
-              icon={WalletAdd02Icon}
-              onPress={() =>
-                navigation.navigate('Placeholder', { title: 'Fund wallet' })
-              }
+              buttonStyle={styles.actionButtonSingle}
             />
           </View>
 
@@ -1067,6 +1059,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     columnGap: darkTheme.spacing.xs,
   },
+  actionButtonSingle: {
+    flex: 0,
+    width: '100%',
+  },
   actionText: {
     color: darkTheme.colors.text,
     fontSize: darkTheme.typography.fontSizes.md,
@@ -1277,15 +1273,6 @@ const styles = StyleSheet.create({
   withdrawError: {
     marginTop: 10,
     color: '#F87171',
-    fontSize: 12,
-  },
-  withdrawCta: {
-    marginTop: 10,
-    minHeight: 38,
-    backgroundColor: darkTheme.colors.accent,
-  },
-  withdrawCtaText: {
-    color: '#111827',
     fontSize: 12,
   },
   withdrawCta: {

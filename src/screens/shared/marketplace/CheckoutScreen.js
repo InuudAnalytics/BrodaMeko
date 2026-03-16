@@ -1,17 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Location01Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { useAuth, useCart } from '../../../context';
-import { checkoutMarketplaceOrder, getMarketplaceOrder, getMarketplacePart } from '../../../services/marketplace.service';
+import {
+  checkoutMarketplaceOrder,
+  getMarketplaceOrder,
+  getMarketplacePart,
+} from '../../../services/marketplace.service';
 import AppAlert from '../../../components/AppAlert';
 import { getWalletBalance } from '../../../services/wallet.service';
 import { WebView } from 'react-native-webview';
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
 
-const resolveImageUri = (value) => {
+const resolveImageUri = value => {
   if (!value) {
     return '';
   }
@@ -19,12 +31,14 @@ const resolveImageUri = (value) => {
     return value;
   }
   if (typeof value === 'object') {
-    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    return String(
+      value?.url || value?.secure_url || value?.uri || value?.path || '',
+    ).trim();
   }
   return '';
 };
 
-const formatAddressObject = (value) => {
+const formatAddressObject = value => {
   if (!value || typeof value !== 'object') {
     return '';
   }
@@ -35,9 +49,10 @@ const formatAddressObject = (value) => {
   return [street, city, state, country].filter(Boolean).join(', ');
 };
 
-const pickFirstDefined = (...values) => values.find(value => value !== undefined && value !== null);
+const pickFirstDefined = (...values) =>
+  values.find(value => value !== undefined && value !== null);
 
-const toFiniteNumber = (value) => {
+const toFiniteNumber = value => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
@@ -51,8 +66,12 @@ const isWithinNigeria = (latitude, longitude) =>
   longitude >= 2.5 &&
   longitude <= 15.0;
 
-const extractShopCoordinates = (product) => {
-  const source = product?.shopCoordinates || product?.storeCoordinates || product?.store?.coordinates || {};
+const extractShopCoordinates = product => {
+  const source =
+    product?.shopCoordinates ||
+    product?.storeCoordinates ||
+    product?.store?.coordinates ||
+    {};
   const latitude =
     toFiniteNumber(source?.latitude) ??
     toFiniteNumber(source?.lat) ??
@@ -75,7 +94,7 @@ const extractShopCoordinates = (product) => {
   return NIGERIA_FALLBACK_COORDS;
 };
 
-const readWalletAmount = (walletPayload) => {
+const readWalletAmount = walletPayload => {
   const root = walletPayload?.data || walletPayload || {};
   const amount =
     root?.balance ??
@@ -87,7 +106,7 @@ const readWalletAmount = (walletPayload) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const readAuthorizationUrl = (responseData) => {
+const readAuthorizationUrl = responseData => {
   const payload = responseData?.payment || responseData || {};
   return String(
     payload?.authorization_url ||
@@ -100,12 +119,9 @@ const readAuthorizationUrl = (responseData) => {
   ).trim();
 };
 
-const readOrderId = (responseData) => {
+const readOrderId = responseData => {
   const directId = String(
-    responseData?.order_id ||
-      responseData?.orderId ||
-      responseData?.id ||
-      '',
+    responseData?.order_id || responseData?.orderId || responseData?.id || '',
   ).trim();
   if (directId) {
     return directId;
@@ -144,13 +160,14 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [verifyingPaystack, setVerifyingPaystack] = useState(false);
 
   const directProduct = route?.params?.directProduct || null;
-  const product = directProduct || items?.[0]?.product || {
-    id: '1',
-    name: 'LED headlights',
-    price: 2500,
-    shop: 'Okon spare part hub',
-    images: ['https://picsum.photos/300'],
-  };
+  const product = directProduct ||
+    items?.[0]?.product || {
+      id: '1',
+      name: 'LED headlights',
+      price: 2500,
+      shop: 'Okon spare part hub',
+      images: ['https://picsum.photos/300'],
+    };
 
   const image = resolveImageUri(product?.images?.[0]);
   const quantity = Number(product?.quantity || items?.[0]?.quantity || 1);
@@ -162,7 +179,9 @@ const CheckoutScreen = ({ navigation, route }) => {
   }, [calculateTotal, directProduct, product?.price, quantity]);
   const deliveryFee = 0;
   const total = subtotal + deliveryFee;
-  const productId = String(product?.id || product?._id || product?.part_id || '').trim();
+  const productId = String(
+    product?.id || product?._id || product?.part_id || '',
+  ).trim();
 
   useEffect(() => {
     let active = true;
@@ -224,8 +243,8 @@ const CheckoutScreen = ({ navigation, route }) => {
       hydratedPart?.store_name,
       hydratedPart?.store?.store_name,
       hydratedPart?.store?.name,
-      product?.shop
-    ) || 'Seller'
+      product?.shop,
+    ) || 'Seller',
   );
   const storeAddress = String(
     pickFirstDefined(
@@ -235,11 +254,13 @@ const CheckoutScreen = ({ navigation, route }) => {
       formatAddressObject(hydratedPart?.store_address),
       hydratedPart?.store?.address,
       hydratedPart?.store?.street
-        ? `${hydratedPart.store.street}, ${hydratedPart.store.city || ''}, ${hydratedPart.store.state || ''}, ${hydratedPart.store.country || ''}`
-        : ''
+        ? `${hydratedPart.store.street}, ${hydratedPart.store.city || ''}, ${
+            hydratedPart.store.state || ''
+          }, ${hydratedPart.store.country || ''}`
+        : '',
     ) ||
       product?.location ||
-      'Store address unavailable'
+      'Store address unavailable',
   );
   const storeInfo = String(
     pickFirstDefined(
@@ -249,9 +270,8 @@ const CheckoutScreen = ({ navigation, route }) => {
       hydratedPart?.store_phone,
       product?.store?.phone,
       hydratedPart?.store?.phone,
-      hydratedPart?.store?.phone_number
-    ) ||
-      'Store information unavailable.'
+      hydratedPart?.store?.phone_number,
+    ) || 'Store information unavailable.',
   );
 
   const resolvedStorePhone = String(
@@ -261,15 +281,15 @@ const CheckoutScreen = ({ navigation, route }) => {
       product?.store?.phone,
       hydratedPart?.store?.phone,
       hydratedPart?.store?.phone_number,
-      product?.phone
-    ) || ''
+      product?.phone,
+    ) || '',
   ).trim();
 
   const closeCheckoutModal = () => {
     setShowCheckoutModal(false);
   };
 
-  const finalizeOrderSuccess = async (successParams) => {
+  const finalizeOrderSuccess = async successParams => {
     await clearCart();
     navigation.navigate('PaymentSuccessScreen', successParams);
   };
@@ -295,12 +315,14 @@ const CheckoutScreen = ({ navigation, route }) => {
         const orderResponse = await getMarketplaceOrder(orderId);
         const payload = orderResponse?.data || orderResponse || {};
         const data = payload?.data || payload || {};
-        const paymentStatus = String(data?.payment_status || '').trim().toLowerCase();
+        const paymentStatus = String(data?.payment_status || '')
+          .trim()
+          .toLowerCase();
         if (paymentStatus === 'paid') {
           paid = true;
           break;
         }
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
 
       if (!paid) {
@@ -353,7 +375,10 @@ const CheckoutScreen = ({ navigation, route }) => {
       };
 
       if (!payload.contact_phone) {
-        AppAlert.alert('Phone required', 'Please add your phone number in profile before checkout.');
+        AppAlert.alert(
+          'Phone required',
+          'Please add your phone number in profile before checkout.',
+        );
         setIsSubmitting(false);
         return;
       }
@@ -361,8 +386,16 @@ const CheckoutScreen = ({ navigation, route }) => {
       const checkoutResponse = await checkoutMarketplaceOrder(payload);
       const responsePayload = checkoutResponse?.data || checkoutResponse || {};
       const responseData = responsePayload?.data || responsePayload || {};
-      const backendSubtotal = readSummaryAmount(responseData, 'subtotal', subtotal);
-      const backendServiceCharge = readSummaryAmount(responseData, 'service_charge', 0);
+      const backendSubtotal = readSummaryAmount(
+        responseData,
+        'subtotal',
+        subtotal,
+      );
+      const backendServiceCharge = readSummaryAmount(
+        responseData,
+        'service_charge',
+        0,
+      );
       const backendTotal = readSummaryAmount(
         responseData,
         'total_amount',
@@ -370,29 +403,41 @@ const CheckoutScreen = ({ navigation, route }) => {
       );
       const createdOrderId = readOrderId(responseData);
       const pickupCode =
-        String(responseData?.pickup_code || '').replace(/\D/g, '').slice(0, 4) || undefined;
+        String(responseData?.pickup_code || '')
+          .replace(/\D/g, '')
+          .slice(0, 4) || undefined;
       const shopCoordinates = extractShopCoordinates({
         ...product,
-        shopCoordinates:
-          product?.shopCoordinates ||
-          hydratedPart?.store?.coordinates ||
-          {
-            latitude: pickFirstDefined(hydratedPart?.store_latitude, hydratedPart?.store?.latitude),
-            longitude: pickFirstDefined(hydratedPart?.store_longitude, hydratedPart?.store?.longitude),
+        shopCoordinates: product?.shopCoordinates ||
+          hydratedPart?.store?.coordinates || {
+            latitude: pickFirstDefined(
+              hydratedPart?.store_latitude,
+              hydratedPart?.store?.latitude,
+            ),
+            longitude: pickFirstDefined(
+              hydratedPart?.store_longitude,
+              hydratedPart?.store?.longitude,
+            ),
           },
-        storeLatitude: pickFirstDefined(product?.storeLatitude, hydratedPart?.store_latitude),
-        storeLongitude: pickFirstDefined(product?.storeLongitude, hydratedPart?.store_longitude),
+        storeLatitude: pickFirstDefined(
+          product?.storeLatitude,
+          hydratedPart?.store_latitude,
+        ),
+        storeLongitude: pickFirstDefined(
+          product?.storeLongitude,
+          hydratedPart?.store_longitude,
+        ),
         latitude: pickFirstDefined(
           product?.latitude,
           hydratedPart?.store_latitude,
           hydratedPart?.store?.latitude,
-          hydratedPart?.latitude
+          hydratedPart?.latitude,
         ),
         longitude: pickFirstDefined(
           product?.longitude,
           hydratedPart?.store_longitude,
           hydratedPart?.store?.longitude,
-          hydratedPart?.longitude
+          hydratedPart?.longitude,
         ),
       });
       const successParams = {
@@ -401,7 +446,9 @@ const CheckoutScreen = ({ navigation, route }) => {
         pickupCode,
         product: {
           name: product?.name || 'Product',
-          storeId: String(product?.storeId || product?.store_id || product?.store?.id || '').trim(),
+          storeId: String(
+            product?.storeId || product?.store_id || product?.store?.id || '',
+          ).trim(),
           price: Number(product?.price || 0),
           shop: product?.shop || 'Seller',
           images: Array.isArray(product?.images) ? product.images : [],
@@ -411,7 +458,11 @@ const CheckoutScreen = ({ navigation, route }) => {
         },
         seller: {
           name: storeName,
-          avatar: product?.store?.logo || product?.store?.avatar || hydratedPart?.store?.logo || '',
+          avatar:
+            product?.store?.logo ||
+            product?.store?.avatar ||
+            hydratedPart?.store?.logo ||
+            '',
           phone: resolvedStorePhone,
           isActive: true,
           coordinates: shopCoordinates,
@@ -447,12 +498,14 @@ const CheckoutScreen = ({ navigation, route }) => {
       setCheckoutError('');
       setShowCheckoutModal(true);
     } catch (error) {
-      AppAlert.alert('Checkout failed', error?.message || 'Could not process checkout.');
+      AppAlert.alert(
+        'Checkout failed',
+        error?.message || 'Could not process checkout.',
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
 
   return (
     <ScreenContainer padded={false}>
@@ -507,11 +560,13 @@ const CheckoutScreen = ({ navigation, route }) => {
             <View style={styles.summaryRow}>
               <AppText style={styles.summaryLabel}>Delivery fee</AppText>
               <AppText style={styles.summaryValue}>
-                {deliveryType === 'pickup' ? 'Calculated at checkout' : 'Unavailable'}
+                {deliveryType === 'pickup'
+                  ? 'Calculated at checkout'
+                  : 'Unavailable'}
               </AppText>
             </View>
             <View style={styles.summaryRow}>
-              <AppText style={styles.summaryLabel}>Service fee (backend)</AppText>
+              <AppText style={styles.summaryLabel}>Service fee</AppText>
               <AppText style={styles.summaryValue}>
                 Calculated at checkout
               </AppText>
@@ -531,15 +586,16 @@ const CheckoutScreen = ({ navigation, route }) => {
                   deliveryType === 'delivery' && styles.deliveryCardActive,
                 ]}
                 onPress={() => {
-                  AppAlert.alert('Delivery unavailable', 'Delivery mode is not available yet. Please use Pick up for now.');
+                  AppAlert.alert(
+                    'Delivery unavailable',
+                    'Delivery mode is not available yet. Please use Pick up for now.',
+                  );
                   setDeliveryType('pickup');
                 }}
                 activeOpacity={0.85}
               >
                 <AppText style={styles.deliveryTitle}>Request delivery</AppText>
-                <AppText style={styles.deliverySubtitle}>
-                  Unavailable
-                </AppText>
+                <AppText style={styles.deliverySubtitle}>Unavailable</AppText>
                 {deliveryType === 'delivery' ? (
                   <View style={styles.deliveryCheck} />
                 ) : null}
@@ -571,12 +627,8 @@ const CheckoutScreen = ({ navigation, route }) => {
               strokeWidth={2}
             />
             <View style={styles.locationInfo}>
-              <AppText style={styles.locationName}>
-                {storeName}
-              </AppText>
-              <AppText style={styles.locationAddress}>
-                {storeAddress}
-              </AppText>
+              <AppText style={styles.locationName}>{storeName}</AppText>
+              <AppText style={styles.locationAddress}>{storeAddress}</AppText>
             </View>
             <TouchableOpacity activeOpacity={0.85}>
               <AppText style={styles.changeText}>Change</AppText>
@@ -595,7 +647,9 @@ const CheckoutScreen = ({ navigation, route }) => {
             >
               <View>
                 <AppText style={styles.paymentTitle}>Pay with wallet</AppText>
-                <AppText style={styles.paymentSubtitle}>Use your wallet balance</AppText>
+                <AppText style={styles.paymentSubtitle}>
+                  Use your wallet balance
+                </AppText>
               </View>
               <View
                 style={[
@@ -668,11 +722,24 @@ const CheckoutScreen = ({ navigation, route }) => {
         />
       </View>
 
-      <Modal visible={showCheckoutModal} animationType="slide" presentationStyle="fullScreen">
+      <Modal
+        visible={showCheckoutModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
         <View style={styles.checkoutScreen}>
           <View style={styles.checkoutHeader}>
-            <TouchableOpacity style={styles.checkoutCloseBtn} activeOpacity={0.85} onPress={closeCheckoutModal}>
-              <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#FFFFFF" strokeWidth={2.2} />
+            <TouchableOpacity
+              style={styles.checkoutCloseBtn}
+              activeOpacity={0.85}
+              onPress={closeCheckoutModal}
+            >
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                size={20}
+                color="#FFFFFF"
+                strokeWidth={2.2}
+              />
             </TouchableOpacity>
             <AppText style={styles.checkoutTitle}>Checkout</AppText>
             <View style={styles.checkoutCloseBtn} />
@@ -686,17 +753,19 @@ const CheckoutScreen = ({ navigation, route }) => {
               domStorageEnabled
               thirdPartyCookiesEnabled
               sharedCookiesEnabled
-              onError={(event) => {
-                const description = String(event?.nativeEvent?.description || 'Could not load checkout.');
+              onError={event => {
+                const description = String(
+                  event?.nativeEvent?.description || 'Could not load checkout.',
+                );
                 setCheckoutError(description);
               }}
-              onHttpError={(event) => {
+              onHttpError={event => {
                 const statusCode = Number(event?.nativeEvent?.statusCode || 0);
                 if (statusCode) {
                   setCheckoutError(`Checkout request failed (${statusCode}).`);
                 }
               }}
-              onShouldStartLoadWithRequest={(request) => {
+              onShouldStartLoadWithRequest={request => {
                 const nextUrl = String(request?.url || '').toLowerCase();
                 if (
                   nextUrl.includes('status=success') ||
@@ -714,14 +783,19 @@ const CheckoutScreen = ({ navigation, route }) => {
                   nextUrl.includes('status=canceled') ||
                   nextUrl.includes('/cancel')
                 ) {
-                  AppAlert.alert('Payment not completed', 'You can retry checkout.');
+                  AppAlert.alert(
+                    'Payment not completed',
+                    'You can retry checkout.',
+                  );
                 }
                 return true;
               }}
             />
           ) : (
             <View style={styles.webLoadingWrap}>
-              <AppText style={styles.errorText}>No checkout URL available.</AppText>
+              <AppText style={styles.errorText}>
+                No checkout URL available.
+              </AppText>
             </View>
           )}
 
@@ -733,7 +807,11 @@ const CheckoutScreen = ({ navigation, route }) => {
 
           <View style={styles.checkoutFooter}>
             <AppButton
-              label={verifyingPaystack ? 'Verifying payment...' : 'Done, verify payment'}
+              label={
+                verifyingPaystack
+                  ? 'Verifying payment...'
+                  : 'Done, verify payment'
+              }
               onPress={() =>
                 verifyPaystackOrderAndContinue(
                   pendingSuccessParams?.orderId || '',
@@ -741,7 +819,11 @@ const CheckoutScreen = ({ navigation, route }) => {
                 )
               }
               disabled={verifyingPaystack || !pendingSuccessParams}
-              left={verifyingPaystack ? <ActivityIndicator size="small" color="#000033" /> : null}
+              left={
+                verifyingPaystack ? (
+                  <ActivityIndicator size="small" color="#000033" />
+                ) : null
+              }
             />
           </View>
         </View>
@@ -1022,7 +1104,3 @@ const styles = StyleSheet.create({
 });
 
 export default CheckoutScreen;
-
-
-
-
