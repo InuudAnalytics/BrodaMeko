@@ -2,17 +2,30 @@ import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 import { trackTelemetryEvent } from './telemetry.service';
 
-const buildServiceError = (message) => {
+const buildValidationError = (message, code = 'DISPUTE_VALIDATION_ERROR') => {
   const error = new Error(message);
   error.statusCode = 400;
   error.data = null;
-  throw error;
+  error.code = code;
+  return error;
+};
+
+const normalizeServiceError = (error, fallbackMessage = 'Dispute request failed.') => {
+  if (error?.code === 'DISPUTE_VALIDATION_ERROR') {
+    return error;
+  }
+
+  const normalized = new Error(String(error?.message || fallbackMessage));
+  normalized.statusCode = Number(error?.statusCode || error?.response?.status || 0);
+  normalized.data = error?.data || error?.response?.data || null;
+  normalized.code = 'DISPUTE_API_ERROR';
+  return normalized;
 };
 
 const assertId = (value, label) => {
   const safeValue = String(value || '').trim();
   if (!safeValue) {
-    buildServiceError(`${label} is required.`);
+    throw buildValidationError(`${label} is required.`);
   }
   return safeValue;
 };
@@ -52,7 +65,7 @@ const toFilePart = (file, index = 0) => {
 const buildDisputeFormData = ({ reason, evidence = [], order_item_id } = {}) => {
   const safeReason = String(reason || '').trim();
   if (!safeReason) {
-    buildServiceError('reason is required.');
+    throw buildValidationError('reason is required.');
   }
 
   const formData = new FormData();
@@ -74,6 +87,14 @@ const buildDisputeFormData = ({ reason, evidence = [], order_item_id } = {}) => 
   return formData;
 };
 
+const toPositiveInteger = (value, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.floor(numeric);
+};
+
 export const fileJobDisputeV2 = async (jobId, { reason, evidence = [] } = {}) => {
   const safeJobId = assertId(jobId, 'jobId');
   const formData = buildDisputeFormData({ reason, evidence });
@@ -84,11 +105,12 @@ export const fileJobDisputeV2 = async (jobId, { reason, evidence = [] } = {}) =>
     trackTelemetryEvent('dispute_job_submit_success', { job_id: safeJobId });
     return response.data;
   } catch (error) {
+    const normalizedError = normalizeServiceError(error, 'Could not file job dispute.');
     trackTelemetryEvent('dispute_job_submit_failed', {
       job_id: safeJobId,
-      status_code: Number(error?.statusCode || error?.response?.status || 0),
+      status_code: Number(normalizedError?.statusCode || 0),
     });
-    throw error;
+    throw normalizedError;
   }
 };
 
@@ -102,32 +124,41 @@ export const fileOrderDispute = async (orderId, { reason, order_item_id, evidenc
     trackTelemetryEvent('dispute_order_submit_success', { order_id: safeOrderId });
     return response.data;
   } catch (error) {
+    const normalizedError = normalizeServiceError(error, 'Could not file order dispute.');
     trackTelemetryEvent('dispute_order_submit_failed', {
       order_id: safeOrderId,
-      status_code: Number(error?.statusCode || error?.response?.status || 0),
+      status_code: Number(normalizedError?.statusCode || 0),
     });
-    throw error;
+    throw normalizedError;
   }
 };
 
 export const getMyJobDisputes = async ({ page = 1, limit = 20 } = {}) => {
-  const response = await api.get(ENDPOINTS.dispute.myJobDisputes, {
-    params: {
-      page: Number.isFinite(Number(page)) ? Number(page) : 1,
-      limit: Number.isFinite(Number(limit)) ? Number(limit) : 20,
-    },
-  });
-  return response.data;
+  try {
+    const response = await api.get(ENDPOINTS.dispute.myJobDisputes, {
+      params: {
+        page: toPositiveInteger(page, 1),
+        limit: toPositiveInteger(limit, 20),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not load job disputes.');
+  }
 };
 
 export const getMyOrderDisputes = async ({ page = 1, limit = 20 } = {}) => {
-  const response = await api.get(ENDPOINTS.dispute.myOrderDisputes, {
-    params: {
-      page: Number.isFinite(Number(page)) ? Number(page) : 1,
-      limit: Number.isFinite(Number(limit)) ? Number(limit) : 20,
-    },
-  });
-  return response.data;
+  try {
+    const response = await api.get(ENDPOINTS.dispute.myOrderDisputes, {
+      params: {
+        page: toPositiveInteger(page, 1),
+        limit: toPositiveInteger(limit, 20),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not load order disputes.');
+  }
 };
 
 export default {

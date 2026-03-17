@@ -58,7 +58,7 @@ Summary count:
 2. NotificationsScreen
 3. PrivacyPolicyScreen
 4. SupportScreen
-5. SupportChatMockScreen
+5. SupportChatScreen
 6. PlaceholderScreen
 7. ConversationsScreen
 8. ChatScreen

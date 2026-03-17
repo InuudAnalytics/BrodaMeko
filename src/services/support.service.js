@@ -2,17 +2,41 @@ import { ENDPOINTS } from '../config/endpoints';
 import api from './api';
 import { trackTelemetryEvent } from './telemetry.service';
 
-const buildServiceError = (message) => {
+export const SUPPORT_TICKET_CATEGORIES = [
+  'payment_issue',
+  'job_dispute',
+  'order_dispute',
+  'account_issue',
+  'technical',
+  'other',
+];
+
+export const SUPPORT_TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+
+const buildValidationError = (message, code = 'SUPPORT_VALIDATION_ERROR') => {
   const error = new Error(message);
   error.statusCode = 400;
   error.data = null;
-  throw error;
+  error.code = code;
+  return error;
+};
+
+const normalizeServiceError = (error, fallbackMessage = 'Support request failed.') => {
+  if (error?.code === 'SUPPORT_VALIDATION_ERROR') {
+    return error;
+  }
+
+  const normalized = new Error(String(error?.message || fallbackMessage));
+  normalized.statusCode = Number(error?.statusCode || error?.response?.status || 0);
+  normalized.data = error?.data || error?.response?.data || null;
+  normalized.code = 'SUPPORT_API_ERROR';
+  return normalized;
 };
 
 const assertTicketId = (ticketId) => {
   const safeTicketId = String(ticketId || '').trim();
   if (!safeTicketId) {
-    buildServiceError('ticketId is required.');
+    throw buildValidationError('ticketId is required.');
   }
   return safeTicketId;
 };
@@ -20,9 +44,39 @@ const assertTicketId = (ticketId) => {
 const assertDisputeId = (disputeId) => {
   const safeDisputeId = String(disputeId || '').trim();
   if (!safeDisputeId) {
-    buildServiceError('disputeId is required.');
+    throw buildValidationError('disputeId is required.');
   }
   return safeDisputeId;
+};
+
+const toPositiveInteger = (value, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.floor(numeric);
+};
+
+const normalizeCategory = (category) => {
+  const safeCategory = String(category || 'other').trim().toLowerCase() || 'other';
+  if (!SUPPORT_TICKET_CATEGORIES.includes(safeCategory)) {
+    throw buildValidationError(
+      `category must be one of: ${SUPPORT_TICKET_CATEGORIES.join(', ')}`,
+      'SUPPORT_VALIDATION_ERROR'
+    );
+  }
+  return safeCategory;
+};
+
+const normalizePriority = (priority) => {
+  const safePriority = String(priority || 'normal').trim().toLowerCase() || 'normal';
+  if (!SUPPORT_TICKET_PRIORITIES.includes(safePriority)) {
+    throw buildValidationError(
+      `priority must be one of: ${SUPPORT_TICKET_PRIORITIES.join(', ')}`,
+      'SUPPORT_VALIDATION_ERROR'
+    );
+  }
+  return safePriority;
 };
 
 const toFilePart = (file, index = 0) => {
@@ -66,13 +120,13 @@ export const createSupportTicket = async ({
 } = {}) => {
   const safeSubject = String(subject || '').trim();
   if (!safeSubject) {
-    buildServiceError('subject is required.');
+    throw buildValidationError('subject is required.');
   }
 
   const payload = {
     subject: safeSubject,
-    category: String(category || 'other').trim() || 'other',
-    priority: String(priority || 'normal').trim() || 'normal',
+    category: normalizeCategory(category),
+    priority: normalizePriority(priority),
   };
 
   const safeJobDisputeId = String(job_dispute_id || '').trim();
@@ -95,79 +149,110 @@ export const createSupportTicket = async ({
     });
     return response.data;
   } catch (error) {
+    const normalizedError = normalizeServiceError(error, 'Could not create support ticket.');
     trackTelemetryEvent('support_ticket_create_failed', {
       has_job_dispute_id: Boolean(safeJobDisputeId),
       has_order_dispute_id: Boolean(safeOrderDisputeId),
-      status_code: Number(error?.statusCode || error?.response?.status || 0),
+      status_code: Number(normalizedError?.statusCode || 0),
     });
-    throw error;
+    throw normalizedError;
   }
 };
 
 export const getSupportTickets = async ({ page = 1, limit = 20 } = {}) => {
-  const response = await api.get(ENDPOINTS.support.tickets, {
-    params: {
-      page: Number.isFinite(Number(page)) ? Number(page) : 1,
-      limit: Number.isFinite(Number(limit)) ? Number(limit) : 20,
-    },
-  });
-  return response.data;
+  try {
+    const response = await api.get(ENDPOINTS.support.tickets, {
+      params: {
+        page: toPositiveInteger(page, 1),
+        limit: toPositiveInteger(limit, 20),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not load support tickets.');
+  }
 };
 
 export const getSupportTicket = async (ticketId) => {
-  const safeTicketId = assertTicketId(ticketId);
-  const response = await api.get(ENDPOINTS.support.ticketDetails(safeTicketId));
-  return response.data;
+  try {
+    const safeTicketId = assertTicketId(ticketId);
+    const response = await api.get(ENDPOINTS.support.ticketDetails(safeTicketId));
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not load support ticket.');
+  }
 };
 
 export const getSupportTicketMessages = async (ticketId, { limit = 50, offset = 0 } = {}) => {
-  const safeTicketId = assertTicketId(ticketId);
-  const response = await api.get(ENDPOINTS.support.ticketMessages(safeTicketId), {
-    params: {
-      limit: Number.isFinite(Number(limit)) ? Number(limit) : 50,
-      offset: Number.isFinite(Number(offset)) ? Number(offset) : 0,
-    },
-  });
-  return response.data;
+  try {
+    const safeTicketId = assertTicketId(ticketId);
+    const safeOffset = Number.isFinite(Number(offset)) && Number(offset) >= 0 ? Math.floor(Number(offset)) : 0;
+    const response = await api.get(ENDPOINTS.support.ticketMessages(safeTicketId), {
+      params: {
+        limit: toPositiveInteger(limit, 50),
+        offset: safeOffset,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not load support messages.');
+  }
 };
 
 export const sendSupportTicketImages = async (ticketId, images = []) => {
-  const safeTicketId = assertTicketId(ticketId);
-  const files = Array.isArray(images) ? images.slice(0, 5) : [];
-  if (!files.length) {
-    buildServiceError('At least one image is required.');
-  }
-
-  const formData = new FormData();
-  files.forEach((image, index) => {
-    const filePart = toFilePart(image, index);
-    if (filePart) {
-      formData.append('images', filePart);
+  try {
+    const safeTicketId = assertTicketId(ticketId);
+    const files = Array.isArray(images) ? images.slice(0, 5) : [];
+    if (!files.length) {
+      throw buildValidationError('At least one image is required.');
     }
-  });
 
-  const response = await api.post(ENDPOINTS.support.ticketImages(safeTicketId), formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  return response.data;
+    const formData = new FormData();
+    files.forEach((image, index) => {
+      const filePart = toFilePart(image, index);
+      if (filePart) {
+        formData.append('images', filePart);
+      }
+    });
+
+    if (!formData?._parts?.length && !formData?.__entries?.length) {
+      // RN FormData does not expose entries consistently; this check is best-effort for tests/web env.
+      // If runtime still carries no valid images, backend will reject and be normalized below.
+    }
+
+    const response = await api.post(ENDPOINTS.support.ticketImages(safeTicketId), formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not upload support image.');
+  }
 };
 
 export const markSupportTicketRead = async (ticketId) => {
-  const safeTicketId = assertTicketId(ticketId);
-  const response = await api.patch(ENDPOINTS.support.ticketRead(safeTicketId), {});
-  return response.data;
+  try {
+    const safeTicketId = assertTicketId(ticketId);
+    const response = await api.patch(ENDPOINTS.support.ticketRead(safeTicketId), {});
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not mark support ticket as read.');
+  }
 };
 
 export const getSupportDisputeTicket = async ({ disputeId, type = 'job' } = {}) => {
-  const safeDisputeId = assertDisputeId(disputeId);
-  const safeType = String(type || '').trim().toLowerCase() === 'order' ? 'order' : 'job';
-  const response = await api.get(ENDPOINTS.support.disputeTicket, {
-    params: {
-      dispute_id: safeDisputeId,
-      type: safeType,
-    },
-  });
-  return response.data;
+  try {
+    const safeDisputeId = assertDisputeId(disputeId);
+    const safeType = String(type || '').trim().toLowerCase() === 'order' ? 'order' : 'job';
+    const response = await api.get(ENDPOINTS.support.disputeTicket, {
+      params: {
+        dispute_id: safeDisputeId,
+        type: safeType,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeServiceError(error, 'Could not fetch linked dispute support ticket.');
+  }
 };
 
 export default {

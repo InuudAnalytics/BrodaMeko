@@ -23,7 +23,7 @@ import { ROUTES } from '../../../utils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const resolveImageUri = (value) => {
+const resolveImageUri = value => {
   if (!value) {
     return '';
   }
@@ -31,20 +31,25 @@ const resolveImageUri = (value) => {
     return value;
   }
   if (typeof value === 'object') {
-    return String(value?.url || value?.secure_url || value?.uri || value?.path || '').trim();
+    return String(
+      value?.url || value?.secure_url || value?.uri || value?.path || '',
+    ).trim();
   }
   return '';
 };
 
-const normalizeImages = (list) => {
+const normalizeImages = list => {
   if (!Array.isArray(list)) {
     return [];
   }
   return list.map(resolveImageUri).filter(Boolean);
 };
 
-const buildStoreLocationLabel = (part) => {
-  const storeAddress = part?.store_address && typeof part.store_address === 'object' ? part.store_address : {};
+const buildStoreLocationLabel = part => {
+  const storeAddress =
+    part?.store_address && typeof part.store_address === 'object'
+      ? part.store_address
+      : {};
   const state = String(storeAddress?.state || '').trim();
   const city = String(storeAddress?.city || '').trim();
   const country = String(storeAddress?.country || '').trim();
@@ -58,8 +63,45 @@ const buildStoreLocationLabel = (part) => {
       part?.store?.state ||
       part?.store?.city ||
       part?.city ||
-      'Nigeria'
+      'Nigeria',
   ).trim();
+};
+
+const buildDeliveryLabel = part => {
+  const deliveryType = String(
+    part?.store_delivery_type ||
+      part?.store?.delivery_type ||
+      part?.store?.deliveryType ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+  const deliveryScope = String(
+    part?.store_delivery_scope ||
+      part?.store?.delivery_scope ||
+      part?.store?.deliveryScope ||
+      '',
+  )
+    .trim()
+    .toLowerCase();
+
+  if (deliveryType === 'pickup') {
+    return 'Pickup only';
+  }
+
+  if (deliveryType === 'delivery') {
+    return deliveryScope === 'nationwide'
+      ? 'Delivery only (Nationwide)'
+      : 'Delivery only';
+  }
+
+  if (deliveryType === 'both') {
+    return deliveryScope === 'nationwide'
+      ? 'Pickup & delivery (Nationwide)'
+      : 'Pickup & delivery';
+  }
+
+  return String(part?.delivery || '').trim() || 'Unavailable';
 };
 
 const ProductDetailsScreen = ({ navigation, route }) => {
@@ -97,17 +139,24 @@ const ProductDetailsScreen = ({ navigation, route }) => {
         const payload = response?.data || response || {};
         const part = payload?.part || payload?.data || payload;
         if (active && part) {
-          const resolvedStoreId = String(part?.store_id || part?.store?.id || '').trim();
+          const resolvedStoreId = String(
+            part?.store_id || part?.store?.id || '',
+          ).trim();
           let reviewCount = Number(part?.reviews || part?.review_count || 0);
           let averageRating = Number(part?.rating ?? part?.average_rating ?? 0);
 
           if (resolvedStoreId) {
             try {
               const reviewResponse = await getStoreReviews(resolvedStoreId);
-              const reviewPayload = reviewResponse?.data || reviewResponse || {};
+              const reviewPayload =
+                reviewResponse?.data || reviewResponse || {};
               const reviewData = reviewPayload?.data || reviewPayload || {};
-              const responseAvg = Number(reviewData?.avg_rating ?? reviewPayload?.avg_rating);
-              const responseCount = Number(reviewData?.total_reviews ?? reviewPayload?.total_reviews);
+              const responseAvg = Number(
+                reviewData?.avg_rating ?? reviewPayload?.avg_rating,
+              );
+              const responseCount = Number(
+                reviewData?.total_reviews ?? reviewPayload?.total_reviews,
+              );
               if (Number.isFinite(responseAvg)) {
                 averageRating = responseAvg;
               }
@@ -121,12 +170,15 @@ const ProductDetailsScreen = ({ navigation, route }) => {
 
           const storeLatitude = Number.isFinite(Number(part?.store_latitude))
             ? Number(part.store_latitude)
-            : (part?.store?.coordinates?.latitude ?? part?.latitude ?? null);
+            : part?.store?.coordinates?.latitude ?? part?.latitude ?? null;
           const storeLongitude = Number.isFinite(Number(part?.store_longitude))
             ? Number(part.store_longitude)
-            : (part?.store?.coordinates?.longitude ?? part?.longitude ?? null);
+            : part?.store?.coordinates?.longitude ?? part?.longitude ?? null;
           const storePhone = String(
-            part?.store_phone || part?.store?.phone || part?.store?.phone_number || ''
+            part?.store_phone ||
+              part?.store?.phone ||
+              part?.store?.phone_number ||
+              '',
           ).trim();
 
           setProduct({
@@ -134,23 +186,35 @@ const ProductDetailsScreen = ({ navigation, route }) => {
             storeId: resolvedStoreId,
             name: String(part?.name || part?.title || '').trim(),
             price: Number(part?.price || 0),
-            shop: String(part?.store?.name || part?.store_name || part?.seller_name || '').trim(),
+            shop: String(
+              part?.store?.name || part?.store_name || part?.seller_name || '',
+            ).trim(),
             rating: averageRating,
             reviews: reviewCount,
             stock: Number(part?.stock_quantity || part?.stock || 0),
             location: buildStoreLocationLabel(part) || '',
             compatibility: String(part?.compatibility || '').trim(),
-            delivery: String(part?.delivery || '').trim(),
+            delivery: buildDeliveryLabel(part),
             description: String(part?.description || ''),
-            images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+            images: Array.isArray(part?.images)
+              ? part.images
+              : part?.image
+              ? [part.image]
+              : [],
             storePhone,
             store: {
               ...(part?.store || {}),
-              phone: storePhone || part?.store?.phone || part?.store?.phone_number,
+              phone:
+                storePhone || part?.store?.phone || part?.store?.phone_number,
             },
-            shopCoordinates: Number.isFinite(Number(storeLatitude)) && Number.isFinite(Number(storeLongitude))
-              ? { latitude: Number(storeLatitude), longitude: Number(storeLongitude) }
-              : (part?.store?.coordinates || null),
+            shopCoordinates:
+              Number.isFinite(Number(storeLatitude)) &&
+              Number.isFinite(Number(storeLongitude))
+                ? {
+                    latitude: Number(storeLatitude),
+                    longitude: Number(storeLongitude),
+                  }
+                : part?.store?.coordinates || null,
             latitude: storeLatitude,
             longitude: storeLongitude,
           });
@@ -175,7 +239,9 @@ const ProductDetailsScreen = ({ navigation, route }) => {
     };
   }, [route?.params?.product, route?.params?.productId]);
 
-  const images = normalizeImages(product?.images?.length ? product.images : null);
+  const images = normalizeImages(
+    product?.images?.length ? product.images : null,
+  );
   const displayImages = images;
   const isInStock = Number(product?.stock || 0) > 0;
 
@@ -232,7 +298,10 @@ const ProductDetailsScreen = ({ navigation, route }) => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {isLoading ? (
           <View style={styles.skeletonWrap}>
             <View style={styles.skeletonHero} />
@@ -249,159 +318,180 @@ const ProductDetailsScreen = ({ navigation, route }) => {
         ) : null}
         {!isLoading && !loadError ? (
           <>
-        <View style={styles.carouselWrap}>
-          {displayImages.length ? (
-            <>
-              <FlatList
-                ref={listRef}
-                data={displayImages}
-                keyExtractor={(item, index) => `${item}-${index}`}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onMomentumScrollEnd={handleScrollEnd}
-                renderItem={({ item }) => (
-                  <Image source={{ uri: item }} style={styles.carouselImage} resizeMode="cover" />
-                )}
-              />
-              <View style={styles.dotsRow}>
-                {displayImages.map((_, index) => (
-                  <View
-                    key={`dot-${index}`}
-                    style={[styles.dot, index === activeIndex ? styles.dotActive : null]}
+            <View style={styles.carouselWrap}>
+              {displayImages.length ? (
+                <>
+                  <FlatList
+                    ref={listRef}
+                    data={displayImages}
+                    keyExtractor={(item, index) => `${item}-${index}`}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={handleScrollEnd}
+                    renderItem={({ item }) => (
+                      <Image
+                        source={{ uri: item }}
+                        style={styles.carouselImage}
+                        resizeMode="cover"
+                      />
+                    )}
                   />
-                ))}
-              </View>
-            </>
-          ) : (
-            <View style={styles.emptyImageState}>
-              <AppText style={styles.emptyImageText}>No product image available.</AppText>
+                  <View style={styles.dotsRow}>
+                    {displayImages.map((_, index) => (
+                      <View
+                        key={`dot-${index}`}
+                        style={[
+                          styles.dot,
+                          index === activeIndex ? styles.dotActive : null,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <View style={styles.emptyImageState}>
+                  <AppText style={styles.emptyImageText}>
+                    No product image available.
+                  </AppText>
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        <View style={styles.section}>
-          <AppText style={styles.productName}>
-            {product?.name || 'Product name unavailable'}
-          </AppText>
-          <View style={styles.ratingRow}>
-            <HugeiconsIcon
-              icon={StarIcon}
-              size={14}
-              color="#E6C714"
-              strokeWidth={2}
-            />
-            <AppText style={styles.ratingText}>
-              {Number(product?.rating || 0).toFixed(1)} (
-              {product?.reviews || 0} reviews)
-            </AppText>
-            <View
-              style={[
-                styles.stockBadge,
-                isInStock ? styles.stockIn : styles.stockOut,
-              ]}
-            >
-              <AppText style={styles.stockText}>
-                {isInStock ? 'In stock' : 'Not in stock'}
+            <View style={styles.section}>
+              <AppText style={styles.productName}>
+                {product?.name || 'Product name unavailable'}
               </AppText>
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.sellerCard} activeOpacity={0.88} onPress={handleOpenStoreDetails}>
-          <View>
-            <AppText style={styles.sellerName}>
-              {product?.shop || 'Store unavailable'}
-            </AppText>
-            <View style={styles.sellerRow}>
-              <View style={styles.sellerBadge}>
-                <AppText style={styles.sellerBadgeText}>Seller</AppText>
-              </View>
-              <AppText style={styles.sellerSubtitle}>Top rated seller</AppText>
-            </View>
-          </View>
-          <AppText style={styles.storeLinkText}>View store</AppText>
-        </TouchableOpacity>
-
-        <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>Description</AppText>
-          <AppText
-            style={styles.description}
-            numberOfLines={expanded ? undefined : 3}
-          >
-            {product?.description || 'No description available.'}
-          </AppText>
-          <TouchableOpacity
-            onPress={() => setExpanded(prev => !prev)}
-            activeOpacity={0.8}
-          >
-            <AppText style={styles.readMore}>
-              {expanded ? 'Read less' : 'Read more'}
-            </AppText>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.infoGrid}>
-          {[
-            { label: 'Compatibility', value: product?.compatibility || 'Unavailable' },
-            { label: 'Location', value: product?.location || 'Unavailable' },
-            { label: 'Delivery', value: product?.delivery || 'Unavailable' },
-            { label: 'Estimated date', value: product?.delivery || 'Unavailable' },
-          ].map(item => {
-            const isLocation = item.label === 'Location';
-            if (isLocation) {
-              return (
-                <TouchableOpacity
-                  key={item.label}
-                  style={styles.infoCard}
-                  activeOpacity={0.88}
-                  onPress={handleOpenStoreDetails}
+              <View style={styles.ratingRow}>
+                <HugeiconsIcon
+                  icon={StarIcon}
+                  size={14}
+                  color="#E6C714"
+                  strokeWidth={2}
+                />
+                <AppText style={styles.ratingText}>
+                  {Number(product?.rating || 0).toFixed(1)} (
+                  {product?.reviews || 0} reviews)
+                </AppText>
+                <View
+                  style={[
+                    styles.stockBadge,
+                    isInStock ? styles.stockIn : styles.stockOut,
+                  ]}
                 >
-                  <AppText style={styles.infoLabel}>{item.label}</AppText>
-                  <AppText style={styles.infoValue}>{item.value}</AppText>
-                </TouchableOpacity>
-              );
-            }
-
-            return (
-              <View key={item.label} style={styles.infoCard}>
-                <AppText style={styles.infoLabel}>{item.label}</AppText>
-                <AppText style={styles.infoValue}>{item.value}</AppText>
+                  <AppText style={styles.stockText}>
+                    {isInStock ? 'In stock' : 'Not in stock'}
+                  </AppText>
+                </View>
               </View>
-            );
-          })}
-        </View>
+            </View>
 
-        <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>Quantity</AppText>
-          <View style={styles.qtyRow}>
             <TouchableOpacity
-              style={styles.qtyButton}
-              onPress={decrement}
-              activeOpacity={0.85}
+              style={styles.sellerCard}
+              activeOpacity={0.88}
+              onPress={handleOpenStoreDetails}
             >
-              <HugeiconsIcon
-                icon={MinusSignIcon}
-                size={18}
-                color="#E6C714"
-                strokeWidth={2}
-              />
+              <View>
+                <AppText style={styles.sellerName}>
+                  {product?.shop || 'Store unavailable'}
+                </AppText>
+                <View style={styles.sellerRow}>
+                  <View style={styles.sellerBadge}>
+                    <AppText style={styles.sellerBadgeText}>Seller</AppText>
+                  </View>
+                  <AppText style={styles.sellerSubtitle}>
+                    Top rated seller
+                  </AppText>
+                </View>
+              </View>
+              <AppText style={styles.storeLinkText}>View store</AppText>
             </TouchableOpacity>
-            <AppText style={styles.qtyValue}>{quantity}</AppText>
-            <TouchableOpacity
-              style={styles.qtyButton}
-              onPress={increment}
-              activeOpacity={0.85}
-            >
-              <HugeiconsIcon
-                icon={PlusSignIcon}
-                size={18}
-                color="#E6C714"
-                strokeWidth={2}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
+
+            <View style={styles.section}>
+              <AppText style={styles.sectionTitle}>Description</AppText>
+              <AppText
+                style={styles.description}
+                numberOfLines={expanded ? undefined : 3}
+              >
+                {product?.description || 'No description available.'}
+              </AppText>
+              <TouchableOpacity
+                onPress={() => setExpanded(prev => !prev)}
+                activeOpacity={0.8}
+              >
+                <AppText style={styles.readMore}>
+                  {expanded ? 'Read less' : 'Read more'}
+                </AppText>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.infoGrid}>
+              {[
+                {
+                  label: 'Location',
+                  value: product?.location || 'Unavailable',
+                },
+                {
+                  label: 'Delivery',
+                  value: product?.delivery || 'Unavailable',
+                },
+                // { label: 'Compatibility', value: product?.compatibility || 'Unavailable' },
+                // { label: 'Estimated date', value: product?.delivery || 'Unavailable' },
+              ].map(item => {
+                const isLocation = item.label === 'Location';
+                if (isLocation) {
+                  return (
+                    <TouchableOpacity
+                      key={item.label}
+                      style={styles.infoCard}
+                      activeOpacity={0.88}
+                      onPress={handleOpenStoreDetails}
+                    >
+                      <AppText style={styles.infoLabel}>{item.label}</AppText>
+                      <AppText style={styles.infoValue}>{item.value}</AppText>
+                    </TouchableOpacity>
+                  );
+                }
+
+                return (
+                  <View key={item.label} style={styles.infoCard}>
+                    <AppText style={styles.infoLabel}>{item.label}</AppText>
+                    <AppText style={styles.infoValue}>{item.value}</AppText>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.section}>
+              <AppText style={styles.sectionTitle}>Quantity</AppText>
+              <View style={styles.qtyRow}>
+                <TouchableOpacity
+                  style={styles.qtyButton}
+                  onPress={decrement}
+                  activeOpacity={0.85}
+                >
+                  <HugeiconsIcon
+                    icon={MinusSignIcon}
+                    size={18}
+                    color="#E6C714"
+                    strokeWidth={2}
+                  />
+                </TouchableOpacity>
+                <AppText style={styles.qtyValue}>{quantity}</AppText>
+                <TouchableOpacity
+                  style={styles.qtyButton}
+                  onPress={increment}
+                  activeOpacity={0.85}
+                >
+                  <HugeiconsIcon
+                    icon={PlusSignIcon}
+                    size={18}
+                    color="#E6C714"
+                    strokeWidth={2}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
           </>
         ) : null}
       </ScrollView>
@@ -454,7 +544,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   scrollContent: {
-    paddingBottom: 60,
+    paddingBottom: 80,
   },
   carouselWrap: {
     marginTop: 10,

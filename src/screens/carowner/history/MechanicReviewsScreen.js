@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { StarIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, StarIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, LiftableTextInput, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useAuth } from '../../../context';
 import { getCarOwnerJob, getMechanicJobStats } from '../../../services/jobs.service';
@@ -10,16 +10,7 @@ import { getMechanicReviews, getReviewReplies, replyToMechanicReview } from '../
 import { darkTheme } from '../../../theme';
 import { ROLES } from '../../../utils';
 
-const FALLBACK_AVATAR = 'https://i.pravatar.cc/160?img=47';
-const FALLBACK_NAME = 'Toluwalase Daniel';
-const FALLBACK_RATING = 3.8;
-const FALLBACK_TOTAL_JOBS = 12;
-const FALLBACK_REVIEW = {
-  author: 'Cody Fischer',
-  date: '12-02-2021',
-  text:
-    "Chidi is a very good mechanic, he came to fix my car yesterday at the 3rd mainland bridge and he was very quick at his work, he's really who he think he is. His rate for fixing my car was a very considerable amount too.",
-};
+const FALLBACK_NAME = 'Assigned mechanic';
 
 const readPayload = (response) => {
   const root = response?.data || response || {};
@@ -40,7 +31,7 @@ const toNumber = (value, fallback = 0) => {
 const formatDate = (value) => {
   const raw = String(value || '').trim();
   if (!raw) {
-    return FALLBACK_REVIEW.date;
+    return '--';
   }
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {
@@ -80,30 +71,32 @@ const toMechanicId = (job, route) =>
     ''
   ).trim();
 
-const normalizeReview = (item, fallbackAvatar) => {
+const normalizeReview = (item) => {
   return {
     id: String(item?.id || item?._id || '').trim(),
     rating: toNumber(item?.rating || item?.stars, 0),
     author:
-      String(item?.author_name || item?.name || item?.user?.name || FALLBACK_REVIEW.author).trim() ||
-      FALLBACK_REVIEW.author,
+      String(item?.author_name || item?.reviewer_name || item?.name || item?.user?.name || 'Reviewer').trim() ||
+      'Reviewer',
     date: formatDate(item?.created_at || item?.date),
     text:
-      String(item?.comment || item?.review || item?.text || FALLBACK_REVIEW.text).trim() ||
-      FALLBACK_REVIEW.text,
-    avatar:
-      String(item?.author_avatar || item?.user?.avatar || fallbackAvatar || FALLBACK_AVATAR).trim() ||
-      FALLBACK_AVATAR,
+      String(item?.comment || item?.review || item?.text || '').trim() ||
+      'No written review yet.',
+    avatar: String(item?.author_avatar || item?.reviewer_avatar || item?.user?.avatar || '').trim(),
     repliesCount: toNumber(item?.replies_count || item?.repliesCount || item?.reply_count || 0),
   };
 };
 
-const MechanicReviewsScreen = ({ route }) => {
+const toInitial = (value, fallback = 'U') =>
+  String(value || '').trim().charAt(0).toUpperCase() || fallback;
+
+const MechanicReviewsScreen = ({ navigation, route }) => {
   const { role } = useAuth();
   const jobId = String(route?.params?.jobId || '').trim();
-  const preview = route?.params?.preview || {};
+  const preview = useMemo(() => route?.params?.preview || {}, [route?.params?.preview]);
   const [job, setJob] = useState(null);
   const [reviewsPayload, setReviewsPayload] = useState([]);
+  const [reviewsSummary, setReviewsSummary] = useState(null);
   const [statsPayload, setStatsPayload] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -134,20 +127,24 @@ const MechanicReviewsScreen = ({ route }) => {
           getMechanicReviews(mechanicId).catch(() => null),
           getMechanicJobStats(mechanicId).catch(() => null),
         ]);
-        const reviewsRoot = reviewsResponse?.data || reviewsResponse || {};
+        const reviewsRoot = reviewsResponse || {};
         const nextReviews = Array.isArray(reviewsRoot)
           ? reviewsRoot
           : (Array.isArray(reviewsRoot?.reviews) ? reviewsRoot.reviews : (Array.isArray(reviewsRoot?.data) ? reviewsRoot.data : []));
+        const nextSummary = reviewsRoot?.summary || null;
         setReviewsPayload(nextReviews);
+        setReviewsSummary(nextSummary);
         setStatsPayload(statsResponse?.data || statsResponse || null);
       } else {
         setReviewsPayload([]);
+        setReviewsSummary(null);
         setStatsPayload(null);
       }
     } catch (requestError) {
       setError(requestError?.message || 'Could not load mechanic reviews.');
       setJob(null);
       setReviewsPayload([]);
+      setReviewsSummary(null);
       setStatsPayload(null);
     } finally {
       setLoading(false);
@@ -176,16 +173,16 @@ const MechanicReviewsScreen = ({ route }) => {
           job?.mechanic?.photo ||
           job?.provider?.avatar ||
           job?.assigned_mechanic?.avatar ||
-          preview?.avatarUrl ||
-          FALLBACK_AVATAR
-      ).trim() || FALLBACK_AVATAR;
+          preview?.avatarUrl
+      ).trim();
 
     const rating = toNumber(
+      reviewsSummary?.avg_rating ||
       job?.mechanic?.rating ||
         job?.provider?.rating ||
         job?.rating ||
         preview?.rating,
-      FALLBACK_RATING
+      0
     );
 
     const totalJobs = toNumber(
@@ -195,13 +192,11 @@ const MechanicReviewsScreen = ({ route }) => {
         job?.provider?.total_jobs ||
         job?.mechanic?.jobs_count ||
         job?.provider?.jobs_count,
-      FALLBACK_TOTAL_JOBS
+      0
     );
 
     const rawReviews = reviewsPayload.length ? reviewsPayload : readReviews(job);
-    const reviews = rawReviews.length
-      ? rawReviews.map((item) => normalizeReview(item, avatar))
-      : [normalizeReview({}, avatar), normalizeReview({}, avatar), normalizeReview({}, avatar)];
+    const reviews = rawReviews.length ? rawReviews.map((item) => normalizeReview(item)) : [];
 
     return {
       name,
@@ -210,7 +205,7 @@ const MechanicReviewsScreen = ({ route }) => {
       totalJobs,
       reviews,
     };
-  }, [job, preview, reviewsPayload, statsPayload]);
+  }, [job, preview, reviewsPayload, reviewsSummary, statsPayload]);
 
   const handleToggleReplies = async (reviewId) => {
     if (!reviewId) {
@@ -274,6 +269,17 @@ const MechanicReviewsScreen = ({ route }) => {
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          activeOpacity={0.85}
+          onPress={() => navigation.goBack()}
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.1} />
+        </TouchableOpacity>
+        <AppText style={styles.headerTitle}>Reviews</AppText>
+      </View>
+
       <View style={styles.listWrap}>
         <PullToRefreshIndicator pullDistance={pullDistance} refreshing={loading} />
         <Animated.ScrollView
@@ -305,7 +311,15 @@ const MechanicReviewsScreen = ({ route }) => {
             {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
 
             <View style={styles.avatarWrap}>
-              <Image source={{ uri: viewModel.avatar }} style={styles.avatar} />
+              {viewModel.avatar ? (
+                <Image source={{ uri: viewModel.avatar }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarInitialWrap}>
+                  <AppText style={styles.avatarInitialText}>
+                    {toInitial(viewModel.name, 'M')}
+                  </AppText>
+                </View>
+              )}
             </View>
             <AppText style={styles.name}>{viewModel.name}</AppText>
 
@@ -323,6 +337,13 @@ const MechanicReviewsScreen = ({ route }) => {
             </View>
 
             <View style={styles.reviewsWrap}>
+              {!viewModel.reviews.length ? (
+                <View style={styles.emptyReviewsWrap}>
+                  <AppText style={styles.emptyReviewsText}>
+                    Mechanic hasn&apos;t been reviewed yet.
+                  </AppText>
+                </View>
+              ) : null}
               {viewModel.reviews.map((review, index) => {
                 const repliesState = expandedReplies[review.id];
                 const replies = repliesState?.list || [];
@@ -330,7 +351,15 @@ const MechanicReviewsScreen = ({ route }) => {
                 return (
                 <View key={`${review.author}-${review.date}-${index}`} style={styles.reviewItem}>
                   <View style={styles.reviewHead}>
-                    <Image source={{ uri: review.avatar }} style={styles.reviewAvatar} />
+                    {review.avatar ? (
+                      <Image source={{ uri: review.avatar }} style={styles.reviewAvatar} />
+                    ) : (
+                      <View style={styles.reviewAvatarInitialWrap}>
+                        <AppText style={styles.reviewAvatarInitialText}>
+                          {toInitial(review.author, 'R')}
+                        </AppText>
+                      </View>
+                    )}
                     <View style={styles.reviewHeadText}>
                       <AppText style={styles.reviewAuthor}>{review.author}</AppText>
                       <AppText style={styles.reviewDate}>{review.date}</AppText>
@@ -408,9 +437,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#010037',
   },
+  header: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 6,
+    position: 'relative',
+    paddingHorizontal: 14,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: darkTheme.colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
   content: {
     paddingHorizontal: 14,
-    paddingTop: 56,
+    paddingTop: 18,
     paddingBottom: 28,
   },
   listWrap: {
@@ -435,6 +488,22 @@ const styles = StyleSheet.create({
     borderRadius: 49,
     borderWidth: 4,
     borderColor: '#F7A23D',
+  },
+  avatarInitialWrap: {
+    width: 98,
+    height: 98,
+    borderRadius: 49,
+    borderWidth: 4,
+    borderColor: '#F7A23D',
+    backgroundColor: 'rgba(247,162,61,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitialText: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   name: {
     marginTop: 12,
@@ -492,6 +561,21 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     marginRight: 10,
   },
+  reviewAvatarInitialWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    marginRight: 10,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewAvatarInitialText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
   reviewHeadText: {
     flex: 1,
   },
@@ -510,6 +594,14 @@ const styles = StyleSheet.create({
   reviewText: {
     color: '#C6CAE8',
     fontSize: 15,
+    lineHeight: 20,
+  },
+  emptyReviewsWrap: {
+    paddingVertical: 16,
+  },
+  emptyReviewsText: {
+    color: '#9EA4C8',
+    fontSize: 14,
     lineHeight: 20,
   },
   reviewActions: {

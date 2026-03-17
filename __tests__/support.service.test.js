@@ -62,4 +62,37 @@ describe('support.service payloads', () => {
     });
     expect(payload.job_dispute_id).toBeUndefined();
   });
+
+  test('createSupportTicket rejects invalid category with typed validation error', async () => {
+    await expect(
+      createSupportTicket({
+        subject: 'Bad category',
+        category: 'billing',
+      })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'SUPPORT_VALIDATION_ERROR',
+    });
+  });
+
+  test('createSupportTicket normalizes api errors', async () => {
+    api.post.mockRejectedValue({
+      message: 'server down',
+      statusCode: 503,
+      data: { error: 'unavailable' },
+    });
+
+    await expect(
+      createSupportTicket({
+        subject: 'Will fail',
+        category: 'other',
+        priority: 'normal',
+      })
+    ).rejects.toMatchObject({
+      message: 'server down',
+      statusCode: 503,
+      code: 'SUPPORT_API_ERROR',
+      data: { error: 'unavailable' },
+    });
+  });
 });

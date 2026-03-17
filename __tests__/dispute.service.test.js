@@ -71,4 +71,15 @@ describe('dispute.service payloads', () => {
     const keys = formData.__entries.map(([key]) => key);
     expect(keys).toContain('evidence');
   });
+
+  test('fileJobDisputeV2 rejects missing reason with typed validation error', async () => {
+    await expect(
+      fileJobDisputeV2('job-1', {
+        reason: '',
+      })
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'DISPUTE_VALIDATION_ERROR',
+    });
+  });
 });

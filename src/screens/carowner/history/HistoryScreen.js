@@ -503,6 +503,7 @@ const HistoryScreen = ({ navigation }) => {
             data={filteredJobs}
             keyExtractor={(item, index) => String(item?.id || item?.jobId || `history-${index}`)}
             renderItem={renderItem}
+            ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
             ListHeaderComponent={listHeader}
             ListEmptyComponent={listEmpty}
             ListFooterComponent={listFooter}
@@ -582,6 +583,9 @@ const styles = StyleSheet.create({
   },
   tabsWrap: {
     marginBottom: 10,
+  },
+  cardSeparator: {
+    height: 10,
   },
   footerWrap: {
     minHeight: 40,

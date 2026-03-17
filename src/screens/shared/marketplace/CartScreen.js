@@ -135,7 +135,7 @@ const CartScreen = ({ navigation, route }) => {
     <View style={styles.root}>
       <ScreenContainer
         padded={false}
-        edges={['top', 'left', 'right']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={styles.screen}
       >
         <View style={styles.header}>
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 180,
+    paddingBottom: 10,
   },
   listWrap: {
     flex: 1,

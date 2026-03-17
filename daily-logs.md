@@ -322,3 +322,137 @@
 4. **docs(logs): add march 9 and march 10 activity entries** (`ef0af1c`) - 19:06 WAT
 
    - Updated daily logs with dated/timestamped records for March 9 and March 10.
+
+## March 11, 2026
+
+### Commits
+
+1. **chore: commit pending app updates including mechanic status gating and chat quotation fixes** (`13d5240`) - 13:40 WAT
+
+   - Bundled pending marketplace/chat/job-flow fixes after backend sync updates.
+   - Included mechanic status gating and quotation handling consistency fixes.
+
+2. **feat(notifications): add foreground toast component and refine bell badge positioning** (`e4a997c`) - 14:24 WAT
+
+   - Added reusable in-app foreground notification toast/banner component.
+   - Refined bell unread badge placement for improved visual alignment.
+
+3. **refactor(marketplace): unify buyer/mech flow into shared screens and tracking** (`a01a0b9`) - 16:02 WAT
+
+   - Moved shared marketplace flows/screens for buyer and mechanic into common modules.
+   - Unified tracking and checkout-related navigation/state behavior across roles.
+
+4. **refactor(marketplace): share cart screen and fix dynamic store address + cart UI alignment** (`289f295`) - 21:39 WAT
+
+   - Consolidated cart experience into shared screen implementation.
+   - Patched dynamic store-address rendering and cart layout alignment issues.
+
+## March 12, 2026
+
+### Commits
+
+1. **chore(marketplace): remove seller-order mocks and align endpoint notes** (`406688b`) - 14:09 WAT
+
+   - Removed stale seller-order mock usage in active flows.
+   - Updated integration notes to match current backend endpoint availability.
+
+2. **feat(marketplace): wire store reviews submission and propagate store ids through order flow** (`4bebdb7`) - 14:16 WAT
+
+   - Wired store review submission flow with backend integration.
+   - Propagated store IDs through marketplace order/tracking data paths.
+
+3. **feat(ui): add shared no-internet state for list screens and remove history mock fallback** (`312628b`) - 15:02 WAT
+
+   - Added reusable no-internet component for list-fetch screens.
+   - Removed remaining history mock fallback behavior.
+
+4. **feat(marketplace): default checkout to pickup and switch tracking contact CTAs to call** (`b5bf20a`) - 15:04 WAT
+
+   - Set pickup as default checkout mode.
+   - Changed tracking contact CTAs from message to call behavior.
+
+5. **fix(marketplace): reduce fallback usage with backend store data and remove stale withdraw placeholder** (`4c87c85`) - 15:25 WAT
+
+   - Reduced frontend fallbacks where backend store payload now provides real values.
+   - Removed stale withdrawal placeholder path.
+
+6. **feat(legal): add privacy and terms docs and wire legal content in app** (`0f03bc9`) - 15:32 WAT
+
+   - Added draft privacy policy and terms documents.
+   - Wired legal content into app legal placeholder flows.
+
+7. **chore(cleanup): remove unused mock auth server file** (`e221976`) - 15:45 WAT
+
+   - Deleted unused `mockServer` auth stub that was no longer part of active flows.
+
+8. **feat(payments): gate quote acceptance and unify checkout wallet/paystack flows** (`6e228d8`) - 16:51 WAT
+
+   - Added wallet sufficiency gate before quotation acceptance + job escrow initiation.
+   - Hid manual reference/trxref inputs in fund-wallet UI while keeping backend payload behavior.
+   - Added wallet option/balance insufficiency handling in checkout.
+   - Unified card/transfer through Paystack init path and added verify-with-fallback testing flow.
+
+9. **fix(report-issue): replace broken issue icons and reorder electrical options** (`98941b6`) - 18:47 WAT
+
+   - Replaced broken issue-reporting icons.
+   - Reordered electrical issue options for clearer selection flow.
+
+10. **feat(marketplace): use backend service fee and propagate totals to tracking** (`95e9ee1`) - 18:49 WAT
+
+    - Switched marketplace totals to backend-provided service fee values.
+    - Propagated subtotal/service-fee/total into tracking screens.
+
+11. **Add car-owner dispute flow and silent live-tracking status sync** (`98c84d0`) - 19:52 WAT
+
+    - Added car-owner dispute initiation flow.
+    - Added silent live-tracking status sync behavior.
+
+## March 13, 2026
+
+### Commits
+
+1. **Add profile reviews hub for mechanics and sellers** (`a3f3c2b`) - 07:43 WAT
+
+   - Added reviews hub access in profile for mechanic and seller roles.
+
+2. **Add profile recovery email add/verify/remove flow** (`2336f2f`) - 07:46 WAT
+
+   - Added recovery email lifecycle flow in profile settings.
+
+3. **Fix order tracking to support multi-item selection** (`8859869`) - 07:58 WAT
+
+   - Added multi-item selection support in marketplace order tracking.
+
+4. **Remove marketplace fallback placeholders and show loading states** (`c9e6183`) - 08:26 WAT
+
+   - Removed stale marketplace placeholders and improved loading state handling.
+
+5. **Align spare-parts address endpoints with seller store routes** (`8ed3f49`) - 08:31 WAT
+
+   - Aligned spare-parts address endpoint usage with seller-store backend routes.
+
+6. **feat(notifications): load in batches of 10 with scroll pagination** (`b00a4fb`) - 08:37 WAT
+
+   - Added paginated notification loading with batch size of 10.
+
+7. **feat(marketplace,chat): consume backend quote/store phone and coordinates fields** (`391753e`) - 08:52 WAT
+
+   - Wired backend quote/store phone and coordinate fields into chat and marketplace flows.
+
+8. **feat(marketplace): wire store details screen service and routes** (`bf261a8`) - 08:54 WAT
+
+   - Wired store-details service call and navigation routes.
+
+9. **fix(chat): use quotation id only for quote actions** (`f3cf3a6`) - 08:57 WAT
+
+   - Updated quote actions to consistently use quotation ID.
+
+10. **Fix API alignment and tracking/review flows** (`9c87a8f`) - 15:53 WAT
+
+    - Aligned frontend methods/endpoints with backend contracts (jobs/chat/wallet).
+    - Added tracking-screen cancel action behavior and review-flow updates.
+
+11. **Update logo assets and auth/profile navigation cleanup** (`01c6684`) - 16:05 WAT
+
+    - Updated app/logo assets and auth-page logo presentation.
+    - Applied related auth/profile navigation cleanup.

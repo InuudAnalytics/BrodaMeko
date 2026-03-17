@@ -1,6 +1,7 @@
 import { ROLES, ROUTES } from './constants';
 
 const safeString = (value) => String(value || '').trim();
+const toLower = (value) => safeString(value).toLowerCase();
 
 export const resolveDisputeType = (payload = {}, fallbackType = '') => {
   const type = safeString(payload?.dispute_type || payload?.type || fallbackType).toLowerCase();
@@ -21,8 +22,15 @@ export const resolveNotificationRoute = ({ notification, role }) => {
   const payload = notification?.data && typeof notification.data === 'object' ? notification.data : {};
   const ticketId = safeString(payload?.ticket_id || payload?.support_ticket_id);
   const disputeId = safeString(payload?.dispute_id);
-  const orderId = safeString(payload?.order_id);
-  const orderItemId = safeString(payload?.order_item_id);
+  const orderId = safeString(payload?.order_id || payload?.orderId);
+  const orderItemId = safeString(payload?.order_item_id || payload?.orderItemId);
+  const pickupCode = safeString(payload?.pickup_code || payload?.pickupCode);
+  const fulfillmentType = toLower(payload?.fulfillment_type || payload?.fulfillmentType);
+  const notificationType = toLower(notification?.type);
+  const isPickupOrder =
+    fulfillmentType === 'pickup' ||
+    Boolean(pickupCode) ||
+    notificationType.includes('pickup');
 
   if (ticketId) {
     return {
@@ -52,6 +60,18 @@ export const resolveNotificationRoute = ({ notification, role }) => {
         params: { orderId, itemId: orderItemId || undefined },
       };
     }
+
+    if (isPickupOrder) {
+      return {
+        route: role === ROLES.MECH ? ROUTES.MECH_PICKUP_TRACKING : ROUTES.CAR_OWNER_PICKUP_TRACKING,
+        params: {
+          orderId,
+          itemId: orderItemId || undefined,
+          pickupCode: pickupCode || undefined,
+        },
+      };
+    }
+
     return {
       route: 'OrderTracking',
       params: { orderId, itemId: orderItemId || undefined },

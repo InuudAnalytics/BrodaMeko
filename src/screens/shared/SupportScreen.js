@@ -4,10 +4,31 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../components';
-import { createSupportTicket, sendSupportTicketImages } from '../../services/support.service';
+import {
+  createSupportTicket,
+  sendSupportTicketImages,
+  SUPPORT_TICKET_CATEGORIES,
+  SUPPORT_TICKET_PRIORITIES,
+} from '../../services/support.service';
 import { darkTheme, withAlpha } from '../../theme';
 import { pickSingleImageFromGallery, ROUTES } from '../../utils';
 import AppAlert from '../../components/AppAlert';
+
+const CATEGORY_LABELS = {
+  payment_issue: 'Payment issue',
+  job_dispute: 'Job dispute',
+  order_dispute: 'Order dispute',
+  account_issue: 'Account issue',
+  technical: 'Technical',
+  other: 'Other',
+};
+
+const PRIORITY_LABELS = {
+  low: 'Low',
+  normal: 'Normal',
+  high: 'High',
+  urgent: 'Urgent',
+};
 const UploadImageGlyph = ({ color }) => (
   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
     <Path
@@ -26,6 +47,8 @@ const SupportScreen = ({ navigation }) => {
   const [attachment, setAttachment] = useState(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [category, setCategory] = useState('other');
+  const [priority, setPriority] = useState('normal');
 
   const handlePickAttachment = async () => {
     if (isPickingImage) {
@@ -76,8 +99,8 @@ const SupportScreen = ({ navigation }) => {
       const subject = safeDescription.length > 80 ? `${safeDescription.slice(0, 80)}...` : safeDescription;
       const ticketResponse = await createSupportTicket({
         subject,
-        category: 'other',
-        priority: 'normal',
+        category,
+        priority,
       });
       const ticket = ticketResponse?.data || ticketResponse || {};
       const ticketId = String(ticket?.id || '').trim();
@@ -123,6 +146,38 @@ const SupportScreen = ({ navigation }) => {
           style={styles.descriptionInput}
           textAlignVertical="top"
         />
+
+        <AppText style={styles.label}>Category</AppText>
+        <View style={styles.selectorRow}>
+          {SUPPORT_TICKET_CATEGORIES.map((option) => (
+            <TouchableOpacity
+              key={option}
+              activeOpacity={0.85}
+              onPress={() => setCategory(option)}
+              style={[styles.selectorChip, category === option ? styles.selectorChipActive : null]}
+            >
+              <AppText style={[styles.selectorChipText, category === option ? styles.selectorChipTextActive : null]}>
+                {CATEGORY_LABELS[option] || option}
+              </AppText>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <AppText style={styles.label}>Priority</AppText>
+        <View style={styles.selectorRow}>
+          {SUPPORT_TICKET_PRIORITIES.map((option) => (
+            <TouchableOpacity
+              key={option}
+              activeOpacity={0.85}
+              onPress={() => setPriority(option)}
+              style={[styles.selectorChip, priority === option ? styles.selectorChipActive : null]}
+            >
+              <AppText style={[styles.selectorChipText, priority === option ? styles.selectorChipTextActive : null]}>
+                {PRIORITY_LABELS[option] || option}
+              </AppText>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <AppText style={styles.label}>Attachment</AppText>
         <View style={styles.uploadWrap}>
@@ -198,6 +253,36 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.medium,
     marginBottom: 10,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 8,
+    rowGap: 8,
+    marginBottom: 14,
+  },
+  selectorChip: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  selectorChipActive: {
+    borderColor: darkTheme.colors.accent,
+    backgroundColor: withAlpha(darkTheme.colors.accent, 0.18),
+  },
+  selectorChipText: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  selectorChipTextActive: {
+    color: darkTheme.colors.accent,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   descriptionInput: {
     minHeight: 126,
