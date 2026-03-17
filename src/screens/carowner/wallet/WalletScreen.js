@@ -189,7 +189,15 @@ const normalizeTransaction = (item, index, source) => {
   const baseTitle = item?.title || item?.narration || item?.description || '';
   const isWithdrawal = source === 'withdrawals' || type.includes('withdraw');
   const resolvedTitle = baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
-  const forceNegative = isWithdrawal;
+  const isDebitType =
+    isWithdrawal ||
+    type.includes('debit') ||
+    type.includes('withdraw') ||
+    type.includes('charge') ||
+    type.includes('payment');
+  const isCreditType = type.includes('credit') || type.includes('fund') || type.includes('top_up');
+  const isDebit = isDebitType || (!isCreditType && amount < 0);
+  const forceNegative = isDebit;
   const normalizedType = String(inferredType || '')
     .trim()
     .replace(/_/g, ' ')
@@ -212,8 +220,8 @@ const normalizeTransaction = (item, index, source) => {
     amountText: toAmountWithSign(amount, forceNegative),
     time: formatTransactionDateTime(createdAtMs),
     createdAtMs,
-    positive: forceNegative ? false : amount >= 0 || type.includes('credit'),
-    icon: isWithdrawal || amount < 0 ? ArrowDownLeft01Icon : PlusSignIcon,
+    positive: !isDebit,
+    icon: isDebit ? ArrowDownLeft01Icon : PlusSignIcon,
     rawAmount: amount,
     rawType: type,
     rawStatus: String(item?.status || '').toLowerCase(),
