@@ -161,15 +161,10 @@ const CheckoutScreen = ({ navigation, route }) => {
 
   const directProduct = route?.params?.directProduct || null;
   const product = directProduct ||
-    items?.[0]?.product || {
-      id: '1',
-      name: 'LED headlights',
-      price: 2500,
-      shop: 'Okon spare part hub',
-      images: ['https://picsum.photos/300'],
-    };
+    items?.[0]?.product || {};
 
   const image = resolveImageUri(product?.images?.[0]);
+  const hasProductPrice = Number.isFinite(Number(product?.price));
   const quantity = Number(product?.quantity || items?.[0]?.quantity || 1);
   const subtotal = useMemo(() => {
     if (directProduct) {
@@ -244,7 +239,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       hydratedPart?.store?.store_name,
       hydratedPart?.store?.name,
       product?.shop,
-    ) || 'Seller',
+    ) || '',
   );
   const storeAddress = String(
     pickFirstDefined(
@@ -260,7 +255,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         : '',
     ) ||
       product?.location ||
-      'Store address unavailable',
+      '',
   );
   const storeInfo = String(
     pickFirstDefined(
@@ -271,7 +266,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       product?.store?.phone,
       hydratedPart?.store?.phone,
       hydratedPart?.store?.phone_number,
-    ) || 'Store information unavailable.',
+    ) || '',
   );
 
   const resolvedStorePhone = String(
@@ -355,6 +350,22 @@ const CheckoutScreen = ({ navigation, route }) => {
 
     setIsSubmitting(true);
     try {
+      const deliveryStreet = String(
+        route?.params?.delivery_street || route?.params?.deliveryStreet || user?.street || user?.address?.street || '',
+      ).trim();
+      const deliveryCity = String(
+        route?.params?.delivery_city || route?.params?.deliveryCity || user?.city || user?.address?.city || '',
+      ).trim();
+      const deliveryState = String(
+        route?.params?.delivery_state || route?.params?.deliveryState || user?.state || user?.address?.state || '',
+      ).trim();
+      const deliveryCountry = String(
+        route?.params?.delivery_country || route?.params?.deliveryCountry || user?.country || user?.address?.country || '',
+      ).trim();
+      const deliveryAddressText = [deliveryStreet, deliveryCity, deliveryState, deliveryCountry]
+        .filter(Boolean)
+        .join(', ');
+
       if (directProduct) {
         await addToCart(directProduct, quantity);
       }
@@ -364,20 +375,37 @@ const CheckoutScreen = ({ navigation, route }) => {
         fulfillment_type: deliveryType === 'pickup' ? 'pickup' : 'delivery',
         ...(deliveryType === 'delivery'
           ? {
-              delivery_street: 'No 1, Onireke street, Agbabiaka',
-              delivery_city: 'Lagos',
-              delivery_state: 'Lagos',
-              delivery_country: 'Nigeria',
+              delivery_street: deliveryStreet,
+              delivery_city: deliveryCity,
+              delivery_state: deliveryState,
+              delivery_country: deliveryCountry,
             }
           : {}),
         contact_phone: String(user?.phone_number || user?.phone || '').trim(),
-        email: String(user?.email || 'buyer@example.com'),
+        email: String(user?.email || '').trim(),
       };
+
+      if (deliveryType === 'delivery' && (!deliveryStreet || !deliveryCity || !deliveryState || !deliveryCountry)) {
+        AppAlert.alert(
+          'Delivery address required',
+          'Delivery checkout needs your street, city, state, and country.',
+        );
+        setIsSubmitting(false);
+        return;
+      }
 
       if (!payload.contact_phone) {
         AppAlert.alert(
           'Phone required',
           'Please add your phone number in profile before checkout.',
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      if (paymentMethod !== 'wallet' && !payload.email) {
+        AppAlert.alert(
+          'Email required',
+          'Please add your email in profile before Paystack checkout.',
         );
         setIsSubmitting(false);
         return;
@@ -445,12 +473,12 @@ const CheckoutScreen = ({ navigation, route }) => {
         fulfillmentType: deliveryType === 'pickup' ? 'pickup' : 'delivery',
         pickupCode,
         product: {
-          name: product?.name || 'Product',
+          name: String(product?.name || '').trim(),
           storeId: String(
             product?.storeId || product?.store_id || product?.store?.id || '',
           ).trim(),
           price: Number(product?.price || 0),
-          shop: product?.shop || 'Seller',
+          shop: String(product?.shop || '').trim(),
           images: Array.isArray(product?.images) ? product.images : [],
           latitude: shopCoordinates.latitude,
           longitude: shopCoordinates.longitude,
@@ -471,7 +499,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         storeAddress,
         storeInfo,
         shopCoordinates,
-        deliveryAddress: 'No 1, Onireke street, Agbabiaka',
+        deliveryAddress: deliveryAddressText,
         subtotal: backendSubtotal,
         serviceCharge: backendServiceCharge,
         totalAmount: backendTotal,
@@ -539,13 +567,13 @@ const CheckoutScreen = ({ navigation, route }) => {
             )}
             <View style={styles.productInfo}>
               <AppText style={styles.productName} numberOfLines={1}>
-                {product?.name || 'Product'}
+                {String(product?.name || '').trim() || 'Unavailable'}
               </AppText>
               <AppText style={styles.productShop} numberOfLines={1}>
-                {product?.shop || 'Seller'}
+                {String(product?.shop || '').trim() || 'Unavailable'}
               </AppText>
               <AppText style={styles.productPrice}>
-                {formatNaira(product?.price || 0)}
+                {hasProductPrice ? formatNaira(product?.price) : 'Unavailable'}
               </AppText>
             </View>
           </View>

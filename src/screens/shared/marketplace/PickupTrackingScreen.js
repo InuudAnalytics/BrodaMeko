@@ -388,9 +388,9 @@ const PickupTrackingScreen = ({ navigation, route }) => {
               <View style={styles.productCard}>
                 {imageUri ? <Image source={{ uri: imageUri }} style={styles.productImage} /> : <View style={styles.imagePlaceholder} />}
                 <View style={styles.productInfo}>
-                  <AppText style={styles.productName} numberOfLines={1}>{product?.name || 'Product details unavailable'}</AppText>
+                  <AppText style={styles.productName} numberOfLines={1}>{String(product?.name || '').trim() || 'Unavailable'}</AppText>
                   <TouchableOpacity activeOpacity={0.85} onPress={handleOpenStoreDetails}>
-                    <AppText style={styles.productShop}>{product?.shop || 'Store unavailable'}</AppText>
+                    <AppText style={styles.productShop}>{String(product?.shop || '').trim() || 'Unavailable'}</AppText>
                   </TouchableOpacity>
                   <AppText style={styles.productPrice}>{formatNaira(product?.price || 0)}</AppText>
                   <AppText style={styles.productAddress} numberOfLines={2}>{pickupAddress || 'Pickup address unavailable'}</AppText>
@@ -424,7 +424,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
                   </View>
                 )}
                 <View>
-                  <AppText style={styles.sellerName}>{seller?.name || 'Seller'}</AppText>
+                  <AppText style={styles.sellerName}>{String(seller?.name || '').trim() || 'Unavailable'}</AppText>
                   <View style={styles.sellerStatusRow}>
                     <View style={styles.statusDot} />
                     <AppText style={styles.sellerStatusText}>{seller?.isActive ? 'Active now' : 'Offline'}</AppText>

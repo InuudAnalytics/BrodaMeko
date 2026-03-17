@@ -33,7 +33,7 @@ const RateProductScreen = ({ navigation, route }) => {
   const [selectedTags, setSelectedTags] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const productName = route?.params?.productName || route?.params?.product?.name || 'LED headlights';
+  const productName = String(route?.params?.productName || route?.params?.product?.name || '').trim() || 'Unavailable';
   const resolveImageUri = (value) => {
     if (!value) {
       return '';
@@ -47,8 +47,8 @@ const RateProductScreen = ({ navigation, route }) => {
     return '';
   };
   const productImage = resolveImageUri(route?.params?.productImage || route?.params?.product?.images?.[0]);
-  const sellerName = route?.params?.sellerName || route?.params?.seller?.name || 'Okon spare part hub';
-  const orderId = route?.params?.orderId || route?.params?.order_id || 'BM-98-09';
+  const sellerName = String(route?.params?.sellerName || route?.params?.seller?.name || '').trim() || 'Unavailable';
+  const orderId = String(route?.params?.orderId || route?.params?.order_id || '').trim() || 'Unavailable';
   const storeId = route?.params?.storeId || route?.params?.store_id || route?.params?.product?.storeId || '';
 
   const initials = useMemo(() => {

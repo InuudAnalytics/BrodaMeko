@@ -23,36 +23,11 @@ import AppAlert from '../../../components/AppAlert';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 const PANEL_MAX_DOWN = 520;
 
-const fallbackTimeline = [
-  { id: 'confirmed', label: 'Order confirmed', eta: 'Today � 10:15 AM' },
-  {
-    id: 'preparing',
-    label: 'Seller preparing package',
-    eta: 'Today � 11:30 AM',
-  },
-  { id: 'out_for_delivery', label: 'Out for delivery', eta: 'Today � 1:20 PM' },
-  { id: 'delivered', label: 'Delivered', eta: 'Today � 3:30 PM' },
-];
-
-const fallbackProduct = {
-  name: 'LED headlights',
-  price: 2500,
-  shop: 'Okon spare part hub',
-  images: ['https://picsum.photos/300?random=55'],
-};
-
-const fallbackSeller = {
-  name: 'Okon spare part hub',
-  avatar: 'https://i.pravatar.cc/100?img=12',
-  phone: '',
-  isActive: true,
-};
-
-const fallbackAddress = 'No 1, Onireke street, Agbabiaka';
 const NIGERIA_FALLBACK_COORDS = { latitude: 9.0765, longitude: 7.3986 }; // Abuja
 
 const formatNaira = value =>
   `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
+const toUnavailable = (value) => String(value || '').trim() || 'Unavailable';
 
 const toMoney = (value, fallback = 0) => {
   const parsed = Number(value);
@@ -115,7 +90,7 @@ const readItemId = (item) => String(item?.id || item?._id || '').trim();
 
 const readItemName = (item) => {
   const part = item?.part || item?.product || item?.spare_part || {};
-  return String(part?.name || item?.part_name || item?.name || 'Item').trim() || 'Item';
+  return String(part?.name || item?.part_name || item?.name || '').trim() || 'Unavailable';
 };
 
 const readItemStatus = (item) => String(item?.status || '').trim().toLowerCase();
@@ -149,13 +124,20 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
     data?.service_charge,
     backendTotal > computedSubtotal ? backendTotal - computedSubtotal : 0,
   );
+  const productImages = Array.isArray(part?.images) && part.images.length
+    ? part.images
+    : Array.isArray(part?.image_urls) && part.image_urls.length
+      ? part.image_urls
+      : part?.image
+        ? [part.image]
+        : [];
 
   const resolvedProduct = {
-    name: part?.name || activeItem?.name || fallbackProduct.name,
-    price: part?.price || activeItem?.price || fallbackProduct.price,
-    shop: itemStoreName || store?.store_name || store?.name || fallbackProduct.shop,
+    name: String(part?.name || activeItem?.part_name || activeItem?.name || '').trim(),
+    price: part?.price ?? activeItem?.price ?? activeItem?.unit_price ?? null,
+    shop: String(itemStoreName || store?.store_name || store?.name || '').trim(),
     storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
-    images: part?.images || part?.image_urls || part?.image ? [part.image] : fallbackProduct.images,
+    images: productImages,
     latitude: itemStoreLat ?? store?.coordinates?.latitude ?? part?.latitude ?? null,
     longitude: itemStoreLng ?? store?.coordinates?.longitude ?? part?.longitude ?? null,
     shopCoordinates: itemStoreLat !== null && itemStoreLng !== null
@@ -164,9 +146,9 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
   };
 
   const resolvedSeller = {
-    name: itemStoreName || store?.store_name || store?.name || fallbackSeller.name,
+    name: String(itemStoreName || store?.store_name || store?.name || '').trim(),
     storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
-    avatar: store?.logo || store?.avatar || fallbackSeller.avatar,
+    avatar: String(store?.logo || store?.avatar || '').trim(),
     phone: itemStorePhone || String(store?.phone || store?.phone_number || '').trim(),
     isActive: Boolean(store?.is_active ?? true),
     coordinates: itemStoreLat !== null && itemStoreLng !== null
@@ -178,7 +160,8 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
   const resolvedAddress =
     addressPayload?.street
       ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
-      : data?.delivery_address_text || fallbackAddress;
+      : String(data?.delivery_address_text || '').trim();
+  const resolvedStatus = String(data?.status || readItemStatus(activeItem) || '').trim().toLowerCase();
 
   return {
     ...prev,
@@ -186,15 +169,15 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
     seller: resolvedSeller,
     deliveryAddress: resolvedAddress,
     storeName: resolvedSeller.name,
-    storeAddress: store?.address || resolvedAddress || prev?.storeAddress,
-    storeInfo: store?.description || itemStorePhone || store?.phone || prev?.storeInfo,
-    statusTimeline: extractTimeline(readItemStatus(activeItem) || data?.status),
+    storeAddress: String(store?.address || resolvedAddress || '').trim(),
+    storeInfo: String(store?.description || itemStorePhone || store?.phone || '').trim(),
+    statusTimeline: resolvedStatus ? extractTimeline(resolvedStatus) : [],
     itemId: itemId || prev?.itemId || '',
     orderItems: trackingItems,
     subtotal: computedSubtotal || prev?.subtotal || 0,
     serviceCharge: backendServiceCharge || prev?.serviceCharge || 0,
     totalAmount: backendTotal || prev?.totalAmount || computedSubtotal + backendServiceCharge,
-    orderStatus: String(data?.status || readItemStatus(activeItem) || '').trim().toLowerCase(),
+    orderStatus: resolvedStatus,
   };
 };
 
@@ -237,15 +220,15 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
 
   const [orderState, setOrderState] = useState({
-    product: route?.params?.product || fallbackProduct,
-    seller: route?.params?.seller || fallbackSeller,
-    deliveryAddress: route?.params?.deliveryAddress || fallbackAddress,
-    storeName: route?.params?.storeName || route?.params?.seller?.name || fallbackSeller.name,
-    storeAddress: route?.params?.storeAddress || fallbackAddress,
-    storeInfo: route?.params?.storeInfo || 'Store information unavailable.',
+    product: route?.params?.product || {},
+    seller: route?.params?.seller || {},
+    deliveryAddress: String(route?.params?.deliveryAddress || '').trim(),
+    storeName: String(route?.params?.storeName || route?.params?.seller?.name || '').trim(),
+    storeAddress: String(route?.params?.storeAddress || '').trim(),
+    storeInfo: String(route?.params?.storeInfo || '').trim(),
     statusTimeline: Array.isArray(route?.params?.statusTimeline)
       ? route.params.statusTimeline
-      : fallbackTimeline,
+      : [],
     orderId: route?.params?.orderId || route?.params?.order_id || '',
     itemId: route?.params?.itemId || '',
     orderItems: [],
@@ -310,6 +293,8 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     return '';
   };
   const imageUri = resolveImageUri(product?.images?.[0]);
+  const hasProductPrice = Number.isFinite(Number(product?.price));
+  const sellerInitial = String(seller?.name || '').trim().charAt(0).toUpperCase() || 'U';
 
   const animatePanelTo = useCallback((toValue) => {
     Animated.spring(panelY, {
@@ -576,53 +561,55 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               {orderError ? (
                 <AppText style={styles.errorText}>{orderError}</AppText>
               ) : null}
-              {statusTimeline.map((step, index) => {
+              {statusTimeline.length ? statusTimeline.map((step, index) => {
                 const isCompleted =
                   typeof step?.completed === 'boolean'
                     ? step.completed
                     : index < statusTimeline.length - 1;
                 return (
-                <View key={step.id} style={styles.timelineRow}>
-                  <View style={styles.timelineMarker}>
-                    <View
-                      style={[
-                        styles.timelineCircle,
-                        isCompleted
-                          ? styles.timelineCircleActive
-                          : styles.timelineCircleInactive,
-                      ]}
-                    >
-                      <AppText
-                        style={[
-                          styles.timelineCheck,
-                          isCompleted
-                            ? styles.timelineCheckActive
-                            : styles.timelineCheckInactive,
-                        ]}
-                      >
-                        {'\u2713'}
-                      </AppText>
-                    </View>
-                    {index < statusTimeline.length - 1 ? (
+                  <View key={step.id || index} style={styles.timelineRow}>
+                    <View style={styles.timelineMarker}>
                       <View
                         style={[
-                          styles.timelineLine,
+                          styles.timelineCircle,
                           isCompleted
-                            ? styles.timelineLineActive
-                            : styles.timelineLineInactive,
+                            ? styles.timelineCircleActive
+                            : styles.timelineCircleInactive,
                         ]}
-                      />
-                    ) : null}
+                      >
+                        <AppText
+                          style={[
+                            styles.timelineCheck,
+                            isCompleted
+                              ? styles.timelineCheckActive
+                              : styles.timelineCheckInactive,
+                          ]}
+                        >
+                          {'\u2713'}
+                        </AppText>
+                      </View>
+                      {index < statusTimeline.length - 1 ? (
+                        <View
+                          style={[
+                            styles.timelineLine,
+                            isCompleted
+                              ? styles.timelineLineActive
+                              : styles.timelineLineInactive,
+                          ]}
+                        />
+                      ) : null}
+                    </View>
+                    <View style={styles.timelineContent}>
+                      <AppText style={styles.timelineTitle}>{step.label}</AppText>
+                      <AppText style={styles.timelineEta}>
+                        {step.eta || 'ETA unavailable'}
+                      </AppText>
+                    </View>
                   </View>
-                  <View style={styles.timelineContent}>
-                    <AppText style={styles.timelineTitle}>{step.label}</AppText>
-                    <AppText style={styles.timelineEta}>
-                      {step.eta || 'ETA coming soon'}
-                    </AppText>
-                  </View>
-                </View>
                 );
-              })}
+              }) : (
+                <AppText style={styles.timelineEta}>Tracking unavailable</AppText>
+              )}
             </View>
 
             <View style={styles.productCard}>
@@ -633,25 +620,25 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               )}
               <View style={styles.productInfo}>
                 <AppText style={styles.productName} numberOfLines={1}>
-                  {product?.name || 'Product'}
+                  {toUnavailable(product?.name)}
                 </AppText>
                 <AppText style={styles.productShop} numberOfLines={1}>
-                  {product?.shop || 'Seller'}
+                  {toUnavailable(product?.shop)}
                 </AppText>
                 <AppText style={styles.productPrice}>
-                  {formatNaira(product?.price || 0)}
+                  {hasProductPrice ? formatNaira(product?.price) : 'Unavailable'}
                 </AppText>
               </View>
             </View>
             <View style={styles.addressRow}>
               <AppText style={styles.addressLabel}>Delivery address</AppText>
-              <AppText style={styles.addressValue}>{deliveryAddress}</AppText>
+              <AppText style={styles.addressValue}>{toUnavailable(deliveryAddress)}</AppText>
             </View>
             <TouchableOpacity style={styles.addressRow} activeOpacity={0.88} onPress={handleOpenStoreDetails}>
               <AppText style={styles.addressLabel}>Store</AppText>
-              <AppText style={styles.addressValue}>{storeName}</AppText>
-              <AppText style={styles.addressSubValue}>{storeAddress}</AppText>
-              <AppText style={styles.addressHint}>{storeInfo}</AppText>
+              <AppText style={styles.addressValue}>{toUnavailable(storeName)}</AppText>
+              <AppText style={styles.addressSubValue}>{toUnavailable(storeAddress)}</AppText>
+              <AppText style={styles.addressHint}>{toUnavailable(storeInfo)}</AppText>
             </TouchableOpacity>
             <View style={styles.addressRow}>
               <AppText style={styles.addressHint}>
@@ -709,13 +696,15 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                       style={styles.sellerAvatar}
                     />
                   ) : (
-                    <View style={styles.sellerAvatarPlaceholder} />
+                    <View style={styles.sellerAvatarPlaceholder}>
+                      <AppText style={styles.sellerAvatarText}>{sellerInitial}</AppText>
+                    </View>
                   )}
                   {seller?.isActive ? <View style={styles.activeDot} /> : null}
                 </View>
                 <View style={styles.sellerInfo}>
                   <AppText style={styles.sellerName}>
-                    {seller?.name || 'Seller'}
+                    {toUnavailable(seller?.name)}
                   </AppText>
                   <AppText style={styles.sellerStatus}>Active now</AppText>
                 </View>
@@ -1029,6 +1018,13 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sellerAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   activeDot: {
     position: 'absolute',
@@ -1140,6 +1136,3 @@ const styles = StyleSheet.create({
 });
 
 export default OrderTrackingScreen;
-
-
-

@@ -181,6 +181,7 @@ const CartScreen = ({ navigation, route }) => {
             {items.map(item => {
               const product = item.product || {};
               const image = resolveImageUri(product?.images?.[0]);
+              const hasPrice = Number.isFinite(Number(product?.price));
               return (
                 <View key={item.productId} style={styles.itemCard}>
                   <View style={styles.itemRow}>
@@ -191,13 +192,13 @@ const CartScreen = ({ navigation, route }) => {
                     )}
                     <View style={styles.itemInfo}>
                       <AppText style={styles.itemName} numberOfLines={1}>
-                        {product?.name || 'Product'}
+                        {String(product?.name || '').trim() || 'Unavailable'}
                       </AppText>
                       <AppText style={styles.itemShop} numberOfLines={1}>
-                        {product?.shop || 'Seller'}
+                        {String(product?.shop || '').trim() || 'Unavailable'}
                       </AppText>
                       <AppText style={styles.itemPrice}>
-                        {formatNaira(product?.price || 0)}
+                        {hasPrice ? formatNaira(product?.price) : 'Unavailable'}
                       </AppText>
                     </View>
                     <View style={styles.actionCol}>
