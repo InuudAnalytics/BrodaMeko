@@ -1,44 +1,69 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { WebView } from 'react-native-webview';
-import { AppButton, AppInput, AppText, ScreenContainer } from '../../../components';
+import {
+  AppButton,
+  AppInput,
+  AppText,
+  ScreenContainer,
+} from '../../../components';
 import { trackTelemetryEvent } from '../../../services/telemetry.service';
-import { getWalletBalance, topUpWallet, verifyWalletPayment } from '../../../services/wallet.service';
+import {
+  getWalletBalance,
+  topUpWallet,
+  verifyWalletPayment,
+} from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
-const readTopUpReference = (payload) => {
+const readTopUpReference = payload => {
   const root = payload?.data || payload || {};
 
   return String(
     root?.reference ||
-    root?.trxref ||
-    root?.data?.reference ||
-    root?.data?.trxref ||
-    ''
+      root?.trxref ||
+      root?.data?.reference ||
+      root?.data?.trxref ||
+      '',
   ).trim();
 };
 
-const readAuthorizationUrl = (payload) => {
+const readTopUpTrxref = payload => {
   const root = payload?.data || payload || {};
 
   return String(
-    root?.authorization_url ||
-    root?.data?.authorization_url ||
-    ''
+    root?.trxref ||
+      root?.reference ||
+      root?.data?.trxref ||
+      root?.data?.reference ||
+      '',
   ).trim();
 };
 
-const readWalletAmount = (walletPayload) => {
+const readAuthorizationUrl = payload => {
+  const root = payload?.data || payload || {};
+
+  return String(
+    root?.authorization_url || root?.data?.authorization_url || '',
+  ).trim();
+};
+
+const readWalletAmount = walletPayload => {
   const root = walletPayload?.data || walletPayload || {};
   const amount = Number(
     root?.wallet?.balance ??
       root?.balance ??
       root?.available_balance ??
       root?.wallet_balance ??
-      0
+      0,
   );
   return Number.isFinite(amount) ? amount : 0;
 };
@@ -46,12 +71,12 @@ const readWalletAmount = (walletPayload) => {
 const WEBHOOK_POLL_INTERVAL_MS = 5000;
 const WEBHOOK_POLL_TIMEOUT_MS = 60000;
 
-const sleep = (ms) =>
-  new Promise((resolve) => {
+const sleep = ms =>
+  new Promise(resolve => {
     setTimeout(resolve, ms);
   });
 
-const FundWalletScreen = ({ navigation }) => {
+const FundWalletScreen = ({ navigation, route }) => {
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
   const [trxref, setTrxref] = useState('');
@@ -62,16 +87,23 @@ const FundWalletScreen = ({ navigation }) => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [loadingVerify, setLoadingVerify] = useState(false);
+  const [loadingSync, setLoadingSync] = useState(false);
   const [loadingWebhookWait, setLoadingWebhookWait] = useState(false);
   const [awaitingWebhookCredit, setAwaitingWebhookCredit] = useState(false);
   const [preTopUpBalance, setPreTopUpBalance] = useState(null);
   const [expectedCreditAmount, setExpectedCreditAmount] = useState(0);
+  const source = String(route?.params?.source || '')
+    .trim()
+    .toLowerCase();
+  const openedFromCheckout =
+    source.includes('checkout') || Boolean(route?.params?.fromCheckout);
 
   const canSubmit = useMemo(() => Number(amount) >= 100, [amount]);
   const canVerify = useMemo(() => reference.trim().length > 0, [reference]);
 
   const waitForWalletWebhookCredit = async (baseBalance, creditAmount) => {
-    const expectedBalance = Number(baseBalance || 0) + Number(creditAmount || 0);
+    const expectedBalance =
+      Number(baseBalance || 0) + Number(creditAmount || 0);
     if (!Number.isFinite(expectedBalance)) {
       return false;
     }
@@ -93,7 +125,10 @@ const FundWalletScreen = ({ navigation }) => {
     return false;
   };
 
-  const runWebhookCreditCheck = async ({ showPendingMessage = false, source = 'verify' } = {}) => {
+  const runWebhookCreditCheck = async ({
+    showPendingMessage = false,
+    eventSource = 'verify',
+  } = {}) => {
     const creditAmount = Number(expectedCreditAmount || amount || 0);
     const baseBalance = Number(preTopUpBalance ?? 0);
     const safeReference = reference.trim();
@@ -105,12 +140,17 @@ const FundWalletScreen = ({ navigation }) => {
     }
 
     setLoadingWebhookWait(true);
+    const checkStartedAt = Date.now();
     try {
-      const credited = await waitForWalletWebhookCredit(baseBalance, creditAmount);
+      const credited = await waitForWalletWebhookCredit(
+        baseBalance,
+        creditAmount,
+      );
+      const waitedMs = Date.now() - checkStartedAt;
 
       if (credited) {
         trackTelemetryEvent('wallet_credit_confirmed', {
-          source,
+          source: eventSource,
           reference: safeReference,
           expected_credit_amount: creditAmount,
           expected_balance: expectedBalance,
@@ -123,14 +163,27 @@ const FundWalletScreen = ({ navigation }) => {
 
       if (showPendingMessage) {
         trackTelemetryEvent('wallet_credit_pending_webhook', {
-          source,
+          source: eventSource,
           reference: safeReference,
           expected_credit_amount: creditAmount,
           expected_balance: expectedBalance,
         });
+        trackTelemetryEvent('verify_success_but_no_credit', {
+          source: eventSource,
+          reference: safeReference,
+          trxref: trxref.trim() || safeReference,
+          expected_credit_amount: creditAmount,
+          expected_balance: expectedBalance,
+          waited_ms: waitedMs,
+        });
         setAwaitingWebhookCredit(true);
+        setError(
+          `Webhook delay on server. Your payment reference: ${
+            safeReference || 'N/A'
+          }`,
+        );
         setInfo(
-          'Payment is verified, but wallet credit is still processing via webhook. Wait a bit, then recheck.'
+          'Payment verified, waiting for wallet credit. Use Sync payment status to recheck.',
         );
       }
     } finally {
@@ -139,7 +192,13 @@ const FundWalletScreen = ({ navigation }) => {
   };
 
   const handleTopUp = async () => {
-    if (!canSubmit || loadingTopUp || loadingWebhookWait) {
+    if (
+      !canSubmit ||
+      loadingTopUp ||
+      loadingWebhookWait ||
+      awaitingWebhookCredit ||
+      loadingSync
+    ) {
       return;
     }
 
@@ -161,20 +220,29 @@ const FundWalletScreen = ({ navigation }) => {
 
       const response = await topUpWallet(enteredAmount);
       const nextReference = readTopUpReference(response);
+      const nextTrxref = readTopUpTrxref(response);
       const nextAuthorizationUrl = readAuthorizationUrl(response);
 
-      if (nextReference) {
-        setReference(nextReference);
-        setTrxref(nextReference);
+      const safeReference = nextReference || nextTrxref;
+      const safeTrxref = nextTrxref || nextReference;
+      if (safeReference) {
+        setReference(safeReference);
+      }
+      if (safeTrxref) {
+        setTrxref(safeTrxref);
       }
 
       if (nextAuthorizationUrl) {
         setAuthorizationUrl(nextAuthorizationUrl);
         setCheckoutError('');
-        setInfo('Checkout link created. Open checkout, complete payment, then verify below.');
+        setInfo(
+          'Checkout link created. Open checkout, complete payment, then verify below.',
+        );
         setShowCheckoutModal(true);
       } else {
-        setInfo('Top-up initialized. Use reference and trxref to verify payment.');
+        setInfo(
+          'Top-up initialized. Use reference and trxref to verify payment.',
+        );
       }
     } catch (topUpError) {
       setError(topUpError?.message || 'Could not initialize top-up.');
@@ -186,7 +254,13 @@ const FundWalletScreen = ({ navigation }) => {
 
   const handleOpenCheckout = async () => {
     const safeUrl = authorizationUrl.trim();
-    if (!safeUrl || loadingTopUp || loadingVerify || loadingWebhookWait) {
+    if (
+      !safeUrl ||
+      loadingTopUp ||
+      loadingVerify ||
+      loadingWebhookWait ||
+      loadingSync
+    ) {
       return;
     }
 
@@ -202,7 +276,7 @@ const FundWalletScreen = ({ navigation }) => {
   };
 
   const handleVerify = async () => {
-    if (!canVerify || loadingVerify || loadingWebhookWait) {
+    if (!canVerify || loadingVerify || loadingWebhookWait || loadingSync) {
       return;
     }
 
@@ -215,8 +289,11 @@ const FundWalletScreen = ({ navigation }) => {
       const safeTrxref = trxref.trim() || safeReference;
 
       await verifyWalletPayment(safeReference, safeTrxref);
-      setInfo('Payment verified. Confirming wallet credit...');
-      await runWebhookCreditCheck({ showPendingMessage: true, source: 'verify' });
+      setInfo('Payment verified, waiting for wallet credit.');
+      await runWebhookCreditCheck({
+        showPendingMessage: true,
+        eventSource: 'verify',
+      });
     } catch (verifyError) {
       setError(verifyError?.message || 'Could not verify this payment yet.');
     } finally {
@@ -224,12 +301,54 @@ const FundWalletScreen = ({ navigation }) => {
     }
   };
 
+  const handleSyncPaymentStatus = async () => {
+    if (
+      !canVerify ||
+      loadingSync ||
+      loadingVerify ||
+      loadingTopUp ||
+      loadingWebhookWait
+    ) {
+      return;
+    }
+
+    setLoadingSync(true);
+    setError('');
+    try {
+      const safeReference = reference.trim();
+      const safeTrxref = trxref.trim() || safeReference;
+      await verifyWalletPayment(safeReference, safeTrxref);
+      setInfo('Payment re-verified, waiting for wallet credit.');
+      await runWebhookCreditCheck({
+        showPendingMessage: true,
+        eventSource: 'sync_status',
+      });
+    } catch (syncError) {
+      setError(syncError?.message || 'Could not sync payment status yet.');
+    } finally {
+      setLoadingSync(false);
+    }
+  };
+
   return (
-    <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
+    <ScreenContainer
+      padded={false}
+      edges={['top', 'left', 'right', 'bottom']}
+      style={styles.screen}
+    >
       <View style={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.8} onPress={() => navigation.goBack()}>
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#FFFFFF" strokeWidth={2.2} />
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.8}
+            onPress={() => navigation.goBack()}
+          >
+            <HugeiconsIcon
+              icon={ArrowLeft01Icon}
+              size={20}
+              color="#FFFFFF"
+              strokeWidth={2.2}
+            />
           </TouchableOpacity>
           <AppText style={styles.heading}>Fund Wallet</AppText>
           <View style={styles.backButtonSpacer} />
@@ -241,54 +360,153 @@ const FundWalletScreen = ({ navigation }) => {
           value={amount}
           onChangeText={setAmount}
           keyboardType="numeric"
+          editable={
+            !awaitingWebhookCredit &&
+            !loadingTopUp &&
+            !loadingVerify &&
+            !loadingSync
+          }
         />
         <AppText style={styles.helperText}>Minimum top-up is ₦100.</AppText>
 
         <AppButton
           label={loadingTopUp ? 'Processing...' : 'Top up'}
           onPress={handleTopUp}
-          disabled={!canSubmit || loadingTopUp || loadingVerify || loadingWebhookWait}
-          left={loadingTopUp ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
+          disabled={
+            !canSubmit ||
+            loadingTopUp ||
+            loadingVerify ||
+            loadingWebhookWait ||
+            awaitingWebhookCredit ||
+            loadingSync
+          }
+          left={
+            loadingTopUp ? (
+              <ActivityIndicator
+                size="small"
+                color={darkTheme.colors.background}
+              />
+            ) : null
+          }
           style={styles.primaryBtn}
         />
 
-        <AppButton
-          label="Open checkout"
-          onPress={handleOpenCheckout}
-          disabled={!authorizationUrl.trim() || loadingTopUp || loadingVerify || loadingWebhookWait}
-          style={styles.secondaryBtn}
-        />
+        {openedFromCheckout ? (
+          <AppButton
+            label="Open checkout"
+            onPress={handleOpenCheckout}
+            disabled={
+              !authorizationUrl.trim() ||
+              loadingTopUp ||
+              loadingVerify ||
+              loadingWebhookWait ||
+              loadingSync
+            }
+            style={styles.secondaryBtn}
+          />
+        ) : null}
 
         <AppButton
           label={loadingVerify ? 'Verifying...' : 'Verify payment'}
           onPress={handleVerify}
-          disabled={!canVerify || loadingVerify || loadingTopUp || loadingWebhookWait}
-          left={loadingVerify ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
+          disabled={
+            !canVerify ||
+            loadingVerify ||
+            loadingTopUp ||
+            loadingWebhookWait ||
+            loadingSync
+          }
+          left={
+            loadingVerify ? (
+              <ActivityIndicator
+                size="small"
+                color={darkTheme.colors.background}
+              />
+            ) : null
+          }
           style={styles.verifyBtn}
         />
 
         {awaitingWebhookCredit ? (
-          <AppButton
-            label={loadingWebhookWait ? 'Rechecking wallet...' : 'Recheck wallet credit'}
-            onPress={() => runWebhookCreditCheck({ showPendingMessage: true, source: 'manual_recheck' })}
-            disabled={loadingWebhookWait || loadingTopUp || loadingVerify}
-            left={loadingWebhookWait ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
-            style={styles.verifyBtn}
-          />
+          <View>
+            <AppButton
+              label={loadingSync ? 'Syncing...' : 'Sync payment status'}
+              onPress={handleSyncPaymentStatus}
+              disabled={
+                loadingSync ||
+                loadingWebhookWait ||
+                loadingTopUp ||
+                loadingVerify
+              }
+              left={
+                loadingSync ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={darkTheme.colors.background}
+                  />
+                ) : null
+              }
+              style={styles.verifyBtn}
+            />
+            <AppButton
+              label={
+                loadingWebhookWait
+                  ? 'Rechecking wallet...'
+                  : 'Recheck wallet credit'
+              }
+              onPress={() =>
+                runWebhookCreditCheck({
+                  showPendingMessage: true,
+                  eventSource: 'manual_recheck',
+                })
+              }
+              disabled={
+                loadingWebhookWait ||
+                loadingTopUp ||
+                loadingVerify ||
+                loadingSync
+              }
+              left={
+                loadingWebhookWait ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={darkTheme.colors.background}
+                  />
+                ) : null
+              }
+              style={styles.verifyBtn}
+            />
+          </View>
         ) : null}
 
         {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
         {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
         {reference.trim() ? (
-          <AppText style={styles.infoText}>Reference captured. Verify after completing checkout.</AppText>
+          <AppText style={styles.infoText}>
+            Reference: {reference.trim()} | Trxref:{' '}
+            {trxref.trim() || reference.trim()}
+          </AppText>
         ) : null}
       </View>
 
-      <Modal visible={showCheckoutModal} animationType="slide" presentationStyle="fullScreen">
+      <Modal
+        visible={showCheckoutModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
         <View style={styles.checkoutScreen}>
           <View style={styles.checkoutHeader}>
-            <TouchableOpacity style={styles.checkoutCloseBtn} activeOpacity={0.85} onPress={handleCheckoutClose}>
-              <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#FFFFFF" strokeWidth={2.2} />
+            <TouchableOpacity
+              style={styles.checkoutCloseBtn}
+              activeOpacity={0.85}
+              onPress={handleCheckoutClose}
+            >
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                size={20}
+                color="#FFFFFF"
+                strokeWidth={2.2}
+              />
             </TouchableOpacity>
             <AppText style={styles.checkoutTitle}>Checkout</AppText>
             <View style={styles.checkoutCloseBtn} />
@@ -310,20 +528,25 @@ const FundWalletScreen = ({ navigation }) => {
               startInLoadingState
               renderLoading={() => (
                 <View style={styles.webLoadingWrap}>
-                  <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+                  <ActivityIndicator
+                    size="small"
+                    color={darkTheme.colors.accent}
+                  />
                 </View>
               )}
-              onError={(syntheticEvent) => {
-                const description = syntheticEvent?.nativeEvent?.description || 'Could not load checkout.';
+              onError={syntheticEvent => {
+                const description =
+                  syntheticEvent?.nativeEvent?.description ||
+                  'Could not load checkout.';
                 setCheckoutError(String(description));
               }}
-              onHttpError={(syntheticEvent) => {
+              onHttpError={syntheticEvent => {
                 const statusCode = syntheticEvent?.nativeEvent?.statusCode;
                 if (statusCode) {
                   setCheckoutError(`Checkout request failed (${statusCode}).`);
                 }
               }}
-              onShouldStartLoadWithRequest={(request) => {
+              onShouldStartLoadWithRequest={request => {
                 const target = String(request?.url || '').toLowerCase();
                 if (
                   target.includes('status=success') ||
@@ -343,7 +566,7 @@ const FundWalletScreen = ({ navigation }) => {
 
                 return true;
               }}
-              onNavigationStateChange={(navState) => {
+              onNavigationStateChange={navState => {
                 const nextUrl = String(navState?.url || '').toLowerCase();
                 if (!nextUrl) {
                   return;
@@ -360,7 +583,9 @@ const FundWalletScreen = ({ navigation }) => {
             />
           ) : (
             <View style={styles.webLoadingWrap}>
-              <AppText style={styles.errorText}>No checkout URL available.</AppText>
+              <AppText style={styles.errorText}>
+                No checkout URL available.
+              </AppText>
             </View>
           )}
 
@@ -371,7 +596,10 @@ const FundWalletScreen = ({ navigation }) => {
           ) : null}
 
           <View style={styles.checkoutFooter}>
-            <AppButton label="Done, verify payment" onPress={handleCheckoutClose} />
+            <AppButton
+              label="Done, verify payment"
+              onPress={handleCheckoutClose}
+            />
           </View>
         </View>
       </Modal>
@@ -433,10 +661,14 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 12,
     color: '#FF7F7F',
+    fontSize: 11,
+    lineHeight: 15,
   },
   infoText: {
     marginTop: 10,
     color: '#9BE17C',
+    fontSize: 11,
+    lineHeight: 15,
   },
   checkoutScreen: {
     flex: 1,

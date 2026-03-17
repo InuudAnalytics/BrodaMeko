@@ -65,7 +65,75 @@ const readTransactions = (payload) => {
 
 const normalizeStatusText = (value) => String(value || '').trim().toLowerCase();
 
+const formatTransactionDateTime = (timestampMs) => {
+  if (!Number.isFinite(Number(timestampMs)) || Number(timestampMs) <= 0) {
+    return 'Unavailable';
+  }
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Lagos',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(new Date(Number(timestampMs)));
+
+  const readPart = (type) =>
+    String(parts.find((entry) => entry.type === type)?.value || '').trim();
+
+  const day = readPart('day');
+  const month = readPart('month');
+  const year = readPart('year');
+  const hour = readPart('hour');
+  const minute = readPart('minute');
+  const dayPeriod = readPart('dayPeriod').toUpperCase();
+
+  if (!day || !month || !year || !hour || !minute || !dayPeriod) {
+    return 'Unavailable';
+  }
+
+  return `${day}-${month}-${year} ${hour}:${minute} ${dayPeriod}`;
+};
+
 const resolveTransactionStatusBadge = (item) => {
+  const fromBackend = [
+    normalizeStatusText(item?.rawStatus),
+    normalizeStatusText(item?.rawPaymentStatus),
+    normalizeStatusText(item?.rawEscrowStatus),
+  ].find(Boolean);
+  if (fromBackend) {
+    if (['held', 'in_escrow', 'funded', 'secured'].includes(fromBackend)) {
+      return { label: 'In escrow', tone: 'warning' };
+    }
+    if (['released', 'disbursed'].includes(fromBackend)) {
+      return { label: 'Released', tone: 'success' };
+    }
+    if (['refunded', 'reversed'].includes(fromBackend)) {
+      return { label: 'Refunded', tone: 'neutral' };
+    }
+    if (fromBackend.includes('pending') || fromBackend.includes('processing')) {
+      return { label: 'Pending', tone: 'warning' };
+    }
+    if (
+      fromBackend.includes('success') ||
+      fromBackend.includes('successful') ||
+      fromBackend.includes('paid') ||
+      fromBackend.includes('completed')
+    ) {
+      return { label: 'Successful', tone: 'success' };
+    }
+    if (
+      fromBackend.includes('failed') ||
+      fromBackend.includes('cancelled') ||
+      fromBackend.includes('canceled') ||
+      fromBackend.includes('declined')
+    ) {
+      return { label: 'Failed', tone: 'danger' };
+    }
+  }
+
   const escrow = normalizeStatusText(item?.rawEscrowStatus);
   const payment = normalizeStatusText(item?.rawPaymentStatus);
   const status = normalizeStatusText(item?.rawStatus);
@@ -122,14 +190,27 @@ const normalizeTransaction = (item, index, source) => {
   const isWithdrawal = source === 'withdrawals' || type.includes('withdraw');
   const resolvedTitle = baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
   const forceNegative = isWithdrawal;
+  const normalizedType = String(inferredType || '')
+    .trim()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+  const typeLabel = normalizedType
+    ? normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1)
+    : '';
+  const statusText = String(item?.status || '').trim().toLowerCase();
+  const failureReason = String(item?.failure_reason || item?.failureReason || '').trim();
+  const subtitle = isWithdrawal
+    ? (statusText.includes('fail') && failureReason ? failureReason : 'Withdrawal')
+    : (typeLabel || 'Transaction');
 
   return {
     id: String(item?.id || item?._id || item?.reference || `txn-${index}`),
     reference: String(item?.reference || item?.trxref || item?.id || '').trim(),
     title: resolvedTitle,
-    subtitle: item?.subtitle || item?.channel || item?.status || '',
+    subtitle,
     amountText: toAmountWithSign(amount, forceNegative),
-    time: createdAtRaw,
+    time: formatTransactionDateTime(createdAtMs),
     createdAtMs,
     positive: forceNegative ? false : amount >= 0 || type.includes('credit'),
     icon: isWithdrawal || amount < 0 ? ArrowDownLeft01Icon : PlusSignIcon,
@@ -234,7 +315,7 @@ const TransactionItem = ({ item, onPress }) => {
         <AppText style={styles.txnTitle}>{item.title}</AppText>
         <View style={styles.txnSubRow}>
           <AppText variant="muted" style={styles.txnSubtitle} numberOfLines={1}>
-            {item.subtitle}
+            {item.subtitle || 'Unavailable'}
           </AppText>
           <View
             style={[
@@ -322,7 +403,7 @@ const WalletScreen = ({ navigation }) => {
         ...readTransactions(withdrawalsResponse).map((item, index) =>
           normalizeTransaction(item, index, 'withdrawals')
         ),
-      ];
+      ].sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0));
 
       setBalance(Number(walletPayload?.balance || walletPayload?.available_balance || 0));
       setTransactions(transactionItems);
@@ -516,6 +597,10 @@ const WalletScreen = ({ navigation }) => {
 
     return next;
   }, [fromDateOption, selectedTypes, toDateOption, transactions]);
+  const visibleTransactions = useMemo(
+    () => filteredTransactions.slice(0, 5),
+    [filteredTransactions]
+  );
 
   const backdropOpacity = sheetProgress.interpolate({
     inputRange: [0, 1],
@@ -607,9 +692,9 @@ const WalletScreen = ({ navigation }) => {
           </View>
         ) : null}
 
-        {!loading && filteredTransactions.length ? (
+        {!loading && visibleTransactions.length ? (
           <View style={styles.txnList}>
-            {filteredTransactions.map((txn) => (
+            {visibleTransactions.map((txn) => (
               <TransactionItem
                 key={txn.id}
                 item={txn}
@@ -626,7 +711,7 @@ const WalletScreen = ({ navigation }) => {
         ) : null}
 
         {!loading && error && !filteredTransactions.length ? (
-          <NoInternetState message={error} onRetry={loadWalletData} />
+          <NoInternetState message={error} onRetry={fetchWalletData} />
         ) : null}
 
         {!loading && !error && !filteredTransactions.length ? (
@@ -1053,8 +1138,8 @@ const styles = StyleSheet.create({
   txnTime: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.48)',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 14,
   },
   filterModalRoot: {
     flex: 1,
