@@ -46,10 +46,27 @@ export const verifyWalletPayment = async (referenceInput, trxrefInput) => {
 
 export const getWalletBalance = async () => {
   const me = await getCurrentUser();
-  const root = me?.data && typeof me.data === 'object' ? me.data : me;
+  const root = me && typeof me === 'object' ? me : {};
+  const nestedData =
+    root?.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? root.data
+      : {};
+  const nestedRootData =
+    nestedData?.data &&
+    typeof nestedData.data === 'object' &&
+    !Array.isArray(nestedData.data)
+      ? nestedData.data
+      : {};
+
+  const walletCandidates = [
+    root?.wallet,
+    nestedData?.wallet,
+    nestedRootData?.wallet,
+  ];
   const wallet =
-    (root?.wallet && typeof root.wallet === 'object' ? root.wallet : null) ||
-    null;
+    walletCandidates.find(
+      candidate => candidate && typeof candidate === 'object' && !Array.isArray(candidate),
+    ) || null;
 
   if (wallet) {
     return wallet;
@@ -57,9 +74,31 @@ export const getWalletBalance = async () => {
 
   // Wallet balance is sourced from /auth/me on current backend.
   return {
-    balance: Number(root?.balance || root?.available_balance || root?.wallet_balance || 0),
-    available_balance: Number(root?.available_balance || root?.balance || root?.wallet_balance || 0),
-    currency: String(root?.currency || root?.wallet_currency || 'NGN'),
+    balance: Number(
+      root?.balance ||
+        nestedData?.balance ||
+        root?.available_balance ||
+        nestedData?.available_balance ||
+        root?.wallet_balance ||
+        nestedData?.wallet_balance ||
+        0,
+    ),
+    available_balance: Number(
+      root?.available_balance ||
+        nestedData?.available_balance ||
+        root?.balance ||
+        nestedData?.balance ||
+        root?.wallet_balance ||
+        nestedData?.wallet_balance ||
+        0,
+    ),
+    currency: String(
+      root?.currency ||
+        nestedData?.currency ||
+        root?.wallet_currency ||
+        nestedData?.wallet_currency ||
+        'NGN',
+    ),
   };
 };
 

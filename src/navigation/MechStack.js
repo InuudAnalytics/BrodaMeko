@@ -45,6 +45,7 @@ import StoreDetailsScreen from '../screens/shared/marketplace/StoreDetailsScreen
 import RateProductScreen from '../screens/shared/marketplace/RateProductScreen';
 import OrderDeliveredSuccessScreen from '../screens/shared/marketplace/OrderDeliveredSuccessScreen';
 import ProductFeedbackSuccessScreen from '../screens/shared/marketplace/ProductFeedbackSuccessScreen';
+import FundWalletScreen from '../screens/carowner/wallet/FundWalletScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -170,6 +171,11 @@ const MechStack = () => {
       <Stack.Screen name={ROUTES.DISPUTES} component={DisputeListScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.DISPUTE_DETAIL} component={DisputeDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name={ROUTES.CAR_OWNER_FUND_WALLET}
+        component={FundWalletScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name={ROUTES.USER_PROFILE}

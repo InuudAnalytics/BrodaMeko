@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -22,7 +22,6 @@ import {
   verifyWalletPayment,
 } from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
 
 const readTopUpReference = payload => {
   const root = payload?.data || payload || {};
@@ -70,6 +69,8 @@ const readWalletAmount = walletPayload => {
 
 const WEBHOOK_POLL_INTERVAL_MS = 5000;
 const WEBHOOK_POLL_TIMEOUT_MS = 60000;
+const VERIFY_POLL_INTERVAL_MS = 5000;
+const VERIFY_POLL_TIMEOUT_MS = 60000;
 
 const sleep = ms =>
   new Promise(resolve => {
@@ -86,12 +87,13 @@ const FundWalletScreen = ({ navigation, route }) => {
   const [loadingTopUp, setLoadingTopUp] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
-  const [loadingVerify, setLoadingVerify] = useState(false);
-  const [loadingSync, setLoadingSync] = useState(false);
+  const [loadingAutoVerify, setLoadingAutoVerify] = useState(false);
   const [loadingWebhookWait, setLoadingWebhookWait] = useState(false);
-  const [awaitingWebhookCredit, setAwaitingWebhookCredit] = useState(false);
+  const [paymentState, setPaymentState] = useState('idle');
   const [preTopUpBalance, setPreTopUpBalance] = useState(null);
   const [expectedCreditAmount, setExpectedCreditAmount] = useState(0);
+  const screenActiveRef = useRef(true);
+  const autoVerificationRef = useRef(false);
   const source = String(route?.params?.source || '')
     .trim()
     .toLowerCase();
@@ -99,7 +101,13 @@ const FundWalletScreen = ({ navigation, route }) => {
     source.includes('checkout') || Boolean(route?.params?.fromCheckout);
 
   const canSubmit = useMemo(() => Number(amount) >= 100, [amount]);
-  const canVerify = useMemo(() => reference.trim().length > 0, [reference]);
+
+  useEffect(() => {
+    screenActiveRef.current = true;
+    return () => {
+      screenActiveRef.current = false;
+    };
+  }, []);
 
   const waitForWalletWebhookCredit = async (baseBalance, creditAmount) => {
     const expectedBalance =
@@ -110,6 +118,9 @@ const FundWalletScreen = ({ navigation, route }) => {
 
     const startedAt = Date.now();
     while (Date.now() - startedAt < WEBHOOK_POLL_TIMEOUT_MS) {
+      if (!screenActiveRef.current) {
+        return false;
+      }
       await sleep(WEBHOOK_POLL_INTERVAL_MS);
       try {
         const wallet = await getWalletBalance();
@@ -125,18 +136,14 @@ const FundWalletScreen = ({ navigation, route }) => {
     return false;
   };
 
-  const runWebhookCreditCheck = async ({
-    showPendingMessage = false,
-    eventSource = 'verify',
-  } = {}) => {
+  const runWebhookCreditCheck = async ({ eventSource = 'auto_verify' } = {}) => {
     const creditAmount = Number(expectedCreditAmount || amount || 0);
     const baseBalance = Number(preTopUpBalance ?? 0);
     const safeReference = reference.trim();
     const expectedBalance = baseBalance + creditAmount;
 
     if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
-      navigation.navigate(ROUTES.CAR_OWNER_REWARDS);
-      return;
+      return false;
     }
 
     setLoadingWebhookWait(true);
@@ -155,39 +162,102 @@ const FundWalletScreen = ({ navigation, route }) => {
           expected_credit_amount: creditAmount,
           expected_balance: expectedBalance,
         });
-        setAwaitingWebhookCredit(false);
-        setInfo('Wallet credited successfully.');
-        navigation.navigate(ROUTES.CAR_OWNER_REWARDS);
+        return true;
+      }
+
+      trackTelemetryEvent('wallet_credit_pending_webhook', {
+        source: eventSource,
+        reference: safeReference,
+        expected_credit_amount: creditAmount,
+        expected_balance: expectedBalance,
+      });
+      trackTelemetryEvent('verify_success_but_no_credit', {
+        source: eventSource,
+        reference: safeReference,
+        trxref: trxref.trim() || safeReference,
+        expected_credit_amount: creditAmount,
+        expected_balance: expectedBalance,
+        waited_ms: waitedMs,
+      });
+      return false;
+    } finally {
+      setLoadingWebhookWait(false);
+    }
+  };
+
+  const waitForPaymentVerification = async ({ safeReference, safeTrxref }) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < VERIFY_POLL_TIMEOUT_MS) {
+      if (!screenActiveRef.current) {
+        return false;
+      }
+
+      try {
+        await verifyWalletPayment(safeReference, safeTrxref);
+        return true;
+      } catch (verifyError) {
+        // Keep polling until verify succeeds or timeout.
+      }
+
+      await sleep(VERIFY_POLL_INTERVAL_MS);
+    }
+    return false;
+  };
+
+  const startAutoVerification = async (eventSource = 'auto_verify') => {
+    if (autoVerificationRef.current) {
+      return;
+    }
+
+    const safeReference = reference.trim();
+    if (!safeReference) {
+      return;
+    }
+    const safeTrxref = trxref.trim() || safeReference;
+
+    autoVerificationRef.current = true;
+    setLoadingAutoVerify(true);
+    setError('');
+    setInfo('');
+    setPaymentState('pending');
+    try {
+      const verified = await waitForPaymentVerification({
+        safeReference,
+        safeTrxref,
+      });
+      if (!verified) {
+        if (!screenActiveRef.current) {
+          return;
+        }
+        setPaymentState('delayed');
+        // setError(
+        //   `Webhook delay on server. Your payment reference: ${
+        //     safeReference || 'N/A'
+        //   }`,
+        // );
         return;
       }
 
-      if (showPendingMessage) {
-        trackTelemetryEvent('wallet_credit_pending_webhook', {
-          source: eventSource,
-          reference: safeReference,
-          expected_credit_amount: creditAmount,
-          expected_balance: expectedBalance,
-        });
-        trackTelemetryEvent('verify_success_but_no_credit', {
-          source: eventSource,
-          reference: safeReference,
-          trxref: trxref.trim() || safeReference,
-          expected_credit_amount: creditAmount,
-          expected_balance: expectedBalance,
-          waited_ms: waitedMs,
-        });
-        setAwaitingWebhookCredit(true);
-        setError(
-          `Webhook delay on server. Your payment reference: ${
-            safeReference || 'N/A'
-          }`,
-        );
-        setInfo(
-          'Payment verified, waiting for wallet credit. Use Sync payment status to recheck.',
-        );
+      const credited = await runWebhookCreditCheck({ eventSource });
+      if (!screenActiveRef.current) {
+        return;
+      }
+      if (credited) {
+        setPaymentState('success');
+        setError('');
+      } else {
+        setPaymentState('delayed');
+        // setError(
+        //   `Webhook delay on server. Your payment reference: ${
+        //     safeReference || 'N/A'
+        //   }`,
+        // );
       }
     } finally {
-      setLoadingWebhookWait(false);
+      if (screenActiveRef.current) {
+        setLoadingAutoVerify(false);
+      }
+      autoVerificationRef.current = false;
     }
   };
 
@@ -196,8 +266,7 @@ const FundWalletScreen = ({ navigation, route }) => {
       !canSubmit ||
       loadingTopUp ||
       loadingWebhookWait ||
-      awaitingWebhookCredit ||
-      loadingSync
+      loadingAutoVerify
     ) {
       return;
     }
@@ -205,7 +274,7 @@ const FundWalletScreen = ({ navigation, route }) => {
     setLoadingTopUp(true);
     setError('');
     setInfo('');
-    setAwaitingWebhookCredit(false);
+    setPaymentState('idle');
 
     try {
       const enteredAmount = Number(amount);
@@ -236,13 +305,11 @@ const FundWalletScreen = ({ navigation, route }) => {
         setAuthorizationUrl(nextAuthorizationUrl);
         setCheckoutError('');
         setInfo(
-          'Checkout link created. Open checkout, complete payment, then verify below.',
+          'Checkout link created. Complete payment to continue.',
         );
         setShowCheckoutModal(true);
       } else {
-        setInfo(
-          'Top-up initialized. Use reference and trxref to verify payment.',
-        );
+        setInfo('Top-up initialized. Waiting for payment completion.');
       }
     } catch (topUpError) {
       setError(topUpError?.message || 'Could not initialize top-up.');
@@ -257,76 +324,25 @@ const FundWalletScreen = ({ navigation, route }) => {
     if (
       !safeUrl ||
       loadingTopUp ||
-      loadingVerify ||
-      loadingWebhookWait ||
-      loadingSync
+      loadingAutoVerify ||
+      loadingWebhookWait
     ) {
       return;
     }
 
     setError('');
     setCheckoutError('');
-    setInfo('Complete payment in-app, then verify.');
+    setInfo('Complete payment in-app.');
     setShowCheckoutModal(true);
   };
 
   const handleCheckoutClose = () => {
     setShowCheckoutModal(false);
-    setInfo('If payment was successful, tap Verify payment now.');
-  };
-
-  const handleVerify = async () => {
-    if (!canVerify || loadingVerify || loadingWebhookWait || loadingSync) {
-      return;
-    }
-
-    setLoadingVerify(true);
-    setError('');
-    setAwaitingWebhookCredit(false);
-
-    try {
-      const safeReference = reference.trim();
-      const safeTrxref = trxref.trim() || safeReference;
-
-      await verifyWalletPayment(safeReference, safeTrxref);
-      setInfo('Payment verified, waiting for wallet credit.');
-      await runWebhookCreditCheck({
-        showPendingMessage: true,
-        eventSource: 'verify',
-      });
-    } catch (verifyError) {
-      setError(verifyError?.message || 'Could not verify this payment yet.');
-    } finally {
-      setLoadingVerify(false);
-    }
-  };
-
-  const handleSyncPaymentStatus = async () => {
-    if (
-      !canVerify ||
-      loadingSync ||
-      loadingVerify ||
-      loadingTopUp ||
-      loadingWebhookWait
-    ) {
-      return;
-    }
-
-    setLoadingSync(true);
-    setError('');
-    try {
-      const safeReference = reference.trim();
-      const safeTrxref = trxref.trim() || safeReference;
-      await verifyWalletPayment(safeReference, safeTrxref);
-      setInfo('Payment re-verified, waiting for wallet credit.');
-      await runWebhookCreditCheck({
-        showPendingMessage: true,
-        eventSource: 'sync_status',
-      });
-    } catch (syncError) {
-      setError(syncError?.message || 'Could not sync payment status yet.');
-    } finally {
-      setLoadingSync(false);
+    if (reference.trim()) {
+      setInfo('Checking payment status...');
+      startAutoVerification('checkout_done');
+    } else {
+      setInfo('Payment status will update automatically once reference is ready.');
     }
   };
 
@@ -361,10 +377,9 @@ const FundWalletScreen = ({ navigation, route }) => {
           onChangeText={setAmount}
           keyboardType="numeric"
           editable={
-            !awaitingWebhookCredit &&
+            paymentState !== 'pending' &&
             !loadingTopUp &&
-            !loadingVerify &&
-            !loadingSync
+            !loadingAutoVerify
           }
         />
         <AppText style={styles.helperText}>Minimum top-up is ₦100.</AppText>
@@ -375,10 +390,9 @@ const FundWalletScreen = ({ navigation, route }) => {
           disabled={
             !canSubmit ||
             loadingTopUp ||
-            loadingVerify ||
+            loadingAutoVerify ||
             loadingWebhookWait ||
-            awaitingWebhookCredit ||
-            loadingSync
+            paymentState === 'pending'
           }
           left={
             loadingTopUp ? (
@@ -398,95 +412,31 @@ const FundWalletScreen = ({ navigation, route }) => {
             disabled={
               !authorizationUrl.trim() ||
               loadingTopUp ||
-              loadingVerify ||
-              loadingWebhookWait ||
-              loadingSync
+              loadingAutoVerify ||
+              loadingWebhookWait
             }
             style={styles.secondaryBtn}
           />
         ) : null}
 
-        <AppButton
-          label={loadingVerify ? 'Verifying...' : 'Verify payment'}
-          onPress={handleVerify}
-          disabled={
-            !canVerify ||
-            loadingVerify ||
-            loadingTopUp ||
-            loadingWebhookWait ||
-            loadingSync
-          }
-          left={
-            loadingVerify ? (
-              <ActivityIndicator
-                size="small"
-                color={darkTheme.colors.background}
-              />
-            ) : null
-          }
-          style={styles.verifyBtn}
-        />
-
-        {awaitingWebhookCredit ? (
-          <View>
-            <AppButton
-              label={loadingSync ? 'Syncing...' : 'Sync payment status'}
-              onPress={handleSyncPaymentStatus}
-              disabled={
-                loadingSync ||
-                loadingWebhookWait ||
-                loadingTopUp ||
-                loadingVerify
-              }
-              left={
-                loadingSync ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={darkTheme.colors.background}
-                  />
-                ) : null
-              }
-              style={styles.verifyBtn}
-            />
-            <AppButton
-              label={
-                loadingWebhookWait
-                  ? 'Rechecking wallet...'
-                  : 'Recheck wallet credit'
-              }
-              onPress={() =>
-                runWebhookCreditCheck({
-                  showPendingMessage: true,
-                  eventSource: 'manual_recheck',
-                })
-              }
-              disabled={
-                loadingWebhookWait ||
-                loadingTopUp ||
-                loadingVerify ||
-                loadingSync
-              }
-              left={
-                loadingWebhookWait ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={darkTheme.colors.background}
-                  />
-                ) : null
-              }
-              style={styles.verifyBtn}
-            />
-          </View>
+        {paymentState === 'pending' ? (
+          <AppText style={styles.infoText}>Payment received, crediting wallet...</AppText>
+        ) : null}
+        {paymentState === 'success' ? (
+          <AppText style={styles.infoText}>Wallet funded successfully.</AppText>
+        ) : null}
+        {paymentState === 'delayed' ? (
+          <AppText style={styles.delayText}>Still processing, we will update shortly.</AppText>
         ) : null}
 
         {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
         {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
-        {reference.trim() ? (
+        {/* {reference.trim() ? (
           <AppText style={styles.infoText}>
             Reference: {reference.trim()} | Trxref:{' '}
             {trxref.trim() || reference.trim()}
           </AppText>
-        ) : null}
+        ) : null} */}
       </View>
 
       <Modal
@@ -553,7 +503,10 @@ const FundWalletScreen = ({ navigation, route }) => {
                   target.includes('payment/success') ||
                   target.includes('/success')
                 ) {
-                  setInfo('Payment success detected. Tap Verify payment now.');
+                  setShowCheckoutModal(false);
+                  setInfo('Checking payment status...');
+                  startAutoVerification('checkout_success_redirect');
+                  return false;
                 }
 
                 if (
@@ -577,7 +530,9 @@ const FundWalletScreen = ({ navigation, route }) => {
                   nextUrl.includes('payment/success') ||
                   nextUrl.includes('/success')
                 ) {
-                  setInfo('Payment success detected. Tap Verify payment now.');
+                  setShowCheckoutModal(false);
+                  setInfo('Checking payment status...');
+                  startAutoVerification('checkout_success_navigation');
                 }
               }}
             />
@@ -597,8 +552,9 @@ const FundWalletScreen = ({ navigation, route }) => {
 
           <View style={styles.checkoutFooter}>
             <AppButton
-              label="Done, verify payment"
+              label={loadingAutoVerify ? 'Checking status...' : 'Done'}
               onPress={handleCheckoutClose}
+              disabled={loadingAutoVerify}
             />
           </View>
         </View>
@@ -655,12 +611,15 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     marginTop: 8,
   },
-  verifyBtn: {
-    marginTop: 8,
-  },
   errorText: {
     marginTop: 12,
     color: '#FF7F7F',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  delayText: {
+    marginTop: 10,
+    color: '#FFC47A',
     fontSize: 11,
     lineHeight: 15,
   },

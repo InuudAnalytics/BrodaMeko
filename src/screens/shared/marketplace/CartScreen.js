@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 80,
   },
   listWrap: {
     flex: 1,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
-    bottom: 30,
+    bottom: 10,
   },
 });
 

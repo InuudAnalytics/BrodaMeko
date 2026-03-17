@@ -23,13 +23,24 @@ import {
   SentIcon,
   ViewIcon,
   ViewOffIcon,
+  WalletAdd02Icon,
 } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, NoInternetState, ScreenContainer } from '../../../components';
+import {
+  AppButton,
+  AppText,
+  NoInternetState,
+  ScreenContainer,
+} from '../../../components';
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
+import { useAuth } from '../../../context';
 import { getTransactions } from '../../../services/transactions.service';
-import { getWalletBalance, getWithdrawals, requestWithdrawal } from '../../../services/wallet.service';
+import {
+  getWalletBalance,
+  getWithdrawals,
+  requestWithdrawal,
+} from '../../../services/wallet.service';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { ROLES, ROUTES } from '../../../utils';
 
 const toNaira = value => {
   const amount = Number(value || 0);
@@ -40,6 +51,83 @@ const toAmountWithSign = (amount, forceNegative = false) => {
   const numeric = Number(amount || 0);
   const sign = forceNegative ? '-' : numeric >= 0 ? '+' : '-';
   return `${sign}${Math.abs(numeric).toLocaleString('en-NG')}`;
+};
+
+const normalizeStatusText = value =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const formatTransactionDateTime = timestampMs => {
+  if (!Number.isFinite(Number(timestampMs)) || Number(timestampMs) <= 0) {
+    return 'Unavailable';
+  }
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Lagos',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(new Date(Number(timestampMs)));
+
+  const readPart = type =>
+    String(parts.find(entry => entry.type === type)?.value || '').trim();
+
+  const day = readPart('day');
+  const month = readPart('month');
+  const year = readPart('year');
+  const hour = readPart('hour');
+  const minute = readPart('minute');
+  const dayPeriod = readPart('dayPeriod').toUpperCase();
+
+  if (!day || !month || !year || !hour || !minute || !dayPeriod) {
+    return 'Unavailable';
+  }
+
+  return `${day}-${month}-${year} ${hour}:${minute} ${dayPeriod}`;
+};
+
+const resolveTransactionStatusBadge = item => {
+  const fromBackend = [
+    normalizeStatusText(item?.rawStatus),
+    normalizeStatusText(item?.rawPaymentStatus),
+    normalizeStatusText(item?.rawEscrowStatus),
+  ].find(Boolean);
+  if (fromBackend) {
+    if (['held', 'in_escrow', 'funded', 'secured'].includes(fromBackend)) {
+      return { label: 'In escrow', tone: 'warning' };
+    }
+    if (['released', 'disbursed'].includes(fromBackend)) {
+      return { label: 'Released', tone: 'success' };
+    }
+    if (['refunded', 'reversed'].includes(fromBackend)) {
+      return { label: 'Refunded', tone: 'neutral' };
+    }
+    if (fromBackend.includes('pending') || fromBackend.includes('processing')) {
+      return { label: 'Pending', tone: 'warning' };
+    }
+    if (
+      fromBackend.includes('success') ||
+      fromBackend.includes('successful') ||
+      fromBackend.includes('paid') ||
+      fromBackend.includes('completed')
+    ) {
+      return { label: 'Successful', tone: 'success' };
+    }
+    if (
+      fromBackend.includes('failed') ||
+      fromBackend.includes('cancelled') ||
+      fromBackend.includes('canceled') ||
+      fromBackend.includes('declined')
+    ) {
+      return { label: 'Failed', tone: 'danger' };
+    }
+  }
+
+  return { label: 'Processing', tone: 'neutral' };
 };
 
 const readTransactions = payload => {
@@ -78,22 +166,57 @@ const normalizeTransaction = (item, index, source) => {
   const createdAtMs = Number.isFinite(parsedTime) ? parsedTime : 0;
   const baseTitle = item?.title || item?.narration || item?.description || '';
   const isWithdrawal = source === 'withdrawals' || type.includes('withdraw');
-  const resolvedTitle = baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
-  const forceNegative = isWithdrawal;
+  const resolvedTitle =
+    baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
+  const isDebitType =
+    isWithdrawal ||
+    type.includes('debit') ||
+    type.includes('withdraw') ||
+    type.includes('charge') ||
+    type.includes('payment');
+  const isCreditType =
+    type.includes('credit') || type.includes('fund') || type.includes('top_up');
+  const isDebit = isDebitType || (!isCreditType && amount < 0);
+  const forceNegative = isDebit;
+  const normalizedType = String(inferredType || '')
+    .trim()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+  const typeLabel = normalizedType
+    ? normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1)
+    : '';
+  const statusText = String(item?.status || '')
+    .trim()
+    .toLowerCase();
+  const failureReason = String(
+    item?.failure_reason || item?.failureReason || '',
+  ).trim();
+  const subtitle = isWithdrawal
+    ? statusText.includes('fail') && failureReason
+      ? failureReason
+      : 'Withdrawal'
+    : typeLabel || 'Transaction';
 
   return {
     id: String(item?.id || item?._id || item?.reference || `txn-${index}`),
     reference: String(item?.reference || item?.trxref || item?.id || '').trim(),
     title: resolvedTitle,
-    subtitle: item?.subtitle || item?.channel || item?.status || '',
+    subtitle,
     amountText: toAmountWithSign(amount, forceNegative),
-    time: createdAtRaw,
+    time: formatTransactionDateTime(createdAtMs),
     createdAtMs,
-    positive: forceNegative ? false : amount >= 0 || type.includes('credit'),
-    icon: isWithdrawal || amount < 0 ? ArrowDownLeft01Icon : PlusSignIcon,
+    positive: !isDebit,
+    icon: isDebit ? ArrowDownLeft01Icon : PlusSignIcon,
     rawAmount: amount,
     rawType: type,
     rawStatus: String(item?.status || '').toLowerCase(),
+    rawPaymentStatus: String(
+      item?.payment_status || item?.paymentStatus || '',
+    ).toLowerCase(),
+    rawEscrowStatus: String(
+      item?.escrow_status || item?.escrowStatus || '',
+    ).toLowerCase(),
     rawTitle: String(
       item?.title || item?.narration || item?.description || '',
     ).toLowerCase(),
@@ -186,6 +309,8 @@ const ActionButton = ({ label, icon, onPress, buttonStyle }) => {
 };
 
 const TransactionItem = ({ item }) => {
+  const statusBadge = resolveTransactionStatusBadge(item);
+
   return (
     <View style={styles.txnRow}>
       <View style={styles.txnIconWrap}>
@@ -199,9 +324,42 @@ const TransactionItem = ({ item }) => {
 
       <View style={styles.txnBody}>
         <AppText style={styles.txnTitle}>{item.title}</AppText>
-        <AppText variant="muted" style={styles.txnSubtitle} numberOfLines={1}>
-          {item.subtitle}
-        </AppText>
+        <View style={styles.txnSubRow}>
+          <AppText variant="muted" style={styles.txnSubtitle} numberOfLines={1}>
+            {item.subtitle || 'Unavailable'}
+          </AppText>
+          <View
+            style={[
+              styles.txnStatusBadge,
+              statusBadge.tone === 'success'
+                ? styles.txnStatusBadgeSuccess
+                : null,
+              statusBadge.tone === 'warning'
+                ? styles.txnStatusBadgeWarning
+                : null,
+              statusBadge.tone === 'danger'
+                ? styles.txnStatusBadgeDanger
+                : null,
+            ]}
+          >
+            <AppText
+              style={[
+                styles.txnStatusBadgeText,
+                statusBadge.tone === 'success'
+                  ? styles.txnStatusBadgeTextSuccess
+                  : null,
+                statusBadge.tone === 'warning'
+                  ? styles.txnStatusBadgeTextWarning
+                  : null,
+                statusBadge.tone === 'danger'
+                  ? styles.txnStatusBadgeTextDanger
+                  : null,
+              ]}
+            >
+              {statusBadge.label}
+            </AppText>
+          </View>
+        </View>
       </View>
 
       <View style={styles.txnMeta}>
@@ -262,6 +420,8 @@ const MechanicWalletScreen = ({
   onTabPress,
   showTabBar = true,
 }) => {
+  const { role } = useAuth();
+  const isMechanic = role === ROLES.MECH;
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -287,11 +447,12 @@ const MechanicWalletScreen = ({
     setError('');
 
     try {
-      const [walletResponse, transactionsResponse, withdrawalsResponse] = await Promise.all([
-        getWalletBalance(),
-        getTransactions(),
-        getWithdrawals(),
-      ]);
+      const [walletResponse, transactionsResponse, withdrawalsResponse] =
+        await Promise.all([
+          getWalletBalance(),
+          getTransactions(),
+          getWithdrawals(),
+        ]);
       const walletPayload = walletResponse?.data || walletResponse || {};
       const transactionItems = [
         ...readTransactions(transactionsResponse).map((item, index) =>
@@ -300,7 +461,9 @@ const MechanicWalletScreen = ({
         ...readTransactions(withdrawalsResponse).map((item, index) =>
           normalizeTransaction(item, index, 'withdrawals'),
         ),
-      ];
+      ].sort(
+        (a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0),
+      );
 
       setBalance(
         Number(walletPayload?.balance || walletPayload?.available_balance || 0),
@@ -406,7 +569,9 @@ const MechanicWalletScreen = ({
     if (code.includes('INSUFFICIENT') || message.includes('insufficient')) {
       return {
         text: requiredAmount
-          ? `Insufficient balance. You need ₦${requiredAmount.toLocaleString('en-NG')}.`
+          ? `Insufficient balance. You need ₦${requiredAmount.toLocaleString(
+              'en-NG',
+            )}.`
           : 'Insufficient balance.',
         action: '',
       };
@@ -620,11 +785,22 @@ const MechanicWalletScreen = ({
           </View>
 
           <View style={styles.actionsRow}>
+            {isMechanic ? (
+              <ActionButton
+                label="Fund wallet"
+                icon={WalletAdd02Icon}
+                onPress={() =>
+                  navigation.navigate(ROUTES.CAR_OWNER_FUND_WALLET, {
+                    source: 'mechanic_wallet',
+                  })
+                }
+              />
+            ) : null}
             <ActionButton
               label="Withdraw"
               icon={SentIcon}
               onPress={openWithdrawModal}
-              buttonStyle={styles.actionButtonSingle}
+              buttonStyle={!isMechanic ? styles.actionButtonSingle : null}
             />
           </View>
 
@@ -1031,8 +1207,8 @@ const styles = StyleSheet.create({
   balanceAmount: {
     marginTop: 4,
     color: darkTheme.colors.text,
-    fontSize: 50,
-    lineHeight: 54,
+    fontSize: 45,
+    lineHeight: 50,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     letterSpacing: -0.3,
   },
@@ -1095,8 +1271,8 @@ const styles = StyleSheet.create({
   metricValue: {
     marginTop: 6,
     color: darkTheme.colors.text,
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   sectionHeader: {
@@ -1155,6 +1331,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 16,
   },
+  txnSubRow: {
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  txnStatusBadge: {
+    marginLeft: 8,
+    minHeight: 18,
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txnStatusBadgeSuccess: {
+    backgroundColor: 'rgba(60, 200, 120, 0.18)',
+  },
+  txnStatusBadgeWarning: {
+    backgroundColor: 'rgba(230, 199, 20, 0.22)',
+  },
+  txnStatusBadgeDanger: {
+    backgroundColor: 'rgba(248, 113, 113, 0.2)',
+  },
+  txnStatusBadgeText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  txnStatusBadgeTextSuccess: {
+    color: '#7CF0A6',
+  },
+  txnStatusBadgeTextWarning: {
+    color: '#E6C714',
+  },
+  txnStatusBadgeTextDanger: {
+    color: '#F87171',
+  },
   txnMeta: {
     alignItems: 'flex-end',
     justifyContent: 'center',
@@ -1175,8 +1389,8 @@ const styles = StyleSheet.create({
   txnTime: {
     marginTop: 2,
     color: 'rgba(255,255,255,0.48)',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 14,
   },
   filterModalRoot: {
     flex: 1,
