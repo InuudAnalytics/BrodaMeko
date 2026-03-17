@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Image,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, Search01Icon } from '@hugeicons/core-free-icons';
-import { AppButton, AppText, NoInternetState, PullToRefreshIndicator, ScreenContainer } from '../../../components';
+import { AppButton, AppText, NoInternetState, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
 import { useSellerStore } from '../../../context';
 import { deleteSellerPart, deleteSellerPartImage, updateSellerPart } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
@@ -22,7 +22,7 @@ import { ROUTES } from '../../../utils';
 
 const SCREEN_BG = '#000033';
 
-const CATEGORY_FILTERS = ['All parts', 'Engine', 'Brakes', 'Battery', 'Electrical'];
+const DEFAULT_CATEGORY_FILTERS = ['Engine', 'Brakes', 'Battery', 'Electrical'];
 
 const formatCurrency = (value) => `₦${Number(value || 0).toLocaleString('en-NG')}`;
 
@@ -31,26 +31,71 @@ const normalizeCategory = (value) => {
   return raw || 'All parts';
 };
 
+const normalizeCategoryKey = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
 const SellerStoreScreen = ({ navigation, onBack }) => {
   const { products, isHydrated, loading, error, removeProduct, updateProduct, refreshStore } = useSellerStore();
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState(CATEGORY_FILTERS[0]);
+  const [activeCategory, setActiveCategory] = useState('All parts');
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const pullDistance = useRef(new Animated.Value(0)).current;
 
   const filteredProducts = useMemo(() => {
     const query = String(search || '').trim().toLowerCase();
-    const isAll = activeCategory === 'All parts';
+    const activeCategoryKey = normalizeCategoryKey(activeCategory);
+    const isAll = activeCategoryKey === normalizeCategoryKey('All parts');
 
     return products.filter((product) => {
       const name = String(product?.name || '').toLowerCase();
-      const category = normalizeCategory(product?.category || product?.type);
+      const category = normalizeCategory(product?.category || product?.type || product?.part_category);
       const matchesSearch = query ? name.includes(query) : true;
-      const matchesCategory = isAll ? true : category.toLowerCase() === activeCategory.toLowerCase();
+      const matchesCategory = isAll
+        ? true
+        : normalizeCategoryKey(category) === activeCategoryKey;
       return matchesSearch && matchesCategory;
     });
   }, [activeCategory, products, search]);
+  const categoryTabs = useMemo(() => {
+    const categoryMap = new Map();
+
+    products.forEach((product) => {
+      const label = normalizeCategory(product?.category || product?.type || product?.part_category);
+      const key = normalizeCategoryKey(label);
+      if (!key || key === normalizeCategoryKey('All parts')) {
+        return;
+      }
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, label);
+      }
+    });
+
+    const defaultsFromData = DEFAULT_CATEGORY_FILTERS.filter((label) =>
+      categoryMap.has(normalizeCategoryKey(label))
+    );
+    const dynamicRemainder = Array.from(categoryMap.entries())
+      .filter(([key]) => !DEFAULT_CATEGORY_FILTERS.some((label) => normalizeCategoryKey(label) === key))
+      .map(([, label]) => label);
+    const finalCategories = defaultsFromData.length || dynamicRemainder.length
+      ? [...defaultsFromData, ...dynamicRemainder]
+      : DEFAULT_CATEGORY_FILTERS;
+
+    return [
+      { key: 'All parts', label: 'All parts' },
+      ...finalCategories.map((label) => ({ key: label, label })),
+    ];
+  }, [products]);
+
+  useEffect(() => {
+    if (!categoryTabs.some((tab) => tab.key === activeCategory)) {
+      setActiveCategory('All parts');
+    }
+  }, [activeCategory, categoryTabs]);
 
   const openEditModal = (product) => {
     setSelectedProduct(product);
@@ -143,23 +188,13 @@ const SellerStoreScreen = ({ navigation, onBack }) => {
           />
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {CATEGORY_FILTERS.map((category) => {
-            const active = activeCategory === category;
-            return (
-              <TouchableOpacity
-                key={category}
-                activeOpacity={0.85}
-                onPress={() => setActiveCategory(category)}
-                style={[styles.filterChip, active ? styles.filterChipActive : null]}
-              >
-                <AppText style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}>
-                  {category}
-                </AppText>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={styles.tabsWrap}>
+          <ScrollableTabs
+            tabs={categoryTabs}
+            activeKey={activeCategory}
+            onChange={setActiveCategory}
+          />
+        </View>
 
         {loading ? (
           <View style={styles.emptyState}>
@@ -358,29 +393,8 @@ const styles = StyleSheet.create({
     color: darkTheme.colors.text,
     fontSize: 13,
   },
-  filterRow: {
-    paddingTop: 12,
-    paddingBottom: 6,
-    columnGap: 10,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterChipActive: {
-    backgroundColor: darkTheme.colors.accent,
-  },
-  filterChipText: {
-    color: darkTheme.colors.text,
-    fontSize: 12,
-  },
-  filterChipTextActive: {
-    color: '#1A1A1A',
-    fontWeight: darkTheme.typography.fontWeights.semibold,
+  tabsWrap: {
+    marginTop: 10,
   },
   list: {
     paddingTop: 10,

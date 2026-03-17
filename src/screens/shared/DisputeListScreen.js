@@ -11,10 +11,11 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../components';
 import AppAlert from '../../components/AppAlert';
+import { useAuth } from '../../context';
 import { getMyJobDisputes, getMyOrderDisputes } from '../../services/dispute.service';
 import { createSupportTicket, getSupportDisputeTicket } from '../../services/support.service';
 import { darkTheme } from '../../theme';
-import { ROUTES } from '../../utils';
+import { ROLES, ROUTES } from '../../utils';
 
 const formatDateTime = (value) => {
   const date = new Date(value || '');
@@ -68,6 +69,8 @@ const readTicketIdFromPayload = (response) => {
 };
 
 const DisputeListScreen = ({ navigation, route }) => {
+  const { role } = useAuth();
+  const isSeller = role === ROLES.SPARE_PARTS_SELLER;
   const [activeType, setActiveType] = useState('job');
   const [jobDisputes, setJobDisputes] = useState([]);
   const [orderDisputes, setOrderDisputes] = useState([]);
@@ -83,31 +86,59 @@ const DisputeListScreen = ({ navigation, route }) => {
     }
     setError('');
     try {
-      const [jobResponse, orderResponse] = await Promise.all([
-        getMyJobDisputes({ page: 1, limit: 50 }),
-        getMyOrderDisputes({ page: 1, limit: 50 }),
+      const shouldLoadJobs = !isSeller;
+      const jobsPromise = shouldLoadJobs
+        ? getMyJobDisputes({ page: 1, limit: 50 })
+        : Promise.resolve({ data: [] });
+      const ordersPromise = getMyOrderDisputes({ page: 1, limit: 50 });
+
+      const [jobResult, orderResult] = await Promise.allSettled([
+        jobsPromise,
+        ordersPromise,
       ]);
 
-      const jobs = pickList(jobResponse)
-        .map((item, index) => normalizeJobDispute(item, index))
-        .filter((item) => item.id);
-      const orders = pickList(orderResponse)
-        .map((item, index) => normalizeOrderDispute(item, index))
-        .filter((item) => item.id);
+      const jobs =
+        jobResult.status === 'fulfilled'
+          ? pickList(jobResult.value)
+              .map((item, index) => normalizeJobDispute(item, index))
+              .filter((item) => item.id)
+          : [];
+
+      const orders =
+        orderResult.status === 'fulfilled'
+          ? pickList(orderResult.value)
+              .map((item, index) => normalizeOrderDispute(item, index))
+              .filter((item) => item.id)
+          : [];
 
       setJobDisputes(jobs);
       setOrderDisputes(orders);
+
+      if (jobResult.status === 'rejected' && orderResult.status === 'rejected') {
+        const firstError = jobResult.reason || orderResult.reason;
+        setError(firstError?.message || 'Could not load disputes.');
+      } else if (orderResult.status === 'rejected') {
+        setError(orderResult.reason?.message || 'Could not load order disputes.');
+      } else if (jobResult.status === 'rejected' && !isSeller) {
+        setError(jobResult.reason?.message || 'Could not load job disputes.');
+      }
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load disputes.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isSeller]);
 
   useEffect(() => {
     loadDisputes();
   }, [loadDisputes]);
+
+  useEffect(() => {
+    if (isSeller && activeType !== 'order') {
+      setActiveType('order');
+    }
+  }, [activeType, isSeller]);
 
   useEffect(() => {
     const targetDisputeId = String(route?.params?.focusDisputeId || '').trim();
@@ -275,22 +306,28 @@ const DisputeListScreen = ({ navigation, route }) => {
         <View style={styles.backButton} />
       </View>
 
-      <View style={styles.segmentWrap}>
-        <TouchableOpacity
-          style={[styles.segmentBtn, activeType === 'job' ? styles.segmentBtnActive : null]}
-          activeOpacity={0.85}
-          onPress={() => setActiveType('job')}
-        >
-          <AppText style={[styles.segmentText, activeType === 'job' ? styles.segmentTextActive : null]}>Job</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.segmentBtn, activeType === 'order' ? styles.segmentBtnActive : null]}
-          activeOpacity={0.85}
-          onPress={() => setActiveType('order')}
-        >
-          <AppText style={[styles.segmentText, activeType === 'order' ? styles.segmentTextActive : null]}>Order</AppText>
-        </TouchableOpacity>
-      </View>
+      {!isSeller ? (
+        <View style={styles.segmentWrap}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeType === 'job' ? styles.segmentBtnActive : null]}
+            activeOpacity={0.85}
+            onPress={() => setActiveType('job')}
+          >
+            <AppText style={[styles.segmentText, activeType === 'job' ? styles.segmentTextActive : null]}>
+              Job
+            </AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeType === 'order' ? styles.segmentBtnActive : null]}
+            activeOpacity={0.85}
+            onPress={() => setActiveType('order')}
+          >
+            <AppText style={[styles.segmentText, activeType === 'order' ? styles.segmentTextActive : null]}>
+              Order
+            </AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.loaderWrap}>

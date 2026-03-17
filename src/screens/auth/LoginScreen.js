@@ -52,6 +52,7 @@ const LoginScreen = ({ navigation, route }) => {
     setSelectedRole,
     signIn,
     signInWithGoogle,
+    signInWithApple,
     isLoading,
     error,
     clearError,
@@ -277,7 +278,7 @@ const LoginScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   disabled={isLoading}
-                  onPress={() => {}}
+                  onPress={() => signInWithApple({ role: effectiveRole })}
                   style={[
                     styles.appleButton,
                     isLoading ? styles.appleButtonDisabled : null,

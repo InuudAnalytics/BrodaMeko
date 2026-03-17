@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import { GOOGLE_CONFIG } from '../config/google';
 import {
+  appleLogin as appleLoginService,
   forgotPassword as forgotPasswordService,
   getCurrentUser,
   login as loginService,
@@ -49,6 +50,21 @@ const getGoogleSigninClient = () => {
   } catch (error) {
     return null;
   }
+};
+
+const getAppleSigninClient = () => {
+  const module = NativeModules?.RNAppleAuthModule;
+  if (!module) {
+    return null;
+  }
+
+  return {
+    isSupported: Boolean(module?.isSupported ?? Platform.OS === 'ios'),
+    performRequest: module?.performRequest,
+    Operation: module?.Operation || { LOGIN: 'LOGIN' },
+    Scope: module?.Scope || { FULL_NAME: 'FULL_NAME', EMAIL: 'EMAIL' },
+    Error: module?.Error || {},
+  };
 };
 
 const normalizeRole = value => {
@@ -724,6 +740,89 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const signInWithApple = async ({ role: selectedRoleInput }) => {
+    setIsLoading(true);
+    clearError();
+
+    try {
+      const appleAuth = getAppleSigninClient();
+
+      if (!appleAuth) {
+        throw new Error('Apple Sign-In is not available in this build yet.');
+      }
+
+      if (!appleAuth.isSupported) {
+        throw new Error('Apple Sign-In is not supported on this device.');
+      }
+      if (typeof appleAuth.performRequest !== 'function') {
+        throw new Error('Apple Sign-In native module is incomplete in this build.');
+      }
+
+      const normalizedSelectedRole = normalizeRole(
+        selectedRoleInput || selectedRole,
+      );
+      if (!normalizedSelectedRole) {
+        throw new Error(
+          'Role could not be determined. Please select a role and try again.',
+        );
+      }
+
+      const appleResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
+      });
+
+      const identityToken = String(appleResponse?.identityToken || '').trim();
+      if (!identityToken) {
+        throw new Error('Failed to get Apple identity token.');
+      }
+
+      const rawFullName = appleResponse?.fullName;
+      const fullName = [rawFullName?.givenName, rawFullName?.familyName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      const response = await appleLoginService({
+        identityToken,
+        fullName,
+        email: appleResponse?.email || '',
+        role: normalizedSelectedRole,
+      });
+
+      const authPayload = pickAuthPayload(response);
+
+      if (!authPayload.token) {
+        throw new Error(
+          'Apple login succeeded but no app token was returned.',
+        );
+      }
+
+      await setAuthedState({
+        nextToken: authPayload.token,
+        nextUser: authPayload.user,
+        nextRole: authPayload.role || normalizedSelectedRole,
+      });
+      await refreshUserProfile(authPayload.token).catch(() => {});
+      return true;
+    } catch (appleError) {
+      const appleAuth = getAppleSigninClient();
+      let errorMessage = 'Apple Sign-In failed.';
+
+      if (appleAuth?.Error?.CANCELED && appleError?.code === appleAuth.Error.CANCELED) {
+        errorMessage = 'Sign in cancelled.';
+      } else {
+        errorMessage = appleError?.message || errorMessage;
+      }
+
+      setError(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
+
   const forceSignOut = React.useCallback(async () => {
     const currentSelectedRole = normalizeRole(selectedRole) || null;
     await clearPersistedAuthState();
@@ -763,6 +862,7 @@ export const AuthProvider = ({ children }) => {
         pendingVerification,
         signIn,
         signInWithGoogle,
+        signInWithApple,
         signUp,
         verifyOtp,
         resendOtp,

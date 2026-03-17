@@ -44,15 +44,15 @@ const ScrollableTabs = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    minWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.14)',
     borderRadius: 8,
     padding: 5,
     columnGap: 6,
-    flexGrow: 1,
+    flexGrow: 0,
   },
   tab: {
     minHeight: 30,

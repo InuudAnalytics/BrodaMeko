@@ -21,6 +21,8 @@ export const ENDPOINTS = {
     recoveryEmailRemove: '/api/v1/auth/users/recovery-email/remove',
     verifyAddContact: '/api/v1/auth/verify/add-contact',
     verifyConfirmContact: '/api/v1/auth/verify/confirm-contact',
+    google: '/api/v1/auth/google',
+    apple: '/api/v1/auth/apple',
     devices: {
       register: '/api/v1/auth/devices/register',
     },

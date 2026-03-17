@@ -10,6 +10,37 @@ import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
 
 const formatNaira = (value) => `\u20A6${Number(value || 0).toLocaleString('en-NG')}`;
+const formatOrderDateTime = (value) => {
+  const parsed = Date.parse(String(value || '').trim());
+  if (!Number.isFinite(parsed)) {
+    return 'Unavailable';
+  }
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).formatToParts(new Date(parsed));
+
+  const readPart = (type) =>
+    String(parts.find((entry) => entry.type === type)?.value || '').trim();
+
+  const day = readPart('day');
+  const month = readPart('month');
+  const year = readPart('year');
+  const hour = readPart('hour');
+  const minute = readPart('minute');
+  const dayPeriod = readPart('dayPeriod').toUpperCase();
+
+  if (!day || !month || !year || !hour || !minute || !dayPeriod) {
+    return 'Unavailable';
+  }
+
+  return `${day}-${month}-${year} ${hour}:${minute} ${dayPeriod}`;
+};
 
 const statusConfig = {
   new: { label: 'New', color: '#E6C714', textColor: '#1A1A1A' },
@@ -86,7 +117,7 @@ const OrdersScreen = ({ navigation }) => {
           name: firstItem?.part_name || order?.name || `Order ${orderId.slice(0, 8)}`,
           qty: Number(firstItem?.quantity || order?.quantity || 1),
           total: Number(order?.total_amount || firstItem?.subtotal || 0),
-          orderedAt: order?.created_at || firstItem?.created_at || 'Recently',
+          orderedAt: formatOrderDateTime(order?.created_at || firstItem?.created_at),
           buyerName: order?.buyer_name || detail?.buyer_name || 'Buyer',
           buyerPhone: String(order?.buyer_phone || detail?.buyer_phone || detail?.buyer?.phone || '').trim(),
           deliveryType: String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase(),

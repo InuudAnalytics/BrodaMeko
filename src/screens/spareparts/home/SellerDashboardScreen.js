@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Animated, Image, RefreshControl, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, RefreshControl, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -11,7 +11,9 @@ import {
 } from '@hugeicons/core-free-icons';
 import { AppText, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIndicator, ScreenContainer } from '../../../components';
 import { useAuth, useNotifications } from '../../../context';
+import { getMarketplaceOrder } from '../../../services/marketplace.service';
 import { getNotifications } from '../../../services/notifications.service';
+import { getSellerOrders, getSellerParts } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -38,10 +40,40 @@ const readUnreadCount = (payload) => {
   return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
 };
 
+const normalizeList = (payload) => {
+  if (!payload) return [];
+  const root = payload?.data || payload;
+  if (Array.isArray(root)) return root;
+  if (Array.isArray(root?.data)) return root.data;
+  if (Array.isArray(root?.orders)) return root.orders;
+  if (Array.isArray(root?.items)) return root.items;
+  if (Array.isArray(root?.results)) return root.results;
+  return [];
+};
+
+const normalizeStatusLabel = (value) => {
+  const status = String(value || '').trim().toLowerCase();
+  if (['completed', 'delivered', 'received', 'confirmed'].includes(status)) {
+    return 'Delivered';
+  }
+  if (['preparing', 'processing'].includes(status)) {
+    return 'Preparing';
+  }
+  if (['shipped', 'in_transit', 'out_for_delivery', 'ready_for_pickup'].includes(status)) {
+    return 'In transit';
+  }
+  return 'Pending';
+};
+
 const SellerDashboardScreen = ({ navigation, onTabPress }) => {
   const { user } = useAuth();
   const { unreadTick, promptPermissionIfNeeded } = useNotifications();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [productCount, setProductCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [revenueAmount, setRevenueAmount] = useState(0);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pullDistance = React.useRef(new Animated.Value(0)).current;
   const firstName = getFirstName(user);
@@ -55,21 +87,11 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
 
   const stats = useMemo(
     () => [
-      { key: 'products', label: 'Total products', value: '48', icon: PackageIcon },
-      { key: 'orders', label: 'Total orders', value: '156', icon: Invoice01Icon },
-      { key: 'revenue', label: 'Revenue', value: formatCurrency(1500000), icon: DollarCircleIcon },
+      { key: 'products', label: 'Total products', value: String(productCount), icon: PackageIcon },
+      { key: 'orders', label: 'Total orders', value: String(orderCount), icon: Invoice01Icon },
+      { key: 'revenue', label: 'Revenue', value: formatCurrency(revenueAmount), icon: DollarCircleIcon },
     ],
-    []
-  );
-
-  const orders = useMemo(
-    () => [
-      { id: 'ord-1', product: 'Brake pad set', buyer: 'Chidi Okafor', price: 12500, status: 'Pending' },
-      { id: 'ord-2', product: 'Car battery', buyer: 'Amaka Eze', price: 1500, status: 'Pending' },
-      { id: 'ord-3', product: 'Spark plug', buyer: 'Tunde Bello', price: 30000, status: 'Delivered' },
-      { id: 'ord-4', product: 'Radiator hose', buyer: 'Joy Nnamdi', price: 8200, status: 'Delivered' },
-    ],
-    []
+    [orderCount, productCount, revenueAmount]
   );
 
   const fetchUnread = useCallback(async () => {
@@ -81,6 +103,74 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
       setUnreadCount(0);
     }
   }, []);
+
+  const fetchDashboardData = useCallback(async () => {
+    setLoadingDashboard(true);
+    try {
+      const sellerId = String(user?.id || user?._id || '').trim();
+      const [partsResponse, ordersResponse] = await Promise.all([
+        getSellerParts(),
+        getSellerOrders(),
+      ]);
+      const partList = normalizeList(partsResponse);
+      const sellerOrders = normalizeList(ordersResponse);
+      setProductCount(partList.length);
+      setOrderCount(sellerOrders.length);
+
+      const orderDetails = await Promise.all(
+        sellerOrders.map((entry) => {
+          const id = String(entry?.id || entry?._id || '').trim();
+          if (!id) return null;
+          return getMarketplaceOrder(id).catch(() => null);
+        })
+      );
+
+      const flattenedItems = [];
+      orderDetails.forEach((detailResponse, index) => {
+        const root = detailResponse?.data || detailResponse || {};
+        const detail = root?.data || root || {};
+        const items = Array.isArray(detail?.items) ? detail.items : [];
+        const scopedItems = items.filter((item) => {
+          if (!sellerId) return true;
+          return String(item?.seller_id || '').trim() === sellerId;
+        });
+        const sourceOrder = sellerOrders[index] || {};
+        const buyerName = String(sourceOrder?.buyer_name || detail?.buyer_name || '').trim() || 'Buyer';
+        const createdAtRaw = sourceOrder?.created_at || detail?.created_at || '';
+
+        scopedItems.forEach((item) => {
+          flattenedItems.push({
+            id: `${String(detail?.id || sourceOrder?.id || '')}:${String(item?.id || '')}`,
+            product: String(item?.part_name || item?.part?.name || '').trim() || 'Unavailable',
+            buyer: buyerName,
+            price: Number(item?.subtotal || item?.unit_price || 0),
+            status: normalizeStatusLabel(item?.status || sourceOrder?.status),
+            createdAtMs: Number.isFinite(Date.parse(String(createdAtRaw || '').trim()))
+              ? Date.parse(String(createdAtRaw || '').trim())
+              : 0,
+          });
+        });
+      });
+
+      const totalRevenue = flattenedItems.reduce(
+        (sum, item) => sum + Number(item?.price || 0),
+        0
+      );
+      const topRecentOrders = flattenedItems
+        .sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0))
+        .slice(0, 5);
+
+      setRevenueAmount(totalRevenue);
+      setRecentOrders(topRecentOrders);
+    } catch {
+      setProductCount(0);
+      setOrderCount(0);
+      setRevenueAmount(0);
+      setRecentOrders([]);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, [user?.id, user?._id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -96,14 +186,21 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
     }, [fetchUnread, unreadTick])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchDashboardData();
+      return undefined;
+    }, [fetchDashboardData])
+  );
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetchUnread();
+      await Promise.all([fetchUnread(), fetchDashboardData()]);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchUnread]);
+  }, [fetchDashboardData, fetchUnread]);
 
   const handleSeeMore = () => {
     if (typeof onTabPress === 'function') {
@@ -212,7 +309,17 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
         </View>
 
         <View style={styles.ordersList}>
-          {orders.slice(0, 5).map((order) => {
+          {loadingDashboard ? (
+            <View style={styles.dashboardLoader}>
+              <ActivityIndicator size="small" color={darkTheme.colors.accent} />
+            </View>
+          ) : null}
+          {!loadingDashboard && !recentOrders.length ? (
+            <AppText variant="muted" style={styles.emptyOrdersText}>
+              No recent orders yet.
+            </AppText>
+          ) : null}
+          {recentOrders.map((order) => {
             const isDelivered = order.status.toLowerCase() === 'delivered';
             return (
               <View key={order.id} style={styles.orderRow}>
@@ -416,6 +523,15 @@ const styles = StyleSheet.create({
   ordersList: {
     marginTop: 8,
     rowGap: 12,
+  },
+  dashboardLoader: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  emptyOrdersText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    paddingVertical: 8,
   },
   orderRow: {
     flexDirection: 'row',

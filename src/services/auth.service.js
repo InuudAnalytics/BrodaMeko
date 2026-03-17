@@ -248,10 +248,35 @@ export const googleLogin = async ({ idToken, role }) => {
     role: mapRoleToBackend(role),
   };
 
-  // Assuming the backend has this endpoint. 
-  // If not, it needs to be created on the backend.
-  // Using a likely path based on other endpoints.
-  const response = await api.post('/api/v1/auth/google', payload, PUBLIC_AUTH_CONFIG);
+  const response = await api.post(ENDPOINTS.auth.google, payload, PUBLIC_AUTH_CONFIG);
+  return response.data;
+};
+
+export const appleLogin = async ({ identityToken, fullName, email, role }) => {
+  const safeIdentityToken = String(identityToken || '').trim();
+  if (!safeIdentityToken) {
+    const error = new Error('identity_token is required.');
+    error.statusCode = 400;
+    error.data = null;
+    throw error;
+  }
+
+  const payload = {
+    identity_token: safeIdentityToken,
+    role: mapRoleToBackend(role),
+  };
+
+  const safeFullName = String(fullName || '').trim();
+  if (safeFullName) {
+    payload.full_name = safeFullName;
+  }
+
+  const safeEmail = String(email || '').trim();
+  if (safeEmail) {
+    payload.email = safeEmail;
+  }
+
+  const response = await api.post(ENDPOINTS.auth.apple, payload, PUBLIC_AUTH_CONFIG);
   return response.data;
 };
 
@@ -261,6 +286,7 @@ export default {
   resendOtp,
   login,
   googleLogin,
+  appleLogin,
   logout,
   forgotPassword,
   resetPassword,

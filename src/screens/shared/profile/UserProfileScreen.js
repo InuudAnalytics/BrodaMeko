@@ -37,6 +37,7 @@ import {
   verifyRecoveryEmail as verifyRecoveryEmailService,
 } from '../../../services/auth.service';
 import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '../../../services/jobs.service';
+import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
 
@@ -45,8 +46,11 @@ const getSettingsRows = (role) => {
     { key: 'personal', label: 'Personal information', icon: User02Icon },
     { key: 'bank', label: 'Bank details', icon: BankIcon },
     { key: 'recovery_email', label: 'Recovery email', icon: Alert01Icon },
-    { key: 'address', label: 'Address', icon: Location01Icon },
   ];
+
+  if (role === ROLES.MECH || role === ROLES.SPARE_PARTS_SELLER) {
+    rows.push({ key: 'address', label: 'Address', icon: Location01Icon });
+  }
 
   if (role === ROLES.MECH) {
     rows.push({ key: 'services', label: 'Services offered', icon: Wrench01Icon });
@@ -142,6 +146,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const totalCountLabel = role === ROLES.SPARE_PARTS_SELLER ? 'Total orders' : 'Total jobs';
 
   const profile = readUser(user);
   const initials = profile.fullName
@@ -162,22 +167,36 @@ const UserProfileScreen = ({ navigation, onBack }) => {
       const fetchStats = async () => {
         try {
           const mechanicId = String(user?.id || user?._id || user?.mechanic_id || '').trim();
-          const [jobsResponse, statsResponse] = await Promise.all([
-            role === ROLES.MECH ? getMechanicAssignedJobs({ page: 1, limit: 100 }) : getCarOwnerJobs({ page: 1, limit: 100 }),
-            role === ROLES.MECH && mechanicId ? getMechanicJobStats(mechanicId).catch(() => null) : Promise.resolve(null),
-          ]);
+          if (role === ROLES.SPARE_PARTS_SELLER) {
+            const ordersResponse = await getSellerOrders();
+            if (!active) {
+              return;
+            }
+            const ordersPayload = ordersResponse?.data || ordersResponse || {};
+            const ordersList = Array.isArray(ordersPayload?.data)
+              ? ordersPayload.data
+              : Array.isArray(ordersPayload)
+                ? ordersPayload
+                : [];
+            setTotalJobs(Number(ordersPayload?.count || ordersPayload?.total || ordersList.length || 0));
+          } else {
+            const [jobsResponse, statsResponse] = await Promise.all([
+              role === ROLES.MECH ? getMechanicAssignedJobs({ page: 1, limit: 100 }) : getCarOwnerJobs({ page: 1, limit: 100 }),
+              role === ROLES.MECH && mechanicId ? getMechanicJobStats(mechanicId).catch(() => null) : Promise.resolve(null),
+            ]);
 
-          if (!active) {
-            return;
+            if (!active) {
+              return;
+            }
+
+            const jobsPayload = jobsResponse?.data || jobsResponse || {};
+            const statsPayload = statsResponse?.data || statsResponse || {};
+            const jobsList = Array.isArray(jobsPayload)
+              ? jobsPayload
+              : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
+            const completedFromStats = Number(statsPayload?.total_completed_jobs || statsPayload?.completed_jobs || 0);
+            setTotalJobs(Number(completedFromStats || jobsPayload?.total || jobsList.length || 0));
           }
-
-          const jobsPayload = jobsResponse?.data || jobsResponse || {};
-          const statsPayload = statsResponse?.data || statsResponse || {};
-          const jobsList = Array.isArray(jobsPayload)
-            ? jobsPayload
-            : (jobsPayload?.jobs || jobsPayload?.items || jobsPayload?.results || []);
-          const completedFromStats = Number(statsPayload?.total_completed_jobs || statsPayload?.completed_jobs || 0);
-          setTotalJobs(Number(completedFromStats || jobsPayload?.total || jobsList.length || 0));
 
           const rawRating = Number(user?.rating || user?.average_rating || user?.avg_rating || 0);
           setRating(Number.isFinite(rawRating) ? rawRating : 0);
@@ -376,7 +395,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
             </View>
             <View>
               <AppText style={styles.statValue}>{totalJobs}</AppText>
-              <AppText style={styles.statLabel}>Total jobs</AppText>
+              <AppText style={styles.statLabel}>{totalCountLabel}</AppText>
             </View>
           </View>
 
@@ -426,7 +445,6 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                     navigation.navigate(ROUTES.SPARE_PARTS_ADDRESS);
                     return;
                   }
-                  navigation.navigate('Placeholder', { title: 'Address' });
                   return;
                 }
                 if (row.key === 'services') {

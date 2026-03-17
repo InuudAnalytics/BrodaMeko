@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -128,7 +128,11 @@ const SupportScreen = ({ navigation }) => {
 
   return (
     <ScreenContainer padded={false} style={styles.screen} edges={['top', 'left', 'right', 'bottom']}>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} activeOpacity={0.85} onPress={() => navigation.goBack()}>
             <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color={darkTheme.colors.text} strokeWidth={2.2} />
@@ -210,7 +214,7 @@ const SupportScreen = ({ navigation }) => {
           left={submitting ? <ActivityIndicator size="small" color={darkTheme.colors.background} /> : null}
           style={styles.submitButton}
         />
-      </View>
+      </ScrollView>
     </ScreenContainer>
   );
 };
@@ -221,7 +225,7 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.colors.background,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 28,
@@ -362,7 +366,7 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.sm,
   },
   submitButton: {
-    marginTop: 'auto',
+    marginTop: 16,
     borderRadius: 14,
     minHeight: 52,
     marginHorizontal: 32,

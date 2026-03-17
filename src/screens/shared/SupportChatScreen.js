@@ -8,6 +8,7 @@ import { useAuth } from '../../context';
 import { getSupportTicketMessages, getSupportTickets, markSupportTicketRead } from '../../services/support.service';
 import { trackTelemetryEvent } from '../../services/telemetry.service';
 import { darkTheme } from '../../theme';
+import { ROUTES } from '../../utils';
 
 const SupportChatScreen = ({ navigation, route }) => {
   const { token } = useAuth();
@@ -145,7 +146,7 @@ const SupportChatScreen = ({ navigation, route }) => {
         }
 
         if (!nextTicketId) {
-          setStatusText('No support ticket found');
+          setStatusText('Ready');
           setLoading(false);
           return;
         }
@@ -183,6 +184,10 @@ const SupportChatScreen = ({ navigation, route }) => {
   }, [connectSocket, hydrateMessages, resolveInitialTicket]);
 
   const canSend = useMemo(() => String(input || '').trim().length > 0, [input]);
+  const hasTicket = Boolean(String(ticketId || '').trim());
+  const hasMessages = messages.length > 0;
+  const showNoTicketState = !loading && !hasTicket;
+  const showNoMessagesState = !loading && hasTicket && !hasMessages;
 
   const handleSend = () => {
     if (sending) {
@@ -230,7 +235,7 @@ const SupportChatScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      <AppText style={styles.todayText}>{ticketId ? `Ticket: ${ticketId.slice(0, 8)}...` : 'No active ticket'}</AppText>
+      {hasTicket ? <AppText style={styles.todayText}>{`Ticket: ${ticketId.slice(0, 8)}...`}</AppText> : null}
 
       <View style={styles.messagesWrap}>
         {loading ? (
@@ -238,7 +243,19 @@ const SupportChatScreen = ({ navigation, route }) => {
             <ActivityIndicator size="small" color={darkTheme.colors.accent} />
           </View>
         ) : null}
-        {!loading && !messages.length ? (
+        {showNoTicketState ? (
+          <View style={styles.emptyWrap}>
+            <AppText style={styles.emptyText}>No support ticket found.</AppText>
+            <TouchableOpacity
+              style={styles.createTicketButton}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate(ROUTES.SUPPORT_CREATE)}
+            >
+              <AppText style={styles.createTicketButtonText}>Create a ticket</AppText>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        {showNoMessagesState ? (
           <View style={styles.emptyWrap}>
             <AppText style={styles.emptyText}>No messages yet.</AppText>
           </View>
@@ -259,29 +276,31 @@ const SupportChatScreen = ({ navigation, route }) => {
         ))}
       </View>
 
-      <View style={styles.inputRow}>
-        <View style={styles.inputWrap}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Type in your message"
-            placeholderTextColor="rgba(255,255,255,0.38)"
-            style={styles.input}
-          />
+      {hasTicket ? (
+        <View style={styles.inputRow}>
+          <View style={styles.inputWrap}>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder="Type in your message"
+              placeholderTextColor="rgba(255,255,255,0.38)"
+              style={styles.input}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.sendButton, !canSend ? styles.sendButtonDisabled : null]}
+            activeOpacity={0.9}
+            disabled={!canSend || sending || !ticketId}
+            onPress={handleSend}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="rgba(255,255,255,0.82)" />
+            ) : (
+              <HugeiconsIcon icon={SentIcon} size={18} color="rgba(255,255,255,0.82)" strokeWidth={2} />
+            )}
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={[styles.sendButton, !canSend ? styles.sendButtonDisabled : null]}
-          activeOpacity={0.9}
-          disabled={!canSend || sending || !ticketId}
-          onPress={handleSend}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="rgba(255,255,255,0.82)" />
-          ) : (
-            <HugeiconsIcon icon={SentIcon} size={18} color="rgba(255,255,255,0.82)" strokeWidth={2} />
-          )}
-        </TouchableOpacity>
-      </View>
+      ) : null}
     </ScreenContainer>
   );
 };
@@ -346,6 +365,21 @@ const styles = StyleSheet.create({
   emptyText: {
     color: 'rgba(255,255,255,0.5)',
     fontSize: 14,
+  },
+  createTicketButton: {
+    marginTop: 10,
+    minHeight: 34,
+    borderRadius: 17,
+    paddingHorizontal: 14,
+    backgroundColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createTicketButtonText: {
+    color: darkTheme.colors.background,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   messageRow: {
     alignSelf: 'flex-start',
