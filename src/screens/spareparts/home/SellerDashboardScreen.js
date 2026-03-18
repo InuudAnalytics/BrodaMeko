@@ -13,7 +13,7 @@ import { AppText, NotificationPermissionChip, PersonalInfoAlert, PullToRefreshIn
 import { useAuth, useNotifications } from '../../../context';
 import { getMarketplaceOrder } from '../../../services/marketplace.service';
 import { getNotifications } from '../../../services/notifications.service';
-import { getSellerOrders, getSellerParts } from '../../../services/spareParts.service';
+import { getSellerDashboardMetrics, getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 
@@ -51,8 +51,25 @@ const normalizeList = (payload) => {
   return [];
 };
 
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 const normalizeStatusLabel = (value) => {
   const status = String(value || '').trim().toLowerCase();
+  if ([
+    'cancelled',
+    'canceled',
+    'cancelled_by_buyer',
+    'canceled_by_buyer',
+    'cancelled_by_seller',
+    'canceled_by_seller',
+    'cancelled_by_system',
+    'canceled_by_system',
+  ].includes(status)) {
+    return 'Cancelled';
+  }
   if (['completed', 'delivered', 'received', 'confirmed'].includes(status)) {
     return 'Delivered';
   }
@@ -108,14 +125,17 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
     setLoadingDashboard(true);
     try {
       const sellerId = String(user?.id || user?._id || '').trim();
-      const [partsResponse, ordersResponse] = await Promise.all([
-        getSellerParts(),
+      const [metricsResponse, ordersResponse] = await Promise.all([
+        getSellerDashboardMetrics(),
         getSellerOrders(),
       ]);
-      const partList = normalizeList(partsResponse);
       const sellerOrders = normalizeList(ordersResponse);
-      setProductCount(partList.length);
-      setOrderCount(sellerOrders.length);
+      const metricsRoot = metricsResponse?.data || metricsResponse || {};
+      const metricsData = metricsRoot?.data || metricsRoot || {};
+
+      setProductCount(toNumber(metricsData?.total_products, 0));
+      setOrderCount(toNumber(metricsData?.total_orders, sellerOrders.length));
+      setRevenueAmount(toNumber(metricsData?.total_revenue, 0));
 
       const orderDetails = await Promise.all(
         sellerOrders.map((entry) => {
@@ -152,15 +172,10 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
         });
       });
 
-      const totalRevenue = flattenedItems.reduce(
-        (sum, item) => sum + Number(item?.price || 0),
-        0
-      );
       const topRecentOrders = flattenedItems
         .sort((a, b) => Number(b?.createdAtMs || 0) - Number(a?.createdAtMs || 0))
         .slice(0, 5);
 
-      setRevenueAmount(totalRevenue);
       setRecentOrders(topRecentOrders);
     } catch {
       setProductCount(0);
@@ -320,7 +335,9 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
             </AppText>
           ) : null}
           {recentOrders.map((order) => {
-            const isDelivered = order.status.toLowerCase() === 'delivered';
+            const statusLower = String(order.status || '').toLowerCase();
+            const isDelivered = statusLower === 'delivered';
+            const isCancelled = statusLower === 'cancelled';
             return (
               <View key={order.id} style={styles.orderRow}>
                 <View style={styles.orderIconWrap}>
@@ -334,8 +351,18 @@ const SellerDashboardScreen = ({ navigation, onTabPress }) => {
                 </View>
                 <View style={styles.orderMeta}>
                   <AppText style={styles.orderPrice}>{formatCurrency(order.price)}</AppText>
-                  <View style={[styles.statusPill, isDelivered ? styles.statusDelivered : styles.statusPending]}>
-                    <AppText style={[styles.statusText, isDelivered ? styles.statusTextDelivered : styles.statusTextPending]}>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      isCancelled ? styles.statusCancelled : (isDelivered ? styles.statusDelivered : styles.statusPending),
+                    ]}
+                  >
+                    <AppText
+                      style={[
+                        styles.statusText,
+                        isCancelled ? styles.statusTextCancelled : (isDelivered ? styles.statusTextDelivered : styles.statusTextPending),
+                      ]}
+                    >
                       {order.status}
                     </AppText>
                   </View>
@@ -583,6 +610,9 @@ const styles = StyleSheet.create({
   statusDelivered: {
     backgroundColor: 'rgba(22,140,63,0.95)',
   },
+  statusCancelled: {
+    backgroundColor: 'rgba(239,68,68,0.95)',
+  },
   statusText: {
     fontSize: 11,
     fontWeight: darkTheme.typography.fontWeights.semibold,
@@ -591,6 +621,9 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
   },
   statusTextDelivered: {
+    color: '#F5F5F5',
+  },
+  statusTextCancelled: {
     color: '#F5F5F5',
   },
 });

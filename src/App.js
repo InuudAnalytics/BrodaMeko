@@ -2,6 +2,7 @@ import { StatusBar } from 'react-native';
 import {
   AuthProvider,
   CartProvider,
+  CallProvider,
   FavoritesProvider,
   ChatProvider,
   JobsProvider,
@@ -23,23 +24,25 @@ export default function App() {
         <AuthProvider>
           <NotificationsProvider>
           <ChatProvider>
-            <JobsProvider>
-              <MechanicProfileProvider>
-                <SparePartsProfileProvider>
-                  <SellerStoreProvider>
-                    <FavoritesProvider>
-                      <CartProvider>
-                        <MechanicServicesProvider>
-                          <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
-                          <RootNavigator />
-                          <NotificationsGlobalGate />
-                        </MechanicServicesProvider>
-                      </CartProvider>
-                    </FavoritesProvider>
-                  </SellerStoreProvider>
-                </SparePartsProfileProvider>
-              </MechanicProfileProvider>
-            </JobsProvider>
+            <CallProvider>
+              <JobsProvider>
+                <MechanicProfileProvider>
+                  <SparePartsProfileProvider>
+                    <SellerStoreProvider>
+                      <FavoritesProvider>
+                        <CartProvider>
+                          <MechanicServicesProvider>
+                            <StatusBar barStyle="light-content" backgroundColor={darkTheme.colors.background} />
+                            <RootNavigator />
+                            <NotificationsGlobalGate />
+                          </MechanicServicesProvider>
+                        </CartProvider>
+                      </FavoritesProvider>
+                    </SellerStoreProvider>
+                  </SparePartsProfileProvider>
+                </MechanicProfileProvider>
+              </JobsProvider>
+            </CallProvider>
           </ChatProvider>
           </NotificationsProvider>
         </AuthProvider>

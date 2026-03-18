@@ -5,6 +5,7 @@ import {
   Easing,
   Modal,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   TextInput,
@@ -845,11 +846,16 @@ const MechanicWalletScreen = ({
           ) : null}
 
           {!loading && filteredTransactions.length ? (
-            <View style={styles.txnList}>
+            <ScrollView
+              style={styles.txnList}
+              contentContainerStyle={styles.txnListContent}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
               {filteredTransactions.map(txn => (
                 <TransactionItem key={txn.id} item={txn} />
               ))}
-            </View>
+            </ScrollView>
           ) : null}
 
           {!loading && error && !filteredTransactions.length ? (
@@ -1300,7 +1306,11 @@ const styles = StyleSheet.create({
   },
   txnList: {
     marginTop: 2,
+    maxHeight: 300,
+  },
+  txnListContent: {
     rowGap: 6,
+    paddingBottom: 6,
   },
   txnRow: {
     flexDirection: 'row',

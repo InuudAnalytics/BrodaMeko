@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, Linking, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, PanResponder, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, CallIcon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, OpenStreetMapView, ScreenContainer } from '../../../components';
 import { cancelMarketplaceOrder, getMarketplaceOrder } from '../../../services/marketplace.service';
+import { getActiveCallForContext, startCall } from '../../../services/calls.service';
+import { useAuth } from '../../../context';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { ROLES, ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 const PANEL_MAX_DOWN = 360;
@@ -30,6 +32,10 @@ const toFiniteNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+const isSameCoordinates = (left, right) =>
+  toFiniteNumber(left?.latitude) === toFiniteNumber(right?.latitude) &&
+  toFiniteNumber(left?.longitude) === toFiniteNumber(right?.longitude);
 
 const NIGERIA_FALLBACK_COORDS = { latitude: 9.0765, longitude: 7.3986 }; // Abuja
 const isWithinNigeria = (latitude, longitude) =>
@@ -80,6 +86,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
   const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
+  const { role } = useAuth();
   const [resolvedPickupCode, setResolvedPickupCode] = React.useState('');
   const [isHydratingOrder, setIsHydratingOrder] = React.useState(false);
   const [product, setProduct] = React.useState(route?.params?.product || null);
@@ -185,39 +192,80 @@ const PickupTrackingScreen = ({ navigation, route }) => {
           : null;
 
         if (active) {
-          if (!product) {
-            setProduct({
-              id: String(part?.id || firstItem?.id || '').trim(),
-              storeId: String(part?.store_id || store?.id || data?.store_id || '').trim(),
-              name: String(part?.name || firstItem?.part_name || firstItem?.name || '').trim(),
-              shop: String(itemStoreName || store?.store_name || store?.name || '').trim(),
-              price: Number(part?.price || firstItem?.price || 0),
-              images: Array.isArray(part?.images) ? part.images : part?.image ? [part.image] : [],
+          setProduct((prev) => {
+            const previous = prev && typeof prev === 'object' ? prev : {};
+            const hydratedProduct = {
+              ...previous,
+              id: String(part?.id || firstItem?.id || previous?.id || '').trim(),
+              storeId: String(part?.store_id || store?.id || data?.store_id || previous?.storeId || '').trim(),
+              name: String(part?.name || firstItem?.part_name || firstItem?.name || previous?.name || '').trim(),
+              shop: String(itemStoreName || store?.store_name || store?.name || previous?.shop || '').trim(),
+              price: Number(part?.price || firstItem?.price || previous?.price || 0),
+              images: Array.isArray(part?.images)
+                ? part.images
+                : part?.image
+                  ? [part.image]
+                  : (Array.isArray(previous?.images) ? previous.images : []),
               shopCoordinates: itemStoreLat !== null && itemStoreLng !== null
                 ? { latitude: itemStoreLat, longitude: itemStoreLng }
-                : (store?.coordinates || null),
-              latitude: itemStoreLat ?? store?.coordinates?.latitude ?? part?.latitude ?? null,
-              longitude: itemStoreLng ?? store?.coordinates?.longitude ?? part?.longitude ?? null,
-            });
-          }
-          if (!seller) {
-            setSeller({
-              storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
-              name: String(itemStoreName || store?.store_name || store?.name || '').trim(),
-              avatar: store?.logo || store?.avatar || '',
-              phone: itemStorePhone || String(store?.phone || store?.phone_number || '').trim(),
-              isActive: Boolean(store?.is_active ?? true),
-              coordinates: itemStoreLat !== null && itemStoreLng !== null
-                ? { latitude: itemStoreLat, longitude: itemStoreLng }
-                : (store?.coordinates || null),
-            });
-          }
-          if (!pickupAddress) {
-            const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
-            const resolvedAddress = addressPayload?.street
-              ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
-              : String(data?.delivery_address_text || '').trim();
-            setPickupAddress(resolvedAddress);
+                : (store?.coordinates || previous?.shopCoordinates || null),
+              latitude: itemStoreLat ?? store?.coordinates?.latitude ?? part?.latitude ?? previous?.latitude ?? null,
+              longitude: itemStoreLng ?? store?.coordinates?.longitude ?? part?.longitude ?? previous?.longitude ?? null,
+            };
+
+            const unchanged =
+              String(previous?.id || '') === String(hydratedProduct?.id || '') &&
+              String(previous?.storeId || '') === String(hydratedProduct?.storeId || '') &&
+              String(previous?.name || '') === String(hydratedProduct?.name || '') &&
+              String(previous?.shop || '') === String(hydratedProduct?.shop || '') &&
+              Number(previous?.price || 0) === Number(hydratedProduct?.price || 0) &&
+              resolveImageUri(previous?.images?.[0]) === resolveImageUri(hydratedProduct?.images?.[0]) &&
+              isSameCoordinates(previous?.shopCoordinates, hydratedProduct?.shopCoordinates) &&
+              toFiniteNumber(previous?.latitude) === toFiniteNumber(hydratedProduct?.latitude) &&
+              toFiniteNumber(previous?.longitude) === toFiniteNumber(hydratedProduct?.longitude);
+
+            return unchanged ? previous : hydratedProduct;
+          });
+
+          setSeller((prev) => {
+            const previous = prev && typeof prev === 'object' ? prev : {};
+            const hydratedUserId = String(firstItem?.seller_id || part?.seller_id || store?.seller_id || '').trim();
+            const hydratedStoreId = String(store?.id || part?.store_id || data?.store_id || '').trim();
+            const hydratedName = String(itemStoreName || store?.store_name || store?.name || '').trim();
+            const hydratedAvatar = String(store?.logo || store?.avatar || '').trim();
+            const hydratedPhone = String(itemStorePhone || store?.phone || store?.phone_number || '').trim();
+            const hydratedCoordinates = itemStoreLat !== null && itemStoreLng !== null
+              ? { latitude: itemStoreLat, longitude: itemStoreLng }
+              : (store?.coordinates || null);
+
+            const hydratedSeller = {
+              ...previous,
+              userId: hydratedUserId || String(previous?.userId || '').trim(),
+              storeId: hydratedStoreId || String(previous?.storeId || '').trim(),
+              name: hydratedName || String(previous?.name || '').trim(),
+              avatar: hydratedAvatar || previous?.avatar || '',
+              phone: hydratedPhone || String(previous?.phone || '').trim(),
+              isActive: typeof previous?.isActive === 'boolean' ? previous.isActive : Boolean(store?.is_active ?? true),
+              coordinates: hydratedCoordinates || previous?.coordinates || null,
+            };
+
+            const unchanged =
+              String(previous?.userId || '') === String(hydratedSeller?.userId || '') &&
+              String(previous?.storeId || '') === String(hydratedSeller?.storeId || '') &&
+              String(previous?.name || '') === String(hydratedSeller?.name || '') &&
+              resolveImageUri(previous?.avatar) === resolveImageUri(hydratedSeller?.avatar) &&
+              String(previous?.phone || '') === String(hydratedSeller?.phone || '') &&
+              Boolean(previous?.isActive) === Boolean(hydratedSeller?.isActive) &&
+              isSameCoordinates(previous?.coordinates, hydratedSeller?.coordinates);
+
+            return unchanged ? previous : hydratedSeller;
+          });
+          const addressPayload = data?.delivery_address || data?.address || data?.delivery || {};
+          const resolvedAddress = addressPayload?.street
+            ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
+            : String(data?.delivery_address_text || '').trim();
+          if (resolvedAddress) {
+            setPickupAddress((prev) => (prev === resolvedAddress ? prev : resolvedAddress));
           }
         }
 
@@ -247,7 +295,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     return () => {
       active = false;
     };
-  }, [incomingCode.length, orderId, pickupAddress, product, seller]);
+  }, [orderId]);
 
   const panResponder = useMemo(
     () =>
@@ -273,26 +321,116 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   );
 
   const handleCallSeller = async () => {
-    const phone = String(seller?.phone || '').trim();
-    if (!phone) {
-      AppAlert.alert('Number unavailable', 'Seller phone number is not available yet.');
+    const calleeId = String(seller?.userId || '').trim();
+    if (!orderId || !calleeId) {
+      AppAlert.alert('Call unavailable', 'Seller call session is not ready for this order yet.');
       return;
     }
-    const url = `tel:${phone}`;
     try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        AppAlert.alert('Call unavailable', 'This device cannot place calls right now.');
+      const clientCallId = `app-order-${orderId}-${Date.now()}`;
+      const response = await startCall({
+        context_type: 'order',
+        context_id: orderId,
+        callee_id: calleeId,
+        client_call_id: clientCallId,
+      });
+      const callPayload = response?.data || {};
+      const callId = String(callPayload?.call_id || '').trim();
+      if (!callId) {
+        AppAlert.alert('Call unavailable', 'Missing call identifier from server.');
         return;
       }
-      await Linking.openURL(url);
-    } catch {
-      AppAlert.alert('Call failed', 'Could not start call.');
+      navigation.navigate(ROUTES.CALL_OUTGOING, {
+        callId,
+        calleeName: String(seller?.name || 'Seller').trim(),
+        contextLabel: `Order #${String(orderId).slice(0, 8)}`,
+        contextType: 'order',
+        contextId: orderId,
+      });
+    } catch (error) {
+      try {
+        const activeCall = await getActiveCallForContext({
+          context_type: 'order',
+          context_id: orderId,
+        });
+        const activeCallId = String(activeCall?.call_id || '').trim();
+        const activeState = String(activeCall?.state || '').trim().toLowerCase();
+        if (activeCallId) {
+          navigation.navigate(
+            activeState === 'accepted' ? ROUTES.CALL_IN_PROGRESS : ROUTES.CALL_OUTGOING,
+            {
+              callId: activeCallId,
+              calleeName: String(seller?.name || 'Seller').trim(),
+              participantName: String(seller?.name || 'Seller').trim(),
+              contextLabel: `Order #${String(orderId).slice(0, 8)}`,
+              contextType: 'order',
+              contextId: orderId,
+            }
+          );
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      const statusCode = Number(error?.statusCode || 0);
+      const safeMessage = String(error?.message || '').trim().toLowerCase();
+      if (statusCode >= 500 || safeMessage.includes('internal server error')) {
+        AppAlert.alert('Call unavailable', 'Call limit reached for this order. One-time call has been used.');
+        return;
+      }
+      AppAlert.alert('Call failed', error?.message || 'Could not start call.');
     }
   };
 
   const handleReportIssue = () => {
     AppAlert.alert('Report issue', 'Issue reporting for pickup orders will be wired soon.');
+  };
+
+  const resolveStoreIdFromOrderPayload = (payload) => {
+    const root = payload?.data || payload || {};
+    const items = Array.isArray(root?.items) ? root.items : [];
+    const firstItem = items[0] || {};
+    const part = firstItem?.part || firstItem?.product || firstItem?.spare_part || {};
+    const store = part?.store || root?.store || root?.seller || {};
+    return String(
+      root?.store_id ||
+      store?.id ||
+      firstItem?.store_id ||
+      part?.store_id ||
+      ''
+    ).trim();
+  };
+
+  const handleReviewProduct = async () => {
+    let storeId = String(
+      route?.params?.storeId ||
+      route?.params?.store_id ||
+      seller?.storeId ||
+      product?.storeId ||
+      ''
+    ).trim();
+    if (!storeId && orderId) {
+      try {
+        const response = await getMarketplaceOrder(orderId);
+        storeId = resolveStoreIdFromOrderPayload(response);
+      } catch {
+        // fallback to error below
+      }
+    }
+    if (!storeId) {
+      AppAlert.alert('Review unavailable', 'Store reference is missing for this order.');
+      return;
+    }
+
+    navigation.navigate('RateProduct', {
+      storeId,
+      orderId,
+      sellerName: String(seller?.name || '').trim() || 'Unavailable',
+      productName: String(product?.name || '').trim() || 'Unavailable',
+      productImage: product?.images?.[0],
+      seller,
+      product,
+    });
   };
 
   const handleCancelOrder = () => {
@@ -313,7 +451,21 @@ const PickupTrackingScreen = ({ navigation, route }) => {
             try {
               await cancelMarketplaceOrder(orderId);
               AppAlert.alert('Cancelled', 'Order cancelled successfully.', [
-                { text: 'OK', onPress: () => navigation.goBack() },
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    const safeRole = String(role || '').trim().toUpperCase();
+                    if (safeRole === ROLES.MECH) {
+                      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+                      return;
+                    }
+                    if (safeRole === ROLES.SPARE_PARTS_SELLER.toUpperCase()) {
+                      navigation.navigate(ROUTES.SPARE_PARTS_TABS, { tab: 'home' });
+                      return;
+                    }
+                    navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD);
+                  },
+                },
               ]);
             } catch (error) {
               AppAlert.alert('Could not cancel order', error?.message || 'Please try again.');
@@ -338,6 +490,19 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     navigation.navigate(ROUTES.STORE_DETAILS, { storeId });
   };
 
+  const handleBackToHome = () => {
+    const safeRole = String(role || '').trim().toUpperCase();
+    if (safeRole === ROLES.MECH) {
+      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+      return;
+    }
+    if (safeRole === ROLES.SPARE_PARTS_SELLER.toUpperCase()) {
+      navigation.navigate(ROUTES.SPARE_PARTS_TABS, { tab: 'home' });
+      return;
+    }
+    navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD);
+  };
+
   return (
     <View style={styles.root}>
       <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
@@ -353,7 +518,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
           />
 
           <View style={styles.topBar}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.85}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBackToHome} activeOpacity={0.85}>
               <HugeiconsIcon icon={ArrowLeft01Icon} size={22} color={darkTheme.colors.accent} strokeWidth={2} />
             </TouchableOpacity>
             <AppText style={styles.topTitle}>Pick up tracking</AppText>
@@ -432,10 +597,14 @@ const PickupTrackingScreen = ({ navigation, route }) => {
                 </View>
               </TouchableOpacity>
               <AppButton
-                label="Call seller"
-                onPress={handleCallSeller}
+                label={isOrderCompleted ? 'Review product' : 'Call seller'}
+                onPress={isOrderCompleted ? handleReviewProduct : handleCallSeller}
                 style={styles.messageButton}
-                left={<HugeiconsIcon icon={CallIcon} size={16} color="#1A1A1A" strokeWidth={2.1} />}
+                left={
+                  isOrderCompleted
+                    ? undefined
+                    : <HugeiconsIcon icon={CallIcon} size={16} color="#1A1A1A" strokeWidth={2.1} />
+                }
               />
             </View>
 

@@ -1,313 +1,640 @@
-# In-App Calling Integration (Production Blueprint)
+# In-App Calling Integration (Easy + Production-Ready Plan)
 
 ## Goal
-Enable true in-app audio calling between buyer and seller (and later car owner/mechanic) without exposing personal phone numbers.
 
-## Scope (Session 1 target)
-- Audio-only WebRTC call (no video)
-- App-to-app calling only (no PSTN)
-- Order-context calls first (buyer <-> seller on same order)
-- Foreground support first, background support in phase 2
+Enable true in-app audio calling (no phone app, no exposed phone numbers) with the fastest path to production.
 
-## Recommended Architecture
-- Media: WebRTC peer-to-peer (RN client)
-- Signaling: Backend WebSocket channel (new calls namespace)
-- NAT traversal: TURN/STUN (coturn)
-- Authorization: backend validates caller/callee relationship from order/job
-- Privacy: no phone numbers in call payloads
+## Recommended Choice (for easiest integration)
 
----
+### Option A (Recommended): Stream Video SDK
 
-## Accounts and Infrastructure To Create
+Why:
 
-## Required
-1. TURN/STUN infrastructure
-- Option A (recommended for control): self-host coturn
-  - 1 VPS (Ubuntu) with static public IP
-  - DNS record (example: `turn.brodameko.com`)
-  - TLS certificate (LetsEncrypt)
-- Option B (faster): managed TURN provider (Twilio NTS / Metered / Xirsys)
+- Very fast React Native integration
+- Managed signaling/media infra (less backend complexity)
+- In-app audio/video flows already solved
+- Has a free tier (verify current limits in Stream dashboard)
 
-2. Push notification credentials (already likely present, verify)
-- Firebase Cloud Messaging (Android)
-- APNs key/cert configured for iOS
-- Needed for incoming call wake-up/alerts when app in background
+### Option B (Alternative): Agora Voice SDK
 
-3. Monitoring
-- Log aggregation (Render logs / ELK / Datadog)
-- Error tracking (Sentry recommended)
+Why:
 
-## Optional (only if PSTN fallback is required)
-- Twilio Voice or Vonage Voice account
-- Purchased numbers + masking logic
-- This is NOT needed for app-to-app WebRTC phase
+- Strong real-time quality
+- Good free tier for low-medium usage
+- Slightly more setup complexity than Stream for full call UX/state
+
+### Option C (Not recommended for your current speed goal)
+
+- Raw WebRTC + custom signaling + TURN
+- Most flexible, but highest backend/mobile complexity and longer stabilization
 
 ---
 
-## Backend Requirements (C:\bm\BrodaMeko-Backend)
+## What You Need To Create (Accounts)
 
-## 1) Data model (new tables)
-### `calls`
-- `id` (uuid, pk)
-- `context_type` (`order` | `job`)
-- `context_id` (uuid)
-- `caller_id` (uuid)
-- `callee_id` (uuid)
-- `status` (`initiated` | `ringing` | `accepted` | `rejected` | `ended` | `missed` | `failed`)
-- `started_at` (timestamp null)
-- `ended_at` (timestamp null)
-- `end_reason` (`hangup` | `declined` | `timeout` | `network_error` | `busy`)
-- `created_at`, `updated_at`
+## 1) Stream account (recommended)
 
-### `call_participants`
-- `call_id` (uuid fk)
-- `user_id` (uuid fk)
-- `joined_at` (timestamp null)
-- `left_at` (timestamp null)
-- `ice_restart_count` (int default 0)
+1. Sign up at Stream dashboard
+2. Create an app (region close to users)
+3. Copy:
 
-### `call_events`
-- `id` (uuid)
-- `call_id` (uuid fk)
-- `event_type` (`offer` | `answer` | `ice_candidate` | `ring` | `accept` | `reject` | `end` | `timeout`)
-- `from_user_id` (uuid)
-- `payload` (jsonb)
-- `created_at`
+- `STREAM_API_KEY` (frontend-safe, example: `your_stream_api_key`)
+- `STREAM_API_SECRET` (backend only)
+- App ID / environment details
 
-## 2) REST endpoints
-Prefix recommendation: `/api/v1/calls`
+## 2) Push credentials (already likely present, verify)
 
-1. `POST /api/v1/calls/initiate`
-- Body:
+- FCM for Android
+- APNs for iOS
+- Needed for incoming call notifications when app is backgrounded
+
+## 3) Optional monitoring
+
+- Sentry (mobile + backend)
+- Structured logs for call lifecycle
+
+---
+
+## Architecture (Recommended)
+
+- Call engine + signaling: Stream
+- App authorization: your backend (JWT + call participant checks)
+- Privacy model: app user IDs only (never raw phone numbers)
+- Call context: order/job scoped eligibility from your DB
+
+Flow:
+
+1. User taps `Call seller` / `Call mechanic`
+2. App calls your backend `POST /api/v1/calls/start`
+3. Backend validates caller/callee are allowed for that order/job
+4. Backend creates/fetches Stream call + returns call metadata
+5. App requests short-lived Stream token from backend (`POST /api/v1/calls/token`)
+6. App joins in-app call UI
+
+---
+
+## Backend Work Required (C:\bm\BrodaMeko-Backend)
+
+## Env vars
+
+- `STREAM_API_KEY`
+- `STREAM_API_SECRET`
+- optional: `STREAM_APP_REGION`
+
+## Minimal endpoints to add
+
+Prefix: `/api/v1/calls`
+
+1. `POST /calls/start`
+   Request:
+
 ```json
 {
   "context_type": "order",
   "context_id": "<order_uuid>",
   "callee_id": "<user_uuid>",
+  "audio_only": true
+}
+```
+
+Response:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "call_id": "<uuid_or_stream_call_id>",
+    "stream_call_type": "default",
+    "stream_call_id": "order_<order_uuid>",
+    "caller_id": "<uuid>",
+    "callee_id": "<uuid>",
+    "context_type": "order",
+    "context_id": "<uuid>",
+    "state": "ringing"
+  }
+}
+```
+
+2. `POST /calls/token`
+   Request:
+
+```json
+{
+  "user_id": "<current_user_uuid>"
+}
+```
+
+Response:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "stream_api_key": "<key>",
+    "token": "<short_lived_token>",
+    "expires_at": "2026-03-17T13:00:00Z"
+  }
+}
+```
+
+3. `POST /calls/end`
+   Request:
+
+```json
+{
+  "call_id": "<id>",
+  "reason": "hangup"
+}
+```
+
+4. (Optional but recommended) `GET /calls/:id`
+
+- For resume/rejoin and state sync
+
+## Required backend authorization rules
+
+- Order calls:
+  - buyer <-> seller linked to order items only
+- Job calls:
+  - car_owner <-> assigned mechanic only
+- Reject all non-participants
+- Never include phone numbers in API/push payloads
+
+## Required backend persistence
+
+Keep internal call records (`calls`, `call_events`) for support/audit.
+
+Suggested `calls` fields:
+
+- `id`, `context_type`, `context_id`, `caller_id`, `callee_id`
+- `provider` (`stream`)
+- `provider_call_id`
+- `status` (`ringing|accepted|ended|missed|failed`)
+- `started_at`, `ended_at`, `created_at`, `updated_at`
+
+---
+
+## Frontend Work Required (C:\bm\BrodaMeko)
+
+## 1) Install SDK
+
+For Stream:
+
+- `@stream-io/video-react-native-sdk`
+- (plus any peer deps required by current Stream RN docs)
+
+## 2) iOS/Android permissions
+
+- Android: `RECORD_AUDIO`
+- iOS: `NSMicrophoneUsageDescription`
+
+## 3) New frontend services
+
+- `src/services/calls.service.js`
+  - `startCall`, `fetchCallToken`, `endCall`, `getCall`
+
+## 4) New call state holder
+
+- `src/context/CallContext.js`
+  - call lifecycle state
+  - active call metadata
+  - token refresh handling
+
+## 5) New screens
+
+- `OutgoingCallScreen`
+- `IncomingCallScreen`
+- `InCallScreen`
+
+## 6) Existing screen edits
+
+- Replace current `Call seller` external dial behavior with in-app call launch
+- Use backend-provided `callee_id` only
+
+## 7) Notification routing
+
+- Handle push payload with `call_id`, `context_type`, `context_id`
+- Navigate to `IncomingCallScreen` or rejoin `InCallScreen`
+
+---
+
+## Simple Implementation Plan (Session-by-session)
+
+## Session 1 (fast MVP)
+
+- Stream account setup
+- Backend: `/calls/start`, `/calls/token`, `/calls/end`
+- Frontend: outgoing + active call screens
+- Foreground in-app audio calls
+
+## Session 2
+
+- Incoming call screen + push wake flow
+- Call timeout/missed/declined states
+- Role/context auth hardening
+
+## Session 3
+
+- Background behavior polish
+- Retry/reconnect handling
+- Full audit + metrics dashboard
+
+---
+
+## Testing Checklist
+
+- Android->Android call
+- iOS->iOS call
+- Android->iOS call
+- Incoming call while app in background
+- Permission denied mic flow
+- Unauthorized caller/callee blocked
+- No phone number appears anywhere
+
+---
+
+## What You Tell Backend Engineer (copy/paste)
+
+"We are implementing in-app calling with Stream. Please add `POST /api/v1/calls/start`, `POST /api/v1/calls/token`, and `POST /api/v1/calls/end`. Enforce strict order/job participant auth (no non-participants). Return Stream call metadata + short-lived user token. Never expose phone numbers in payloads. Persist call lifecycle for support audit."
+
+---
+
+## Important Notes
+
+- Free tier limits change; verify current pricing/limits before go-live.
+- Keep all provider secrets on backend only.
+- Do not block launch on PSTN fallback; app-to-app calling is enough for your current requirement.
+
+---
+
+## Backend Handoff Message (Send This As-Is)
+
+Team,
+
+Frontend call UI is now scaffolded and ready (`Outgoing`, `Incoming`, `In-Call`, `Ended` screens in shared/calls).
+To integrate in-app calling cleanly into chat and order flows, we need the following backend API contracts and payloads.
+
+### Non-negotiable requirements
+- No phone numbers in call APIs/events/push payloads.
+- All call eligibility must be validated by context (`order` or `job`) on backend.
+- Always return participant identity fields needed by UI:
+  - `id`
+  - `full_name`
+  - `avatar_url` (or `avatar.url`)
+  - `role`
+- Use authenticated user from token as caller (never trust caller_id from client).
+
+---
+
+### 1) Start Call
+**Endpoint**: `POST /api/v1/calls/start`
+
+**Request body**
+```json
+{
+  "context_type": "order",
+  "context_id": "<order_uuid_or_job_uuid>",
+  "callee_id": "<user_uuid>",
+  "audio_only": true,
   "client_call_id": "optional-idempotency-key"
 }
 ```
-- Behavior:
-  - Validate auth user
-  - Validate caller/callee relationship via order/job ownership
-  - Enforce rate-limit and max concurrent calls
-  - Create call row (`initiated` -> `ringing`)
-  - Return call metadata + ws routing info
 
-2. `POST /api/v1/calls/{callId}/accept`
-3. `POST /api/v1/calls/{callId}/reject`
-4. `POST /api/v1/calls/{callId}/end`
-5. `GET /api/v1/calls/{callId}`
-6. `GET /api/v1/calls/history?context_type=order&context_id=<id>`
+**Validation rules**
+- `context_type` must be `order` or `job`.
+- `context_id` must exist.
+- `callee_id` must be a valid participant for that context.
+- Caller must be authenticated and allowed for context.
+- Reject cross-context/non-participant calls with `403`.
+- Rate limit initiate endpoint.
+- Enforce one active call per context pair (or defined concurrency policy).
 
-7. `GET /api/v1/calls/ice-servers`
-- Returns short-lived TURN credentials
+**Success response (200)**
 ```json
 {
-  "ice_servers": [
-    { "urls": ["stun:turn.brodameko.com:3478"] },
-    {
-      "urls": ["turns:turn.brodameko.com:5349?transport=tcp"],
-      "username": "temp-user",
-      "credential": "temp-pass"
-    }
-  ],
-  "ttl_seconds": 600
+  "status": "success",
+  "message": "call started",
+  "data": {
+    "call_id": "<internal_call_uuid>",
+    "provider": "stream",
+    "provider_call_type": "default",
+    "provider_call_id": "order_<context_uuid>",
+    "audio_only": true,
+    "state": "ringing",
+    "context": {
+      "type": "order",
+      "id": "<context_uuid>"
+    },
+    "participants": {
+      "caller": {
+        "id": "<uuid>",
+        "full_name": "Dumebi Okeke",
+        "avatar_url": "https://...",
+        "role": "car_owner"
+      },
+      "callee": {
+        "id": "<uuid>",
+        "full_name": "Mebi Autos",
+        "avatar_url": "https://...",
+        "role": "seller"
+      }
+    },
+    "created_at": "2026-03-17T20:10:00Z",
+    "expires_at": "2026-03-17T20:10:30Z"
+  }
 }
 ```
 
-## 3) WebSocket signaling
-Recommended: extend existing ws auth/session pattern used for chat/support.
-
-New channel events:
-- `call.incoming`
-- `call.ringing`
-- `call.accepted`
-- `call.rejected`
-- `call.ended`
-- `call.offer`
-- `call.answer`
-- `call.ice_candidate`
-- `call.error`
-
-Event envelope:
-```json
-{
-  "event": "call.offer",
-  "call_id": "<uuid>",
-  "from_user_id": "<uuid>",
-  "to_user_id": "<uuid>",
-  "payload": { "sdp": "..." },
-  "sent_at": "2026-03-17T12:00:00Z"
-}
-```
-
-## 4) Authorization rules
-- `context_type=order`:
-  - buyer can call only sellers attached to that order
-  - seller can call only buyer for that order
-- `context_type=job`:
-  - car owner and assigned mechanic only
-- reject any cross-context or non-participant call
-
-## 5) Reliability and anti-abuse
-- Rate limits:
-  - initiate: e.g. 5/min per user
-  - signaling flood protection for ICE events
-- Idempotency key for initiate
-- Call timeout (e.g. 30s no answer -> `missed`)
-- One active call per user per context (configurable)
-
-## 6) Notifications
-- On incoming call when callee offline/background:
-  - create in-app notification with `call_id`, `context_type`, `context_id`
-  - push notification payload includes only IDs, never phone number
-
-## 7) Observability
-- Structured logs with call lifecycle state transitions
-- Metrics:
-  - call setup success rate
-  - median setup time
-  - drop rate < 30s
-  - average duration
+**Error examples**
+- `400` invalid payload
+- `401` unauthorized
+- `403` caller not allowed for context
+- `404` context not found
+- `409` call already active
+- `429` rate limited
 
 ---
 
-## Frontend Requirements (C:\bm\BrodaMeko)
+### 2) Get Call Token (Provider Token)
+**Endpoint**: `POST /api/v1/calls/token`
 
-## 1) Dependencies
-- Add `react-native-webrtc`
-- Keep existing `@react-native-firebase/messaging`
-- Optional phase 2:
-  - iOS: CallKit bridge
-  - Android: ConnectionService/foreground service helper
+**Request body**
+```json
+{
+  "call_id": "<internal_call_uuid>"
+}
+```
 
-## 2) Permissions
-### Android
-- Add `RECORD_AUDIO` in `AndroidManifest.xml`
-- Request runtime microphone permission before call starts
+**Behavior**
+- Verify requester is one of call participants.
+- Mint short-lived provider token for requester.
+- Return provider key + token + expiry.
 
-### iOS
-- Add `NSMicrophoneUsageDescription` in `ios/BrodaMekoBare/Info.plist`
+**Success response (200)**
+```json
+{
+  "status": "success",
+  "data": {
+    "provider": "stream",
+    "api_key": "<stream_public_api_key>",
+    "token": "<short_lived_user_token>",
+    "expires_at": "2026-03-17T21:10:00Z",
+    "user": {
+      "id": "<uuid>",
+      "full_name": "Dumebi Okeke",
+      "avatar_url": "https://...",
+      "role": "car_owner"
+    }
+  }
+}
+```
 
-## 3) New services
-Create:
-- `src/services/calls.service.js`
-  - `initiateCall`, `acceptCall`, `rejectCall`, `endCall`, `getIceServers`
-- `src/context/CallContext.js`
-  - global call state + WebRTC peer lifecycle
-- `src/services/call-signaling.service.js`
-  - ws event send/receive abstraction
+---
 
-## 4) New screens/components
-- `src/screens/shared/calls/OutgoingCallScreen.js`
-- `src/screens/shared/calls/IncomingCallScreen.js`
-- `src/screens/shared/calls/InCallScreen.js`
-- Reusable `CallBanner` for mini ongoing call UI
+### 3) Accept Call
+**Endpoint**: `POST /api/v1/calls/{call_id}/accept`
 
-## 5) Existing screen edits
-1. `OrderTrackingScreen.js`
-- Replace `handleCallSeller` tel flow with `initiateCall({ context_type:'order', context_id: orderId, callee_id: sellerUserId })`
+**Request body**
+```json
+{
+  "accepted": true
+}
+```
 
-2. `PickupTrackingScreen.js`
-- same replacement as above
+**Success response**
+```json
+{
+  "status": "success",
+  "message": "call accepted",
+  "data": {
+    "call_id": "<uuid>",
+    "state": "accepted",
+    "started_at": "2026-03-17T20:10:07Z"
+  }
+}
+```
 
-3. Any other "call" entry points in marketplace/job flows
-- route to in-app call initiate
+---
 
-4. Notification routing
-- Extend `src/utils/notificationRouting.js` to handle `call_id` deep links to `IncomingCallScreen` or `InCallScreen`
+### 4) Reject Call
+**Endpoint**: `POST /api/v1/calls/{call_id}/reject`
 
-## 6) Client state machine
-- `idle`
-- `outgoing_ringing`
-- `incoming_ringing`
-- `connecting`
-- `in_call`
-- `ending`
-- `ended`
+**Request body**
+```json
+{
+  "reason": "declined"
+}
+```
+
+**Success response**
+```json
+{
+  "status": "success",
+  "message": "call rejected",
+  "data": {
+    "call_id": "<uuid>",
+    "state": "rejected",
+    "ended_at": "2026-03-17T20:10:05Z",
+    "end_reason": "declined"
+  }
+}
+```
+
+---
+
+### 5) End Call
+**Endpoint**: `POST /api/v1/calls/end`
+
+**Request body**
+```json
+{
+  "call_id": "<internal_call_uuid>",
+  "reason": "hangup"
+}
+```
+
+**Allowed reasons**
+- `hangup`
+- `declined`
+- `missed`
+- `timeout`
+- `network_error`
 - `failed`
 
-UI state must be driven from this machine only.
-
-## 7) Data needed from backend for UI
-Call action buttons need:
-- `counterparty_user_id` (seller user id for order; mechanic id for job)
-- `counterparty_name`
-- `counterparty_avatar`
-
-Important: Do not use/store phone number for call flow.
-
----
-
-## Security Requirements
-- Never include real phone in call APIs/events
-- Signed, short-lived ICE credentials (do not ship static TURN password in app)
-- Validate both participants on every state transition
-- Audit logs for moderation and dispute investigation
-- Encrypt transport (wss/https only)
+**Success response**
+```json
+{
+  "status": "success",
+  "message": "call ended",
+  "data": {
+    "call_id": "<uuid>",
+    "state": "ended",
+    "ended_at": "2026-03-17T20:14:11Z",
+    "end_reason": "hangup",
+    "duration_seconds": 244
+  }
+}
+```
 
 ---
 
-## Testing Plan
+### 6) Get Call Details (for rejoin/resume)
+**Endpoint**: `GET /api/v1/calls/{call_id}`
 
-## Backend tests
-- Unit: authz matrix for order/job participants
-- Integration: initiate -> ring -> accept -> end
-- Negative: unauthorized caller, stale callId, duplicate accept, timeout
-
-## Mobile tests
-- Unit tests for call reducer/state machine
-- Manual matrix:
-  - Android <-> Android
-  - iOS <-> iOS
-  - Android <-> iOS
-  - app foreground/background transitions
-  - network handoff (wifi -> mobile)
-
-## UAT checks
-- no phone number visible anywhere
-- call starts within <= 5s median on good network
-- missed/declined states reflect correctly
-
----
-
-## Rollout Plan
-
-## Phase 1 (MVP)
-- Foreground app-to-app audio calls only
-- Order-context only
-- No CallKit/ConnectionService
-
-## Phase 2
-- Job-context calls
-- Background incoming call UX (CallKit/ConnectionService)
-- Better reconnect/ICE-restart handling
-
-## Phase 3
-- Optional PSTN masked fallback for unreachable app users
-
----
-
-## Acceptance Criteria
-- User taps "Call seller" and sees in-app ringing UI (not phone app)
-- Seller receives in-app incoming call UI
-- Both can talk audio in app
-- No personal phone number exposed in any API/UI/push payload
-- Call records are visible in admin/logs for support audit
+**Success response**
+```json
+{
+  "status": "success",
+  "data": {
+    "call_id": "<uuid>",
+    "provider": "stream",
+    "provider_call_type": "default",
+    "provider_call_id": "order_<context_uuid>",
+    "audio_only": true,
+    "state": "ringing",
+    "context": {
+      "type": "order",
+      "id": "<context_uuid>"
+    },
+    "participants": {
+      "caller": {
+        "id": "<uuid>",
+        "full_name": "Dumebi Okeke",
+        "avatar_url": "https://...",
+        "role": "car_owner"
+      },
+      "callee": {
+        "id": "<uuid>",
+        "full_name": "Mebi Autos",
+        "avatar_url": "https://...",
+        "role": "seller"
+      }
+    },
+    "created_at": "2026-03-17T20:10:00Z",
+    "started_at": "2026-03-17T20:10:07Z",
+    "ended_at": null,
+    "end_reason": null,
+    "duration_seconds": 0
+  }
+}
+```
 
 ---
 
-## Open Decisions (decide before coding)
-1. TURN option: self-host coturn vs managed provider
-2. MVP background behavior: reject with message vs notify and open app
-3. Call recording: disabled by default (recommended)
-4. Concurrent call policy: one active call per user or per context
+### 7) Optional Call History (highly useful)
+**Endpoint**: `GET /api/v1/calls/history?context_type=order&context_id=<uuid>&page=1&limit=20`
+
+**Success response**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "call_id": "<uuid>",
+      "state": "ended",
+      "context_type": "order",
+      "context_id": "<uuid>",
+      "other_party": {
+        "id": "<uuid>",
+        "full_name": "Mebi Autos",
+        "avatar_url": "https://...",
+        "role": "seller"
+      },
+      "started_at": "2026-03-17T20:10:07Z",
+      "ended_at": "2026-03-17T20:14:11Z",
+      "duration_seconds": 244,
+      "end_reason": "hangup"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1
+  }
+}
+```
 
 ---
 
-## Effort Estimate (realistic)
-- Backend APIs/signaling/authz/logging: 5-8 dev days
-- Mobile WebRTC integration + call UI/state: 6-10 dev days
-- QA + tuning + cross-platform stabilization: 4-6 dev days
-- Total: 3-5 weeks to production-quality rollout
+### 8) Push/Realtime event payloads (required for UI)
+When emitting WS/push events, include:
+- `call_id`
+- `state`
+- `context_type`
+- `context_id`
+- `from_user` (`id`, `full_name`, `avatar_url`, `role`)
+- `to_user` (`id`, `full_name`, `avatar_url`, `role`)
+- `timestamp`
+
+**Incoming call event example**
+```json
+{
+  "event": "call.incoming",
+  "data": {
+    "call_id": "<uuid>",
+    "state": "ringing",
+    "context_type": "order",
+    "context_id": "<uuid>",
+    "from_user": {
+      "id": "<uuid>",
+      "full_name": "Dumebi Okeke",
+      "avatar_url": "https://...",
+      "role": "car_owner"
+    },
+    "to_user": {
+      "id": "<uuid>",
+      "full_name": "Mebi Autos",
+      "avatar_url": "https://...",
+      "role": "seller"
+    },
+    "timestamp": "2026-03-17T20:10:00Z"
+  }
+}
+```
+
+---
+
+### 9) Context authorization matrix
+
+#### `context_type = order`
+- Buyer can call seller(s) tied to order items.
+- Seller can call the buyer for that order.
+- Other users: forbidden.
+
+#### `context_type = job`
+- Car owner can call assigned mechanic.
+- Assigned mechanic can call car owner.
+- Other users: forbidden.
+
+---
+
+### 10) Data frontend requires for sure
+For every call lifecycle API/event response, include these fields to avoid extra lookups:
+- `call_id`
+- `state`
+- `context_type`
+- `context_id`
+- `participants.caller.id`
+- `participants.caller.full_name`
+- `participants.caller.avatar_url`
+- `participants.caller.role`
+- `participants.callee.id`
+- `participants.callee.full_name`
+- `participants.callee.avatar_url`
+- `participants.callee.role`
+- `created_at`
+- `started_at`
+- `ended_at`
+- `duration_seconds`
+- `end_reason`
+
+---
+
+### 11) Security + ops
+- Provider secret remains backend-only.
+- Provider tokens short-lived.
+- Full call lifecycle audit logs persisted.
+- Rate-limit call initiation and state transitions.
+- Idempotency support on `/calls/start` via `client_call_id`.
+
+Thanks. Once these contracts are ready, frontend can wire call buttons in chat/order tracking and complete in-app calling integration end-to-end.

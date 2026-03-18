@@ -70,6 +70,7 @@ const normalizeCartItems = (payload) => {
       productId,
       product: normalizedProduct,
       quantity: toNumber(item?.quantity || item?.qty || 1, 1),
+      subtotal: toNumber(item?.subtotal, 0),
     };
   });
 };
@@ -125,31 +126,60 @@ export const CartProvider = ({ children }) => {
     }
   }, []);
 
-  const removeFromCart = useCallback(async (productId) => {
-    const safeId = String(productId || '').trim();
-    const target = items.find((item) => item.productId === safeId);
+  const findCartItem = useCallback((identifier) => {
+    const safeIdentifier = String(identifier || '').trim();
+    if (!safeIdentifier) {
+      return null;
+    }
+    return (
+      items.find((item) => String(item?.id || '').trim() === safeIdentifier) ||
+      items.find((item) => String(item?.productId || '').trim() === safeIdentifier) ||
+      null
+    );
+  }, [items]);
+
+  const removeFromCart = useCallback(async (identifier) => {
+    const target = findCartItem(identifier);
+    const targetId = String(target?.id || '').trim();
+    const targetProductId = String(target?.productId || '').trim();
+
+    if (!target && identifier) {
+      const fallbackId = String(identifier).trim();
+      setItems((prev) =>
+        prev.filter((item) => String(item?.id || '').trim() !== fallbackId && String(item?.productId || '').trim() !== fallbackId)
+      );
+      return;
+    }
+
     if (!target?.id) {
-      setItems((prev) => prev.filter((item) => item.productId !== safeId));
+      setItems((prev) =>
+        prev.filter((item) => String(item?.productId || '').trim() !== targetProductId)
+      );
       return;
     }
 
     try {
-      await removeMarketplaceCartItem(target.id);
-      setItems((prev) => prev.filter((item) => item.productId !== safeId));
+      await removeMarketplaceCartItem(targetId);
+      setItems((prev) =>
+        prev.filter((item) => String(item?.id || '').trim() !== targetId)
+      );
     } catch (removeError) {
       setError(removeError?.message || 'Could not remove item.');
     }
-  }, [items]);
+  }, [findCartItem]);
 
-  const updateQuantity = useCallback(async (productId, quantity) => {
-    const safeId = String(productId || '').trim();
+  const updateQuantity = useCallback(async (identifier, quantity) => {
     const nextQty = Math.max(0, toNumber(quantity, 0));
-    const target = items.find((item) => item.productId === safeId);
+    const target = findCartItem(identifier);
+    const targetId = String(target?.id || '').trim();
+    const targetProductId = String(target?.productId || '').trim();
     if (!target?.id) {
       setItems((prev) =>
         prev
           .map((item) =>
-            item.productId === safeId ? { ...item, quantity: nextQty } : item
+            String(item?.productId || '').trim() === targetProductId
+              ? { ...item, quantity: nextQty }
+              : item
           )
           .filter((item) => item.quantity > 0)
       );
@@ -157,21 +187,23 @@ export const CartProvider = ({ children }) => {
     }
 
     if (nextQty <= 0) {
-      await removeFromCart(safeId);
+      await removeFromCart(targetId);
       return;
     }
 
     try {
-      await updateMarketplaceCartItem(target.id, { quantity: nextQty });
+      await updateMarketplaceCartItem(targetId, { quantity: nextQty });
       setItems((prev) =>
         prev.map((item) =>
-          item.productId === safeId ? { ...item, quantity: nextQty } : item
+          String(item?.id || '').trim() === targetId
+            ? { ...item, quantity: nextQty }
+            : item
         )
       );
     } catch (updateError) {
       setError(updateError?.message || 'Could not update quantity.');
     }
-  }, [items, removeFromCart]);
+  }, [findCartItem, removeFromCart]);
 
   const clearCart = useCallback(async () => {
     try {
@@ -185,6 +217,10 @@ export const CartProvider = ({ children }) => {
 
   const calculateTotal = useCallback(() => {
     return items.reduce((total, item) => {
+      const lineSubtotal = toNumber(item?.subtotal, NaN);
+      if (Number.isFinite(lineSubtotal) && lineSubtotal > 0) {
+        return total + lineSubtotal;
+      }
       const price = toNumber(item.product?.price, 0);
       return total + price * item.quantity;
     }, 0);

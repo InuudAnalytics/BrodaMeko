@@ -13,6 +13,8 @@ import {
   listenForTokenRefresh,
   requestNotificationPermission,
 } from '../utils/pushNotifications';
+import { buildCallNavigationTarget } from '../utils/callRouting';
+import { trackTelemetryEvent } from '../services/telemetry.service';
 
 const NotificationsContext = createContext(undefined);
 
@@ -29,8 +31,23 @@ const normalizeRemoteMessage = (message) => {
 
 const getNavigationTarget = (message) => {
   const data = message?.data || {};
+  const callTarget = buildCallNavigationTarget(data);
+  if (callTarget) {
+    return callTarget;
+  }
+
   const routeName = String(data?.screen || data?.route || data?.screen_name || '').trim();
-  const params = data?.params && typeof data.params === 'object' ? data.params : {};
+  let params = data?.params && typeof data.params === 'object' ? data.params : {};
+  if (!Object.keys(params).length && typeof data?.params === 'string') {
+    try {
+      const parsed = JSON.parse(data.params);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        params = parsed;
+      }
+    } catch {
+      params = {};
+    }
+  }
 
   if (routeName) {
     return { routeName, params };
@@ -48,38 +65,55 @@ export const NotificationsProvider = ({ children }) => {
   const tokenRef = useRef('');
   const appStateRef = useRef(AppState.currentState);
   const hadTokenRef = useRef(false);
+  const registerRetryRef = useRef(null);
 
   const logTelemetry = useCallback((event, payload = {}) => {
     if (__DEV__) {
       console.log('[Notifications][Telemetry]', event, payload);
     }
+    trackTelemetryEvent(event, payload);
   }, []);
 
   const registerToken = useCallback(
-    async (nextToken) => {
+    async (nextToken, { source = 'unknown', attempt = 1 } = {}) => {
       const safeToken = String(nextToken || '').trim();
       if (!safeToken || !token) {
         logTelemetry('register_token_skipped', {
           hasToken: Boolean(token),
           hasFcmToken: Boolean(safeToken),
+          source,
         });
         return;
       }
 
       try {
         await registerDevice({ fcm_token: safeToken, device_type: getDeviceType() });
-        logTelemetry('register_device_success');
+        logTelemetry('register_device_success', { source, attempt });
       } catch (error) {
-        logTelemetry('register_device_failed', { message: error?.message || String(error) });
+        logTelemetry('register_device_failed', {
+          source,
+          attempt,
+          message: error?.message || String(error),
+        });
+        if (registerRetryRef.current) {
+          clearTimeout(registerRetryRef.current);
+          registerRetryRef.current = null;
+        }
+        if (attempt < 3) {
+          registerRetryRef.current = setTimeout(() => {
+            registerToken(safeToken, { source: `${source}_retry`, attempt: attempt + 1 });
+          }, attempt * 2500);
+        }
       }
     },
     [logTelemetry, token]
   );
 
-  const syncGrantedToken = useCallback(async () => {
+  const syncGrantedToken = useCallback(async ({ source = 'manual', forceRegister = false } = {}) => {
     const tokenValue = await getFcmToken();
     const trimmed = String(tokenValue || '').trim();
     logTelemetry('fcm_token_fetched', {
+      source,
       hasToken: Boolean(trimmed),
       sameAsCurrent: trimmed && trimmed === tokenRef.current,
     });
@@ -90,13 +124,16 @@ export const NotificationsProvider = ({ children }) => {
       );
     }
 
-    if (!trimmed || trimmed === tokenRef.current) {
+    if (!trimmed) {
       return;
     }
 
+    const changed = trimmed !== tokenRef.current;
     tokenRef.current = trimmed;
     setFcmToken(trimmed);
-    await registerToken(trimmed);
+    if (changed || forceRegister) {
+      await registerToken(trimmed, { source, attempt: 1 });
+    }
   }, [logTelemetry, registerToken]);
 
   const checkAndSyncToken = useCallback(async (source = 'manual') => {
@@ -117,7 +154,7 @@ export const NotificationsProvider = ({ children }) => {
       return;
     }
 
-    await syncGrantedToken();
+    await syncGrantedToken({ source });
   }, [logTelemetry, syncGrantedToken, token]);
 
   const requestAndSyncToken = useCallback(async () => {
@@ -134,7 +171,7 @@ export const NotificationsProvider = ({ children }) => {
       return;
     }
 
-    await syncGrantedToken();
+    await syncGrantedToken({ source: 'permission_request' });
   }, [logTelemetry, syncGrantedToken, token]);
 
   const promptPermissionIfNeeded = useCallback(
@@ -149,7 +186,7 @@ export const NotificationsProvider = ({ children }) => {
       logTelemetry('permission_status_before_prompt', { source, status: currentStatus });
 
       if (currentStatus === 'granted') {
-        await syncGrantedToken();
+        await syncGrantedToken({ source, forceRegister: true });
         return 'granted';
       }
 
@@ -162,7 +199,7 @@ export const NotificationsProvider = ({ children }) => {
       logTelemetry('permission_status_after_prompt', { source, status: requestedStatus });
 
       if (requestedStatus === 'granted') {
-        await syncGrantedToken();
+        await syncGrantedToken({ source: `${source}_granted`, forceRegister: true });
       } else {
         setFcmToken('');
         tokenRef.current = '';
@@ -200,10 +237,14 @@ export const NotificationsProvider = ({ children }) => {
       setLastNotification(normalized);
     }
     const target = getNavigationTarget(message || {});
+    logTelemetry('push_opened', {
+      route: target?.routeName || '',
+      has_call_target: target?.routeName === 'CallIncoming',
+    });
     if (navigationRef.isReady()) {
       navigationRef.navigate(target.routeName, target.params);
     }
-  }, []);
+  }, [logTelemetry]);
 
   useEffect(() => {
     if (!isBootstrapped) {
@@ -221,6 +262,7 @@ export const NotificationsProvider = ({ children }) => {
     hadTokenRef.current = hasTokenNow;
     checkAndSyncToken(source);
     if (source === 'login_access') {
+      syncGrantedToken({ source: 'login_access_force_register', forceRegister: true });
       promptPermissionIfNeeded('login_access_auto_prompt');
     }
 
@@ -233,15 +275,19 @@ export const NotificationsProvider = ({ children }) => {
       }
       tokenRef.current = trimmed;
       setFcmToken(trimmed);
-      await registerToken(trimmed);
+      await registerToken(trimmed, { source: 'token_refresh', attempt: 1 });
     });
 
     return () => {
+      if (registerRetryRef.current) {
+        clearTimeout(registerRetryRef.current);
+        registerRetryRef.current = null;
+      }
       unsubscribeMessage?.();
       unsubscribeOpen?.();
       unsubscribeRefresh?.();
     };
-  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, promptPermissionIfNeeded, registerToken, token]);
+  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, promptPermissionIfNeeded, registerToken, syncGrantedToken, token]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {

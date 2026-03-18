@@ -13,6 +13,10 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
   const subtotal = Number(route?.params?.subtotal || 0);
   const serviceCharge = Number(route?.params?.serviceCharge || 0);
   const totalAmount = Number(route?.params?.totalAmount || subtotal + serviceCharge);
+  const pickupTrackingRoute =
+    String(role || '').toLowerCase() === 'mech'
+      ? ROUTES.MECH_PICKUP_TRACKING
+      : ROUTES.CAR_OWNER_PICKUP_TRACKING;
 
   const handleBackToMarketplace = () => {
     if (String(role || '').toLowerCase() === 'mech') {
@@ -38,7 +42,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
               style={styles.primaryButton}
               onPress={() =>
                 fulfillmentType === 'pickup'
-                  ? navigation.navigate(ROUTES.CAR_OWNER_PICKUP_TRACKING, {
+                  ? navigation.navigate(pickupTrackingRoute, {
                       orderId,
                       pickupCode: route?.params?.pickupCode,
                       product: route?.params?.product,

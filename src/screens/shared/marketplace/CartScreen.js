@@ -24,6 +24,7 @@ import {
 import MechanicTabBar from '../../../components/navigation/MechanicTabBar';
 import { ROUTES } from '../../../utils';
 import { useCart } from '../../../context';
+import { useFocusEffect } from '@react-navigation/native';
 
 const formatNaira = value => `N${Number(value || 0).toLocaleString('en-NG')}`;
 
@@ -43,7 +44,7 @@ const resolveImageUri = value => {
 };
 
 const CartScreen = ({ navigation, route }) => {
-  const { items, removeFromCart, updateQuantity, calculateTotal } = useCart();
+  const { items, removeFromCart, updateQuantity, calculateTotal, reloadCart } = useCart();
   const pullDistance = React.useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -65,9 +66,20 @@ const CartScreen = ({ navigation, route }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 450));
+    try {
+      await reloadCart();
+    } finally {
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
     setRefreshing(false);
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      reloadCart();
+      return undefined;
+    }, [reloadCart])
+  );
 
   const renderBottomNav = () => {
     if (isMechanic) {
@@ -178,12 +190,12 @@ const CartScreen = ({ navigation, route }) => {
               />
             }
           >
-            {items.map(item => {
+            {items.map((item, index) => {
               const product = item.product || {};
               const image = resolveImageUri(product?.images?.[0]);
               const hasPrice = Number.isFinite(Number(product?.price));
               return (
-                <View key={item.productId} style={styles.itemCard}>
+                <View key={String(item?.id || item?.productId || `cart-item-${index}`)} style={styles.itemCard}>
                   <View style={styles.itemRow}>
                     {image ? (
                       <Image source={{ uri: image }} style={styles.itemImage} />
@@ -204,7 +216,7 @@ const CartScreen = ({ navigation, route }) => {
                     <View style={styles.actionCol}>
                       <TouchableOpacity
                         style={styles.deleteButton}
-                        onPress={() => removeFromCart(item.productId)}
+                        onPress={() => removeFromCart(item.id || item.productId)}
                         activeOpacity={0.85}
                       >
                         <HugeiconsIcon
@@ -218,7 +230,7 @@ const CartScreen = ({ navigation, route }) => {
                         <TouchableOpacity
                           style={styles.qtyButton}
                           onPress={() =>
-                            updateQuantity(item.productId, item.quantity - 1)
+                            updateQuantity(item.id || item.productId, item.quantity - 1)
                           }
                           activeOpacity={0.85}
                         >
@@ -235,7 +247,7 @@ const CartScreen = ({ navigation, route }) => {
                         <TouchableOpacity
                           style={styles.qtyButton}
                           onPress={() =>
-                            updateQuantity(item.productId, item.quantity + 1)
+                            updateQuantity(item.id || item.productId, item.quantity + 1)
                           }
                           activeOpacity={0.85}
                         >

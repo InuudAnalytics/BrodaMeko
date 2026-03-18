@@ -305,6 +305,7 @@ export const ChatProvider = ({ children }) => {
   const [wsDebugInfo, setWsDebugInfo] = useState({ url: '', tokenLength: 0, state: 'idle' });
   const [latestJobRequestUpdate, setLatestJobRequestUpdate] = useState(null);
   const [latestJobStatusUpdate, setLatestJobStatusUpdate] = useState(null);
+  const [latestCallSignal, setLatestCallSignal] = useState(null);
   const [carOwnerChatShortcut, setCarOwnerChatShortcutState] = useState(null);
   const [mechanicChatShortcut, setMechanicChatShortcutState] = useState(null);
   const [error, setError] = useState(null);
@@ -665,6 +666,15 @@ export const ChatProvider = ({ children }) => {
               text: `Quotation ${nextDecision || String(payload?.status || payload?.action || 'updated')}.`,
               created_at: new Date().toISOString(),
               status: 'sent',
+            });
+            return;
+          }
+
+          if (eventType.startsWith('call.')) {
+            setLatestCallSignal({
+              type: eventType,
+              payload,
+              received_at: new Date().toISOString(),
             });
             return;
           }
@@ -1215,6 +1225,7 @@ export const ChatProvider = ({ children }) => {
       wsDebugExtras,
       latestJobRequestUpdate,
       latestJobStatusUpdate,
+      latestCallSignal,
       carOwnerChatShortcut,
       mechanicChatShortcut,
       error,
@@ -1261,6 +1272,7 @@ export const ChatProvider = ({ children }) => {
       wsDebugExtras,
       latestJobRequestUpdate,
       latestJobStatusUpdate,
+      latestCallSignal,
       carOwnerChatShortcut,
       mechanicChatShortcut,
       error,
@@ -1314,6 +1326,7 @@ export const useChat = () => {
       wsStatus: 'error',
       latestJobRequestUpdate: null,
       latestJobStatusUpdate: null,
+      latestCallSignal: null,
       carOwnerChatShortcut: null,
       mechanicChatShortcut: null,
       error: 'Chat provider unavailable',

@@ -2,6 +2,7 @@ export { AuthProvider, useAuth } from './AuthContext';
 export { CartProvider, useCart } from './CartContext';
 export { FavoritesProvider, useFavorites } from './FavoritesContext';
 export { ChatProvider, useChat } from './ChatContext';
+export { CallProvider, useCallSession } from './CallContext';
 export { JobsProvider, useJobs } from './JobsContext';
 export { MechanicProfileProvider, useMechanicProfile } from './MechanicProfileContext';
 export { MechanicServicesProvider, useMechanicServices } from './MechanicServicesContext';

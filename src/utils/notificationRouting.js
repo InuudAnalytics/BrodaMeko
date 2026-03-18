@@ -2,6 +2,11 @@ import { ROLES, ROUTES } from './constants';
 
 const safeString = (value) => String(value || '').trim();
 const toLower = (value) => safeString(value).toLowerCase();
+const toBool = (value) => {
+  if (typeof value === 'boolean') return value;
+  const text = toLower(value);
+  return text === 'true' || text === '1' || text === 'yes';
+};
 
 export const resolveDisputeType = (payload = {}, fallbackType = '') => {
   const type = safeString(payload?.dispute_type || payload?.type || fallbackType).toLowerCase();
@@ -25,12 +30,32 @@ export const resolveNotificationRoute = ({ notification, role }) => {
   const orderId = safeString(payload?.order_id || payload?.orderId);
   const orderItemId = safeString(payload?.order_item_id || payload?.orderItemId);
   const pickupCode = safeString(payload?.pickup_code || payload?.pickupCode);
-  const fulfillmentType = toLower(payload?.fulfillment_type || payload?.fulfillmentType);
+  const fulfillmentType = toLower(
+    payload?.fulfillment_type ||
+    payload?.fulfillmentType ||
+    payload?.delivery_type ||
+    payload?.deliveryType ||
+    payload?.order_type ||
+    payload?.orderType ||
+    payload?.fulfilment_type ||
+    payload?.fulfilmentType ||
+    payload?.fulfillment_mode ||
+    payload?.fulfillmentMode
+  );
   const notificationType = toLower(notification?.type);
+  const bodyText = toLower(notification?.body || notification?.message || '');
+  const titleText = toLower(notification?.title || '');
+  const explicitPickup = toBool(payload?.is_pickup) || toBool(payload?.isPickup);
+  const mentionsPickup = notificationType.includes('pickup') || bodyText.includes('pickup') || titleText.includes('pickup');
   const isPickupOrder =
+    explicitPickup ||
     fulfillmentType === 'pickup' ||
+    fulfillmentType === 'pick_up' ||
+    fulfillmentType === 'pick-up' ||
+    fulfillmentType === 'collection' ||
+    fulfillmentType === 'collect' ||
     Boolean(pickupCode) ||
-    notificationType.includes('pickup');
+    mentionsPickup;
 
   if (ticketId) {
     return {

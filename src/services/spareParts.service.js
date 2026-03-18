@@ -206,6 +206,11 @@ export const getSellerOrders = async () => {
   return response.data;
 };
 
+export const getSellerDashboardMetrics = async () => {
+  const response = await api.get(ENDPOINTS.marketplace.sellerDashboardMetrics);
+  return response.data;
+};
+
 export default {
   getSellerStore,
   createSellerStore,
@@ -224,4 +229,5 @@ export default {
   deleteSellerPartImage,
   addSellerPartImages,
   getSellerOrders,
+  getSellerDashboardMetrics,
 };

@@ -1,24 +1,43 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { openSettings } from 'react-native-permissions';
 import AppText from './AppText';
 import ForegroundNotificationToast from './ForegroundNotificationToast';
-import { useAuth, useNotifications } from '../context';
+import { useAuth, useChat, useNotifications } from '../context';
 import { navigationRef } from '../navigation/navigationRef';
 import { darkTheme } from '../theme';
+import { trackTelemetryEvent } from '../services/telemetry.service';
+import { buildCallNavigationTarget } from '../utils/callRouting';
 
 const readTarget = message => {
   const data = message?.data && typeof message.data === 'object' ? message.data : {};
+  const callTarget = buildCallNavigationTarget(data);
+  if (callTarget) {
+    return callTarget;
+  }
+
   const routeName = String(data?.screen || data?.route || data?.screen_name || '').trim() || 'Notifications';
-  const params = data?.params && typeof data.params === 'object' ? data.params : {};
+  let params = data?.params && typeof data.params === 'object' ? data.params : {};
+  if (!Object.keys(params).length && typeof data?.params === 'string') {
+    try {
+      const parsed = JSON.parse(data.params);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        params = parsed;
+      }
+    } catch {
+      params = {};
+    }
+  }
   return { routeName, params };
 };
 
 const NotificationsGlobalGate = () => {
   const { token, isBootstrapped } = useAuth();
   const { permissionStatus, requestPermission, lastNotification } = useNotifications();
+  const { latestCallSignal } = useChat();
   const [sessionDismissed, setSessionDismissed] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const lastCallSignalKeyRef = useRef('');
 
   const normalizedStatus = String(permissionStatus || '').toLowerCase();
   const isBlocked = normalizedStatus === 'blocked';
@@ -36,6 +55,38 @@ const NotificationsGlobalGate = () => {
       setSessionDismissed(false);
     }
   }, [isGranted]);
+
+  useEffect(() => {
+    const signal = latestCallSignal && typeof latestCallSignal === 'object' ? latestCallSignal : null;
+    if (!signal) {
+      return;
+    }
+
+    const target = buildCallNavigationTarget({
+      ...signal?.payload,
+      type: signal?.type,
+    });
+    if (!target) {
+      return;
+    }
+
+    const callId = String(signal?.payload?.call_id || '').trim();
+    const signalType = String(signal?.type || '').trim().toLowerCase();
+    const dedupeKey = `${signalType}:${callId}`;
+    if (!callId || dedupeKey === lastCallSignalKeyRef.current) {
+      return;
+    }
+    lastCallSignalKeyRef.current = dedupeKey;
+    trackTelemetryEvent('ws_delivered', {
+      signal_type: signalType,
+      call_id: callId,
+      route: target?.routeName || '',
+    });
+
+    if (navigationRef.isReady()) {
+      navigationRef.navigate(target.routeName, target.params);
+    }
+  }, [latestCallSignal]);
 
   const handleEnableNotifications = async () => {
     if (isBlocked) {

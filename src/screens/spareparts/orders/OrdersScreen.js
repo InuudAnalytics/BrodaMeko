@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, DeviceEventEmitter, Image, Linking, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, DeviceEventEmitter, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, NoInternetState, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
 import { confirmMarketplaceOrderItem, getMarketplaceOrder } from '../../../services/marketplace.service';
+import { getActiveCallForContext, startCall } from '../../../services/calls.service';
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
@@ -47,6 +48,7 @@ const statusConfig = {
   preparing: { label: 'Preparing', color: '#3B82F6', textColor: '#E9F1FF' },
   in_transit: { label: 'Shipped', color: '#22C55E', textColor: '#0B2B15' },
   completed: { label: 'Completed', color: '#22C55E', textColor: '#0B2B15' },
+  cancelled: { label: 'Cancelled', color: '#EF4444', textColor: '#FFFFFF' },
 };
 
 const normalizeOrderList = (payload) => {
@@ -74,6 +76,18 @@ const toStatusKey = (value) => {
   if (['preparing', 'processing'].includes(status)) return 'preparing';
   if (['shipped', 'in_transit', 'out_for_delivery'].includes(status)) return 'in_transit';
   if (['completed', 'delivered', 'received'].includes(status)) return 'completed';
+  if ([
+    'cancelled',
+    'canceled',
+    'cancelled_by_buyer',
+    'canceled_by_buyer',
+    'cancelled_by_seller',
+    'canceled_by_seller',
+    'cancelled_by_system',
+    'canceled_by_system',
+  ].includes(status)) {
+    return 'cancelled';
+  }
   return 'new';
 };
 
@@ -119,6 +133,7 @@ const OrdersScreen = ({ navigation }) => {
           total: Number(order?.total_amount || firstItem?.subtotal || 0),
           orderedAt: formatOrderDateTime(order?.created_at || firstItem?.created_at),
           buyerName: order?.buyer_name || detail?.buyer_name || 'Buyer',
+          buyerId: String(order?.buyer_id || detail?.buyer_id || detail?.buyer?.id || '').trim(),
           buyerPhone: String(order?.buyer_phone || detail?.buyer_phone || detail?.buyer?.phone || '').trim(),
           deliveryType: String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase(),
           pickupCode: '',
@@ -232,28 +247,76 @@ const OrdersScreen = ({ navigation }) => {
   );
 
   const handleCallBuyer = useCallback(async (order) => {
-    const phone = String(order?.buyerPhone || '').trim();
-    if (!phone) {
-      AppAlert.alert('Number unavailable', 'Buyer phone number is not available yet.');
+    const orderId = String(order?.orderId || order?.id || '').trim();
+    const calleeId = String(order?.buyerId || '').trim();
+    if (!orderId || !calleeId) {
+      AppAlert.alert('Call unavailable', 'Buyer call session is not ready for this order yet.');
       return;
     }
-    const url = `tel:${phone}`;
     try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        AppAlert.alert('Call unavailable', 'This device cannot place calls right now.');
+      const clientCallId = `app-order-${orderId}-${Date.now()}`;
+      const response = await startCall({
+        context_type: 'order',
+        context_id: orderId,
+        callee_id: calleeId,
+        client_call_id: clientCallId,
+      });
+      const callPayload = response?.data || {};
+      const callId = String(callPayload?.call_id || '').trim();
+      if (!callId) {
+        AppAlert.alert('Call unavailable', 'Missing call identifier from server.');
         return;
       }
-      await Linking.openURL(url);
-    } catch {
-      AppAlert.alert('Call failed', 'Could not start call.');
+      navigation.navigate(ROUTES.CALL_OUTGOING, {
+        callId,
+        calleeName: String(order?.buyerName || 'Buyer').trim(),
+        contextLabel: `Order #${orderId.slice(0, 8)}`,
+        contextType: 'order',
+        contextId: orderId,
+      });
+    } catch (error) {
+      try {
+        const activeCall = await getActiveCallForContext({
+          context_type: 'order',
+          context_id: orderId,
+        });
+        const activeCallId = String(activeCall?.call_id || '').trim();
+        const activeState = String(activeCall?.state || '').trim().toLowerCase();
+        if (activeCallId) {
+          navigation.navigate(
+            activeState === 'accepted' ? ROUTES.CALL_IN_PROGRESS : ROUTES.CALL_OUTGOING,
+            {
+              callId: activeCallId,
+              calleeName: String(order?.buyerName || 'Buyer').trim(),
+              participantName: String(order?.buyerName || 'Buyer').trim(),
+              contextLabel: `Order #${orderId.slice(0, 8)}`,
+              contextType: 'order',
+              contextId: orderId,
+            }
+          );
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      const statusCode = Number(error?.statusCode || 0);
+      const safeMessage = String(error?.message || '').trim().toLowerCase();
+      if (statusCode >= 500 || safeMessage.includes('internal server error')) {
+        AppAlert.alert('Call unavailable', 'Call limit reached for this order. One-time call has been used.');
+        return;
+      }
+      AppAlert.alert('Call failed', error?.message || 'Could not start call.');
     }
-  }, []);
+  }, [navigation]);
+
+  const handleBackToHome = useCallback(() => {
+    navigation.navigate(ROUTES.SPARE_PARTS_TABS, { tab: 'home' });
+  }, [navigation]);
 
   return (
     <View style={styles.root}>
       <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
-        <CenteredHeader title="Orders" />
+        <CenteredHeader title="Orders" onBackPress={handleBackToHome} />
 
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
@@ -367,7 +430,7 @@ const OrdersScreen = ({ navigation }) => {
 
                 {order.status === 'in_transit' ? (
                   <View style={styles.dualRow}>
-                    {order?.buyerPhone ? (
+                    {order?.buyerId ? (
                       <TouchableOpacity
                         style={styles.outlineButton}
                         activeOpacity={0.85}

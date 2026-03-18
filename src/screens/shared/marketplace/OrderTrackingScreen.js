@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, Linking, PanResponder, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, PanResponder, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -17,8 +17,10 @@ import {
   getMarketplaceOrder,
   receivedMarketplaceOrderItem,
 } from '../../../services/marketplace.service';
+import { getActiveCallForContext, startCall } from '../../../services/calls.service';
+import { useAuth } from '../../../context';
 import { darkTheme } from '../../../theme';
-import { ROUTES } from '../../../utils';
+import { ROLES, ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 const PANEL_MAX_DOWN = 520;
@@ -148,6 +150,7 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
   const resolvedSeller = {
     name: String(itemStoreName || store?.store_name || store?.name || '').trim(),
     storeId: String(store?.id || part?.store_id || data?.store_id || '').trim(),
+    userId: String(activeItem?.seller_id || part?.seller_id || store?.seller_id || '').trim(),
     avatar: String(store?.logo || store?.avatar || '').trim(),
     phone: itemStorePhone || String(store?.phone || store?.phone_number || '').trim(),
     isActive: Boolean(store?.is_active ?? true),
@@ -218,6 +221,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   const panelYRef = useRef(0);
   const dragStartRef = useRef(0);
   const { location, permissionStatus, requestPermission, refreshOnce } = useUserLocation();
+  const { role } = useAuth();
 
   const [orderState, setOrderState] = useState({
     product: route?.params?.product || {},
@@ -349,21 +353,65 @@ const OrderTrackingScreen = ({ navigation, route }) => {
   }, [permissionStatus, refreshOnce, requestPermission]);
 
   const handleCallSeller = async () => {
-    const phone = String(seller?.phone || '').trim();
-    if (!phone) {
-      AppAlert.alert('Number unavailable', 'Seller phone number is not available yet.');
+    const calleeId = String(seller?.userId || '').trim();
+    if (!orderId || !calleeId) {
+      AppAlert.alert('Call unavailable', 'Seller call session is not ready for this order yet.');
       return;
     }
-    const url = `tel:${phone}`;
+
     try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (!canOpen) {
-        AppAlert.alert('Call unavailable', 'This device cannot place calls right now.');
+      const clientCallId = `app-order-${orderId}-${Date.now()}`;
+      const response = await startCall({
+        context_type: 'order',
+        context_id: orderId,
+        callee_id: calleeId,
+        client_call_id: clientCallId,
+      });
+      const callPayload = response?.data || {};
+      const callId = String(callPayload?.call_id || '').trim();
+      if (!callId) {
+        AppAlert.alert('Call unavailable', 'Missing call identifier from server.');
         return;
       }
-      await Linking.openURL(url);
-    } catch {
-      AppAlert.alert('Call failed', 'Could not start call.');
+      navigation.navigate(ROUTES.CALL_OUTGOING, {
+        callId,
+        calleeName: toUnavailable(seller?.name),
+        contextLabel: `Order #${String(orderId).slice(0, 8)}`,
+        contextType: 'order',
+        contextId: orderId,
+      });
+    } catch (error) {
+      try {
+        const activeCall = await getActiveCallForContext({
+          context_type: 'order',
+          context_id: orderId,
+        });
+        const activeCallId = String(activeCall?.call_id || '').trim();
+        const activeState = String(activeCall?.state || '').trim().toLowerCase();
+        if (activeCallId) {
+          navigation.navigate(
+            activeState === 'accepted' ? ROUTES.CALL_IN_PROGRESS : ROUTES.CALL_OUTGOING,
+            {
+              callId: activeCallId,
+              calleeName: toUnavailable(seller?.name),
+              participantName: toUnavailable(seller?.name),
+              contextLabel: `Order #${String(orderId).slice(0, 8)}`,
+              contextType: 'order',
+              contextId: orderId,
+            }
+          );
+          return;
+        }
+      } catch {
+        // fall through to base error below
+      }
+      const statusCode = Number(error?.statusCode || 0);
+      const safeMessage = String(error?.message || '').trim().toLowerCase();
+      if (statusCode >= 500 || safeMessage.includes('internal server error')) {
+        AppAlert.alert('Call unavailable', 'Call limit reached for this order. One-time call has been used.');
+        return;
+      }
+      AppAlert.alert('Call failed', error?.message || 'Could not start call.');
     }
   };
 
@@ -417,6 +465,56 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     });
   };
 
+  const resolveStoreIdFromOrderPayload = (payload) => {
+    const root = payload?.data || payload || {};
+    const items = Array.isArray(root?.items) ? root.items : [];
+    const firstItem = items[0] || {};
+    const part = firstItem?.part || firstItem?.product || firstItem?.spare_part || {};
+    const store = part?.store || root?.store || root?.seller || {};
+    return String(
+      root?.store_id ||
+      store?.id ||
+      firstItem?.store_id ||
+      part?.store_id ||
+      ''
+    ).trim();
+  };
+
+  const handleReviewProduct = async () => {
+    let storeId = String(
+      product?.storeId ||
+      seller?.storeId ||
+      route?.params?.storeId ||
+      route?.params?.store_id ||
+      resolveStoreIdFromOrderPayload(orderData) ||
+      ''
+    ).trim();
+
+    if (!storeId && orderId) {
+      try {
+        const response = await getMarketplaceOrder(orderId);
+        storeId = resolveStoreIdFromOrderPayload(response);
+      } catch {
+        // fallback to error below
+      }
+    }
+
+    if (!storeId) {
+      AppAlert.alert('Review unavailable', 'Store reference is missing for this order.');
+      return;
+    }
+
+    navigation.navigate('RateProduct', {
+      storeId,
+      orderId,
+      sellerName: toUnavailable(seller?.name),
+      productName: toUnavailable(product?.name),
+      productImage: product?.images?.[0],
+      seller,
+      product,
+    });
+  };
+
   const handleCancelOrder = () => {
     if (!orderId) {
       AppAlert.alert('Missing order info', 'Could not cancel this order right now.');
@@ -435,7 +533,21 @@ const OrderTrackingScreen = ({ navigation, route }) => {
             try {
               await cancelMarketplaceOrder(orderId);
               AppAlert.alert('Cancelled', 'Order cancelled successfully.', [
-                { text: 'OK', onPress: () => navigation.goBack() },
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    const safeRole = String(role || '').trim().toUpperCase();
+                    if (safeRole === ROLES.MECH) {
+                      navigation.navigate(ROUTES.MECH_DASHBOARD_TABS, { tab: 'marketplace' });
+                      return;
+                    }
+                    if (safeRole === ROLES.SPARE_PARTS_SELLER.toUpperCase()) {
+                      navigation.navigate(ROUTES.SPARE_PARTS_TABS, { tab: 'home' });
+                      return;
+                    }
+                    navigation.navigate(ROUTES.CAR_OWNER_DASHBOARD);
+                  },
+                },
               ]);
             } catch (error) {
               AppAlert.alert('Could not cancel order', error?.message || 'Please try again.');
@@ -711,16 +823,20 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.messageBtn}
-                onPress={handleCallSeller}
+                onPress={isOrderCompleted ? handleReviewProduct : handleCallSeller}
                 activeOpacity={0.85}
               >
-                <HugeiconsIcon
-                  icon={CallIcon}
-                  size={18}
-                  color="#E6C714"
-                  strokeWidth={2}
-                />
-                <AppText style={styles.messageText}>Call seller</AppText>
+                {!isOrderCompleted ? (
+                  <HugeiconsIcon
+                    icon={CallIcon}
+                    size={18}
+                    color="#E6C714"
+                    strokeWidth={2}
+                  />
+                ) : null}
+                <AppText style={styles.messageText}>
+                  {isOrderCompleted ? 'Review product' : 'Call seller'}
+                </AppText>
               </TouchableOpacity>
             </View>
 

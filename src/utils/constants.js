@@ -55,6 +55,11 @@ export const ROUTES = {
   SUPPORT_CHAT: 'SupportChat',
   DISPUTES: 'Disputes',
   PRIVACY_POLICY: 'PrivacyPolicy',
+  CALL_OUTGOING: 'CallOutgoing',
+  CALL_INCOMING: 'CallIncoming',
+  CALL_IN_PROGRESS: 'CallInProgress',
+  CALL_ENDED: 'CallEnded',
+  CALL_HISTORY: 'CallHistory',
 
   MECH_DASHBOARD: 'MechDashboard',
   MECH_DASHBOARD_TABS: 'MechanicDashboardTabs',

@@ -140,6 +140,15 @@ export const ENDPOINTS = {
     ticketRead: (ticketId) => `/api/v1/support/tickets/${encodeURIComponent(String(ticketId || ''))}/read`,
     disputeTicket: '/api/v1/support/dispute-ticket',
   },
+  calls: {
+    start: '/api/v1/calls/start',
+    token: '/api/v1/calls/token',
+    accept: (callId) => `/api/v1/calls/${encodeURIComponent(String(callId || ''))}/accept`,
+    reject: (callId) => `/api/v1/calls/${encodeURIComponent(String(callId || ''))}/reject`,
+    end: '/api/v1/calls/end',
+    details: (callId) => `/api/v1/calls/${encodeURIComponent(String(callId || ''))}`,
+    history: '/api/v1/calls/history',
+  },
   dispute: {
     fileJob: (jobId) => `/api/v1/dispute/jobs/${encodeURIComponent(String(jobId || ''))}/dispute`,
     fileOrder: (orderId) => `/api/v1/dispute/orders/${encodeURIComponent(String(orderId || ''))}/dispute`,
@@ -190,6 +199,7 @@ export const ENDPOINTS = {
     sellerStoreLogo: '/api/v1/marketplace/seller/store/logo',
     sellerStoreBanner: '/api/v1/marketplace/seller/store/banner',
     sellerOrders: '/api/v1/marketplace/seller/orders',
+    sellerDashboardMetrics: '/api/v1/marketplace/dashboard',
     partsList: '/api/v1/marketplace/parts',
     storeDetails: (storeId) => `/api/v1/marketplace/stores/${encodeURIComponent(String(storeId || ''))}`,
     partDetails: (partId) => `/api/v1/marketplace/parts/${encodeURIComponent(String(partId || ''))}`,

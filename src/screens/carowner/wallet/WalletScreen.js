@@ -5,6 +5,7 @@ import {
   Easing,
   Modal,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   TextInput,
@@ -701,7 +702,12 @@ const WalletScreen = ({ navigation }) => {
         ) : null}
 
         {!loading && visibleTransactions.length ? (
-          <View style={styles.txnList}>
+          <ScrollView
+            style={styles.txnList}
+            contentContainerStyle={styles.txnListContent}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
             {visibleTransactions.map((txn) => (
               <TransactionItem
                 key={txn.id}
@@ -715,7 +721,7 @@ const WalletScreen = ({ navigation }) => {
                 }}
               />
             ))}
-          </View>
+          </ScrollView>
         ) : null}
 
         {!loading && error && !filteredTransactions.length ? (
@@ -1057,7 +1063,11 @@ const styles = StyleSheet.create({
   },
   txnList: {
     marginTop: 2,
+    maxHeight: 300,
+  },
+  txnListContent: {
     rowGap: 6,
+    paddingBottom: 6,
   },
   txnRow: {
     flexDirection: 'row',

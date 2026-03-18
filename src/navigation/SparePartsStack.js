@@ -35,6 +35,13 @@ import { useAuth, useSparePartsProfile } from '../context';
 import { ScreenContainer } from '../components';
 import { darkTheme } from '../theme';
 import { ROUTES } from '../utils';
+import {
+  CallEndedScreen,
+  CallHistoryScreen,
+  InCallScreen,
+  IncomingCallScreen,
+  OutgoingCallScreen,
+} from '../screens/shared/calls';
 
 const Stack = createNativeStackNavigator();
 
@@ -112,6 +119,11 @@ const SparePartsStack = () => {
       <Stack.Screen name={ROUTES.SUPPORT_CHAT} component={SupportChatScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.DISPUTES} component={DisputeListScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.DISPUTE_DETAIL} component={DisputeDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.CALL_OUTGOING} component={OutgoingCallScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.CALL_INCOMING} component={IncomingCallScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.CALL_IN_PROGRESS} component={InCallScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.CALL_ENDED} component={CallEndedScreen} options={{ headerShown: false }} />
+      <Stack.Screen name={ROUTES.CALL_HISTORY} component={CallHistoryScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.PRIVACY_POLICY} component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name={ROUTES.USER_PROFILE} component={UserProfileScreen} options={{ headerShown: false }} />
