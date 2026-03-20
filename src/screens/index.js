@@ -14,8 +14,8 @@ export { default as CarOwnerEditProfileScreen } from './carowner/profile/EditPro
 export { default as CarOwnerAddContactSuccessScreen } from './carowner/profile/AddContactSuccessScreen';
 export { default as CarOwnerReportIssueScreen } from './carowner/assistance/ReportIssueScreen';
 export { default as CarOwnerRequestDiagnosticsScreen } from './carowner/assistance/RequestDiagnosticsScreen';
-export { default as CarOwnerTowingCompaniesScreen } from './carowner/assistance/TowingCompaniesScreen';
-export { default as CarOwnerDiagnosticExpertsScreen } from './carowner/diagnostics/DiagnosticExpertsListScreen';
+export { default as CarOwnerTowingCompaniesScreen } from './carowner/assistance/TowingServicesDirectoryScreen';
+export { default as CarOwnerDiagnosticExpertsScreen } from './carowner/diagnostics/DiagnosticExpertsDirectoryScreen';
 export { default as CarOwnerMechanicDiscoveryScreen } from './carowner/assistance/FindMechanicsScreen';
 export { default as CarOwnerLiveTrackingScreen } from './carowner/assistance/LiveTrackingScreen';
 

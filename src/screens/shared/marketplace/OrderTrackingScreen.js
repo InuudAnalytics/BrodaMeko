@@ -265,7 +265,9 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     orderStatus,
   } = orderState;
   const isOrderCompleted = orderStatus === 'completed';
+  const isOrderCancelled = orderStatus === 'cancelled';
   const isOrderDisputed = orderStatus === 'disputed';
+  const isTerminalOrderState = isOrderCompleted || isOrderCancelled || isOrderDisputed;
   const shopCoordinates = useMemo(
     () => buildStoreCoordinates({ route, orderState }),
     [orderState, route]
@@ -381,6 +383,13 @@ const OrderTrackingScreen = ({ navigation, route }) => {
         contextId: orderId,
       });
     } catch (error) {
+      console.warn('Order call start failed', {
+        orderId,
+        sellerId: seller?.id,
+        statusCode: Number(error?.statusCode || 0),
+        message: error?.message || '',
+        data: error?.data || null,
+      });
       try {
         const activeCall = await getActiveCallForContext({
           context_type: 'order',
@@ -408,7 +417,7 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       const statusCode = Number(error?.statusCode || 0);
       const safeMessage = String(error?.message || '').trim().toLowerCase();
       if (statusCode >= 500 || safeMessage.includes('internal server error')) {
-        AppAlert.alert('Call unavailable', 'Call limit reached for this order. One-time call has been used.');
+        AppAlert.alert('Call unavailable', 'Could not start call right now. Please try again.');
         return;
       }
       AppAlert.alert('Call failed', error?.message || 'Could not start call.');
@@ -854,15 +863,15 @@ const OrderTrackingScreen = ({ navigation, route }) => {
               <AppButton
                 label="Confirm delivery"
                 onPress={handleConfirmDelivery}
-                disabled={loadingOrder || !itemId}
+                disabled={loadingOrder || !itemId || isTerminalOrderState}
               />
               <TouchableOpacity
                 style={styles.secondaryAction}
-                onPress={isOrderDisputed ? handleOpenDisputeDetail : (isOrderCompleted ? handleReportIssue : handleCancelOrder)}
+                onPress={isOrderDisputed ? handleOpenDisputeDetail : ((isOrderCompleted || isOrderCancelled) ? handleReportIssue : handleCancelOrder)}
                 activeOpacity={0.85}
               >
                 <AppText style={styles.secondaryActionText}>
-                  {isOrderDisputed ? 'View dispute status' : (isOrderCompleted ? 'Report an issue' : 'Cancel order')}
+                  {isOrderDisputed ? 'View dispute status' : ((isOrderCompleted || isOrderCancelled) ? 'Report an issue' : 'Cancel order')}
                 </AppText>
               </TouchableOpacity>
             </View>

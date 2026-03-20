@@ -149,6 +149,14 @@ export const ENDPOINTS = {
     details: (callId) => `/api/v1/calls/${encodeURIComponent(String(callId || ''))}`,
     history: '/api/v1/calls/history',
   },
+  services: {
+    diagnosticExperts: '/api/v1/services/diagnostic-experts',
+    diagnosticExpertDetails: (serviceId) =>
+      `/api/v1/services/diagnostic-experts/${encodeURIComponent(String(serviceId || ''))}`,
+    towingServices: '/api/v1/services/towing-services',
+    towingServiceDetails: (serviceId) =>
+      `/api/v1/services/towing-services/${encodeURIComponent(String(serviceId || ''))}`,
+  },
   dispute: {
     fileJob: (jobId) => `/api/v1/dispute/jobs/${encodeURIComponent(String(jobId || ''))}/dispute`,
     fileOrder: (orderId) => `/api/v1/dispute/orders/${encodeURIComponent(String(orderId || ''))}/dispute`,

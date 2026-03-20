@@ -14,7 +14,6 @@ import {
   CarOwnerMechanicDiscoveryScreen,
   CarOwnerProfileScreen,
   CarOwnerReportIssueScreen,
-  CarOwnerRequestDiagnosticsScreen,
   CarOwnerTowingCompaniesScreen,
   CarOwnerRewardsScreen,
   CarOwnerWithdrawScreen,
@@ -227,11 +226,6 @@ const CarOwnerStack = () => {
       <Stack.Screen
         name={ROUTES.CAR_OWNER_REPORT_ISSUE}
         component={CarOwnerReportIssueScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name={ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS}
-        component={CarOwnerRequestDiagnosticsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

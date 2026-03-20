@@ -112,6 +112,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const orderId = String(route?.params?.orderId || route?.params?.order_id || '').trim();
   const pickupCode = resolvedPickupCode || incomingCode;
   const isOrderCompleted = orderStatus === 'completed';
+  const isOrderCancelled = orderStatus === 'cancelled';
 
   const shopCoordinates = useMemo(() => {
     // TODO: backend should provide shop coordinates for pickup navigation
@@ -348,6 +349,13 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         contextId: orderId,
       });
     } catch (error) {
+      console.warn('Pickup order call start failed', {
+        orderId,
+        sellerId: seller?.id,
+        statusCode: Number(error?.statusCode || 0),
+        message: error?.message || '',
+        data: error?.data || null,
+      });
       try {
         const activeCall = await getActiveCallForContext({
           context_type: 'order',
@@ -375,7 +383,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
       const statusCode = Number(error?.statusCode || 0);
       const safeMessage = String(error?.message || '').trim().toLowerCase();
       if (statusCode >= 500 || safeMessage.includes('internal server error')) {
-        AppAlert.alert('Call unavailable', 'Call limit reached for this order. One-time call has been used.');
+        AppAlert.alert('Call unavailable', 'Could not start call right now. Please try again.');
         return;
       }
       AppAlert.alert('Call failed', error?.message || 'Could not start call.');
@@ -529,7 +537,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]} {...panResponder.panHandlers}>
           <View style={styles.handle} />
           <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-            <AppText style={styles.heading}>Your delivery code</AppText>
+            <AppText style={styles.heading}>Your pickup code</AppText>
             <AppText style={styles.description}>
               This delivery code would be entered by the seller to confirm your order. Please do not share to anyone else.
             </AppText>
@@ -599,6 +607,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
               <AppButton
                 label={isOrderCompleted ? 'Review product' : 'Call seller'}
                 onPress={isOrderCompleted ? handleReviewProduct : handleCallSeller}
+                disabled={isOrderCancelled}
                 style={styles.messageButton}
                 left={
                   isOrderCompleted
@@ -610,10 +619,10 @@ const PickupTrackingScreen = ({ navigation, route }) => {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={isOrderCompleted ? handleReportIssue : handleCancelOrder}
+              onPress={(isOrderCompleted || isOrderCancelled) ? handleReportIssue : handleCancelOrder}
             >
               <AppText style={styles.reportText}>
-                {isOrderCompleted ? 'Report an issue' : 'Cancel order'}
+                {(isOrderCompleted || isOrderCancelled) ? 'Report an issue' : 'Cancel order'}
               </AppText>
             </TouchableOpacity>
           </ScrollView>

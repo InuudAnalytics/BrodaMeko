@@ -652,7 +652,7 @@ const DashboardScreen = ({ navigation, route }) => {
         Our certified mechanics are nearby
       </AppText>
       <HelpActionRow label="I know the issues" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)} />
-      <HelpActionRow label="Diagnose my car" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REQUEST_DIAGNOSTICS)} />
+      <HelpActionRow label="Diagnose my car" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_DIAGNOSTIC_EXPERTS)} />
       <HelpActionRow label="Help tow my vehicle" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_TOWING_COMPANIES)} />
     </>
   );
@@ -872,9 +872,6 @@ const DashboardScreen = ({ navigation, route }) => {
             <View style={styles.locationLiveBadge}>
               <AppText style={styles.locationLiveBadgeText}>{locationBadgeText}</AppText>
             </View>
-            <View style={styles.osmAttribution}>
-              <AppText style={styles.osmAttributionText}>Map data (C) OpenStreetMap contributors</AppText>
-            </View>
           </>
         ) : (
           <LocationFallbackCard
@@ -1017,8 +1014,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: darkTheme.spacing.sm,
   },
   locationLiveBadgeText: { color: darkTheme.colors.accent, fontSize: darkTheme.typography.fontSizes.xs },
-  osmAttribution: { position: 'absolute', left: darkTheme.spacing.sm, right: darkTheme.spacing.sm, bottom: 6, alignItems: 'center' },
-  osmAttributionText: { color: '#AAB0C2', fontSize: 10 },
   locationLoadingText: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.sm },
   locationFallbackWrap: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', paddingHorizontal: darkTheme.spacing.lg },
   locationFallbackCard: {

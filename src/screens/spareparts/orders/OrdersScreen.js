@@ -275,6 +275,13 @@ const OrdersScreen = ({ navigation }) => {
         contextId: orderId,
       });
     } catch (error) {
+      console.warn('Seller order call start failed', {
+        orderId,
+        buyerId: order?.buyerId,
+        statusCode: Number(error?.statusCode || 0),
+        message: error?.message || '',
+        data: error?.data || null,
+      });
       try {
         const activeCall = await getActiveCallForContext({
           context_type: 'order',
@@ -302,7 +309,7 @@ const OrdersScreen = ({ navigation }) => {
       const statusCode = Number(error?.statusCode || 0);
       const safeMessage = String(error?.message || '').trim().toLowerCase();
       if (statusCode >= 500 || safeMessage.includes('internal server error')) {
-        AppAlert.alert('Call unavailable', 'Call limit reached for this order. One-time call has been used.');
+        AppAlert.alert('Call unavailable', 'Could not start call right now. Please try again.');
         return;
       }
       AppAlert.alert('Call failed', error?.message || 'Could not start call.');

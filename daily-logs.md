@@ -454,5 +454,85 @@
 
 11. **Update logo assets and auth/profile navigation cleanup** (`01c6684`) - 16:05 WAT
 
-    - Updated app/logo assets and auth-page logo presentation.
-    - Applied related auth/profile navigation cleanup.
+   - Updated app/logo assets and auth-page logo presentation.
+   - Applied related auth/profile navigation cleanup.
+
+## March 16, 2026
+
+### Commits
+
+1. **feat: integrate support/dispute flows and harden wallet/marketplace UX** (`1590198`)
+
+   - Integrated support and dispute flows into the app.
+   - Tightened wallet and marketplace UX handling around active backend behavior.
+
+2. **chore: google and apple auth done** (`0dc8d6c`) [Backend]
+
+   - Added backend support for Google and Apple authentication.
+   - Unblocked frontend social auth integration work.
+
+## March 17, 2026
+
+### Commits
+
+1. **feat: finalize support/dispute, reviews routing, and in-app calling blueprint** (`3a1626f`)
+
+   - Finalized key support and dispute user flows.
+   - Wired review-related routing and laid down the frontend in-app calling blueprint.
+
+2. **Remove marketplace UI fallbacks and show explicit unavailable states** (`20a51fb`)
+
+   - Removed stale marketplace fallbacks.
+   - Added clearer unavailable and empty-state handling.
+
+3. **Refine wallet transaction list, statuses, and timestamp display** (`01b8b05`)
+
+   - Improved wallet transaction presentation and timestamp formatting.
+
+4. **Rename app display label to BrodaMeko on iOS** (`366824f`)
+
+   - Updated the iOS app display label to the final product name.
+
+5. **Use debit icon for debit wallet transactions** (`7db341b`)
+
+   - Swapped wallet transaction visuals so debit entries use the correct iconography.
+
+6. **Implement support/dispute UX fixes, seller profile stats, social auth wiring, and spare-parts UI data updates** (`4da7129`)
+
+   - Applied UX fixes across support and dispute flows.
+   - Added seller profile stats, social auth wiring, and spare-parts data/UI updates.
+
+7. **Unify wallet UX flows and fix auth-me wallet balance mapping** (`f3d8bb9`)
+
+   - Unified wallet behavior across screens.
+   - Fixed wallet balance mapping from the auth/me payload.
+
+8. **feat: enrich admin withdrawals response with wallet and bank details** (`5e249d1`) [Backend]
+
+   - Expanded admin withdrawal responses to include wallet and bank detail data.
+
+9. **chore: updates done to seller dashboard** (`5d6ee70`) [Backend]
+
+   - Applied seller dashboard backend updates needed by the current frontend work.
+
+## March 18, 2026
+
+### Commits
+
+1. **feat: integrate in-app calling flow and improve tracking route handling** (`ed5884e`)
+
+   - Integrated the in-app calling flow on the frontend.
+   - Improved route handling around marketplace tracking screens.
+
+2. **chore(auth): update Google web client ID for Firebase project** (`ab7a70d`)
+
+   - Updated the Firebase Google web client ID configuration.
+
+3. **feat: In app calling done** (`7a755d2`) [Backend]
+
+   - Added backend support for in-app calling flows.
+
+4. **chore: update to order notifications** (`0025be4`) [Backend]
+
+   - Updated marketplace/order notification payloads and related call handling.
+   - Included the follow-up backend sync that landed on March 19 in this workstream.

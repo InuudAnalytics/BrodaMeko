@@ -6,6 +6,15 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
-const config = {};
+const config = {
+  resolver: {
+    useWatchman: false,
+  },
+  watcher: {
+    healthCheck: {
+      enabled: false,
+    },
+  },
+};
 
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);
