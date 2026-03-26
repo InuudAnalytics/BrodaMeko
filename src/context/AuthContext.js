@@ -58,12 +58,7 @@ const getAppleSigninClient = () => {
   }
 
   try {
-    const {
-      default: appleAuth,
-      AppleAuthRequestOperation,
-      AppleAuthRequestScope,
-      AppleAuthError,
-    } = require('@invertase/react-native-apple-authentication');
+    const { default: appleAuth } = require('@invertase/react-native-apple-authentication');
 
     if (!appleAuth?.isSupported) {
       return null;
@@ -72,9 +67,9 @@ const getAppleSigninClient = () => {
     return {
       isSupported: true,
       performRequest: appleAuth.performRequest.bind(appleAuth),
-      Operation: AppleAuthRequestOperation,
-      Scope: AppleAuthRequestScope,
-      Error: AppleAuthError,
+      Operation: appleAuth.Operation,
+      Scope: appleAuth.Scope,
+      Error: appleAuth.Error,
     };
   } catch {
     return null;
