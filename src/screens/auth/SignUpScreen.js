@@ -477,11 +477,11 @@ const SignUpScreen = ({ navigation, route }) => {
                 />
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  disabled={isLoading}
+                  disabled={isLoading || Platform.OS !== 'ios'}
                   onPress={() => signUpWithApple({ role: selectedRole })}
                   style={[
                     styles.appleButton,
-                    isLoading ? styles.appleButtonDisabled : null,
+                    isLoading || Platform.OS !== 'ios' ? styles.appleButtonDisabled : null,
                   ]}
                 >
                   <HugeiconsIcon

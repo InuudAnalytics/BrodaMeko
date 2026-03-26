@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -239,7 +239,7 @@ const EditProfileScreen = ({ navigation }) => {
         <View style={styles.backButton} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <TouchableOpacity style={styles.avatarWrap} activeOpacity={0.85} onPress={handlePickAvatar}>
           <View style={styles.avatar}>
             {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} /> : <View style={styles.avatarFallback} />}
@@ -341,7 +341,7 @@ const EditProfileScreen = ({ navigation }) => {
             />
           </View>
         </View>
-      </View>
+      </ScrollView>
 
       <View style={styles.ctaWrap}>
         <AppButton
@@ -430,8 +430,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentInner: {
     paddingHorizontal: 12,
     paddingTop: 8,
+    paddingBottom: 8,
   },
   avatarWrap: {
     alignSelf: 'center',
