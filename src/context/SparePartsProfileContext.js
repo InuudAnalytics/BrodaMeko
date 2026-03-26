@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { getSellerStore, getSellerBankDetails } from '../services/spareParts.service';
 
 const STORAGE_KEY_BASE = '@brodameko/spare_parts_profile';
 
@@ -82,12 +83,60 @@ export const SparePartsProfileProvider = ({ children }) => {
       setIsHydrated(false);
       try {
         const raw = await AsyncStorage.getItem(storageKey);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setSparePartsProfile(sanitizeProfile(parsed));
-        } else {
-          setSparePartsProfile(INITIAL_PROFILE);
+        const local = raw ? sanitizeProfile(JSON.parse(raw)) : { ...INITIAL_PROFILE };
+
+        // Hydrate store and bank details from the server so reinstalling the app
+        // doesn't wipe out completed setup steps.
+        const [storeResult, bankResult] = await Promise.allSettled([
+          getSellerStore(),
+          getSellerBankDetails(),
+        ]);
+
+        let serverStoreDetails = null;
+        if (storeResult.status === 'fulfilled') {
+          const d = storeResult.value?.data || storeResult.value || {};
+          const store = d?.store || d?.seller_store || d;
+          if (store?.store_name || store?.storeName) {
+            serverStoreDetails = {
+              storeName: String(store.store_name || store.storeName || '').trim(),
+              description: String(store.description || '').trim(),
+              street: String(store.street || '').trim(),
+              city: String(store.city || '').trim(),
+              state: String(store.state || '').trim(),
+              country: String(store.country || '').trim(),
+              latitude: String(store.latitude ?? '').trim(),
+              longitude: String(store.longitude ?? '').trim(),
+              openingTime: String(store.opening_time || store.openingTime || '').trim(),
+              closingTime: String(store.closing_time || store.closingTime || '').trim(),
+              openDays: Array.isArray(store.open_days || store.openDays) ? (store.open_days || store.openDays) : [],
+              deliveryType: String(store.delivery_type || store.deliveryType || '').trim(),
+              deliveryScope: String(store.delivery_scope || store.deliveryScope || '').trim(),
+              bannerUrl: String(store.banner_url || store.bannerUrl || '').trim(),
+            };
+          }
         }
+
+        let serverBankDetails = null;
+        if (bankResult.status === 'fulfilled') {
+          const d = bankResult.value?.data || bankResult.value || {};
+          const banks = Array.isArray(d?.bank_accounts || d?.banks || d) ? (d?.bank_accounts || d?.banks || d) : null;
+          const bank = Array.isArray(banks) ? (banks.find((b) => b?.is_primary || b?.isPrimary) || banks[0]) : (d?.bank_account || d);
+          if (bank?.account_name || bank?.accountName) {
+            serverBankDetails = {
+              id: String(bank.id || bank._id || '').trim(),
+              accountName: String(bank.account_name || bank.accountName || '').trim(),
+              accountNumber: String(bank.account_number || bank.accountNumber || '').trim(),
+              bankName: String(bank.bank_name || bank.bankName || '').trim(),
+              isPrimary: Boolean(bank.is_primary || bank.isPrimary),
+            };
+          }
+        }
+
+        setSparePartsProfile(sanitizeProfile({
+          ...local,
+          storeDetails: serverStoreDetails || local.storeDetails,
+          bankDetails: serverBankDetails || local.bankDetails,
+        }));
       } catch {
         setSparePartsProfile(INITIAL_PROFILE);
       } finally {
