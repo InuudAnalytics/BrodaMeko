@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -131,6 +132,8 @@ const SettingRow = ({ label, icon, onPress, isLast, tone }) => {
 };
 
 const UserProfileScreen = ({ navigation, onBack }) => {
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
   const { user, role, signOut, isLoading, refreshUserProfile } = useAuth();
   const [totalJobs, setTotalJobs] = useState(0);
   const [rating, setRating] = useState(0);
@@ -352,7 +355,7 @@ const UserProfileScreen = ({ navigation, onBack }) => {
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -655,6 +658,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 8,
     paddingBottom: 28,
+  },
+  contentTablet: {
+    maxWidth: 600,
+    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: 24,
   },
   header: {
     minHeight: 40,

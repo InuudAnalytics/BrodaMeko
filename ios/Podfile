@@ -17,6 +17,8 @@ end
 target 'BrodaMekoBare' do
   config = use_native_modules!
 
+  pod 'RNAppleAuthentication', :path => '../node_modules/@invertase/react-native-apple-authentication'
+
   # Avoid global modular headers, which can cause React/Hermes modulemap collisions
   # (e.g. redefinition of `react_runtime` on Xcode 16).
   # Keep modular headers only for Firebase dependency chain when needed.

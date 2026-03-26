@@ -11,6 +11,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -45,6 +46,8 @@ const ROLE_LABELS = {
 };
 
 const LoginScreen = ({ navigation, route }) => {
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
   const roleParam = route?.params?.role;
   const {
     token,
@@ -148,7 +151,7 @@ const LoginScreen = ({ navigation, route }) => {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Animated.View ref={targetRef} style={animatedStyle}>
+            <Animated.View ref={targetRef} style={[animatedStyle, isTablet && styles.tabletContainer]}>
               <View style={styles.logoWrap}>
                 <Image
                   source={require('../../../assets/logo.png')}
@@ -277,11 +280,11 @@ const LoginScreen = ({ navigation, route }) => {
                 />
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  disabled={isLoading}
+                  disabled={isLoading || Platform.OS !== 'ios'}
                   onPress={() => signInWithApple({ role: effectiveRole })}
                   style={[
                     styles.appleButton,
-                    isLoading ? styles.appleButtonDisabled : null,
+                    isLoading || Platform.OS !== 'ios' ? styles.appleButtonDisabled : null,
                   ]}
                 >
                   <HugeiconsIcon
@@ -323,6 +326,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: darkTheme.spacing.xl,
     paddingBottom: darkTheme.spacing.xxl,
+  },
+  tabletContainer: {
+    maxWidth: 480,
+    alignSelf: 'center',
+    width: '100%',
   },
   logoWrap: {
     alignItems: 'center',

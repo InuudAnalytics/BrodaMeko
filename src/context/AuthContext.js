@@ -53,18 +53,32 @@ const getGoogleSigninClient = () => {
 };
 
 const getAppleSigninClient = () => {
-  const module = NativeModules?.RNAppleAuthModule;
-  if (!module) {
+  if (Platform.OS !== 'ios') {
     return null;
   }
 
-  return {
-    isSupported: Boolean(module?.isSupported ?? Platform.OS === 'ios'),
-    performRequest: module?.performRequest,
-    Operation: module?.Operation || { LOGIN: 'LOGIN' },
-    Scope: module?.Scope || { FULL_NAME: 'FULL_NAME', EMAIL: 'EMAIL' },
-    Error: module?.Error || {},
-  };
+  try {
+    const {
+      default: appleAuth,
+      AppleAuthRequestOperation,
+      AppleAuthRequestScope,
+      AppleAuthError,
+    } = require('@invertase/react-native-apple-authentication');
+
+    if (!appleAuth?.isSupported) {
+      return null;
+    }
+
+    return {
+      isSupported: true,
+      performRequest: appleAuth.performRequest.bind(appleAuth),
+      Operation: AppleAuthRequestOperation,
+      Scope: AppleAuthRequestScope,
+      Error: AppleAuthError,
+    };
+  } catch {
+    return null;
+  }
 };
 
 const normalizeRole = value => {
@@ -589,6 +603,12 @@ export const AuthProvider = ({ children }) => {
       }
 
       const { GoogleSignin } = googleClient;
+
+      GoogleSignin.configure({
+        webClientId: GOOGLE_CONFIG.webClientId,
+        offlineAccess: GOOGLE_CONFIG.offlineAccess,
+        forceCodeForRefreshToken: GOOGLE_CONFIG.forceCodeForRefreshToken,
+      });
 
       await GoogleSignin.hasPlayServices();
       await GoogleSignin.signIn();
