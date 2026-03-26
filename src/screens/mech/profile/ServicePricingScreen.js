@@ -706,7 +706,7 @@ const ServicePricingScreen = ({ navigation, route }) => {
           disabled={saving}
           left={saving ? <ActivityIndicator size="small" color="#1A1A1A" /> : null}
         />
-        {isOnboarding ? (
+        {false ? (
           <TouchableOpacity activeOpacity={0.85} onPress={handleTemporarySkip} style={styles.skipTempBtn}>
             <AppText style={styles.skipTempText}>Skip for now</AppText>
           </TouchableOpacity>
