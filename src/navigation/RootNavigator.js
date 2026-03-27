@@ -1,4 +1,5 @@
 import React from 'react';
+import { Animated, Image, StyleSheet, View } from 'react-native';
 import { DarkTheme as NavigationDarkTheme, NavigationContainer } from '@react-navigation/native';
 import { AppText, ScreenContainer } from '../components';
 import { useAuth } from '../context';
@@ -23,6 +24,41 @@ const navTheme = {
     notification: darkTheme.colors.accent,
   },
 };
+
+const BootSplash = () => {
+  const opacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity]);
+
+  return (
+    <View style={bootStyles.container}>
+      <Animated.Image
+        source={require('../../assets/brodamekoLogo.png')}
+        style={[bootStyles.logo, { opacity }]}
+        resizeMode="contain"
+      />
+    </View>
+  );
+};
+
+const bootStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: darkTheme.colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 140,
+    height: 140,
+  },
+});
 
 const InvalidRoleScreen = ({ role }) => {
   return (
@@ -62,7 +98,7 @@ const RootNavigator = () => {
   };
 
   if (!isBootstrapped) {
-    return <ScreenContainer padded={false} />;
+    return <BootSplash />;
   }
 
   return (
