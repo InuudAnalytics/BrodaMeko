@@ -13,7 +13,7 @@ import {
   ScrollableTabs,
 } from '../../../components';
 import { useChat } from '../../../context';
-import { deleteJob, getCarOwnerJobs, updateJobStatus } from '../../../services/jobs.service';
+import { confirmJob, deleteJob, getCarOwnerJobs, updateJobStatus } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
@@ -31,6 +31,22 @@ const toTitleCaseWords = (value) => {
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
+};
+
+const extractAvatarUrl = (value) => {
+  if (!value) return null;
+  if (typeof value === 'object') return value?.url || value?.uri || null;
+  const str = String(value).trim();
+  if (!str) return null;
+  if (str.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(str);
+      return parsed?.url || parsed?.uri || null;
+    } catch {
+      // not JSON
+    }
+  }
+  return str;
 };
 
 const normalizeIssueType = (value) => {
@@ -74,9 +90,11 @@ const normalizeJob = (job, index) => {
   ).trim();
 
   const mechanicName =
+    job?.mechanic?.full_name ||
     job?.mechanic?.name ||
     job?.mechanic_name ||
     job?.mech_name ||
+    job?.assigned_mechanic?.full_name ||
     job?.assigned_mechanic?.name ||
     job?.provider?.name ||
     (safeStatus === 'pending' ? 'Awaiting assignment' : 'Assigned mechanic');
@@ -91,14 +109,14 @@ const normalizeJob = (job, index) => {
   );
   const jobId = String(job?.id || job?._id || job?.job_id || `job-${index}`);
   const avatarUrl =
-    job?.mechanic?.avatar ||
-    job?.mechanic?.avatar_url ||
-    job?.mechanic?.image ||
-    job?.mechanic_avatar ||
-    job?.mech_avatar ||
-    job?.mechanic_image ||
-    job?.assigned_mechanic?.avatar ||
-    job?.provider?.avatar ||
+    extractAvatarUrl(job?.mechanic?.avatar) ||
+    extractAvatarUrl(job?.mechanic?.avatar_url) ||
+    extractAvatarUrl(job?.mechanic?.image) ||
+    extractAvatarUrl(job?.mechanic_avatar) ||
+    extractAvatarUrl(job?.mech_avatar) ||
+    extractAvatarUrl(job?.mechanic_image) ||
+    extractAvatarUrl(job?.assigned_mechanic?.avatar) ||
+    extractAvatarUrl(job?.provider?.avatar) ||
     null;
   const safeRating = Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
   const hasMechanicIdentity = Boolean(mechanicId || String(mechanicName || '').trim());
@@ -168,14 +186,27 @@ const HistorySkeleton = () => {
   );
 };
 
-const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cancelling, deleting }) => {
+const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, onConfirmCompletion, cancelling, deleting, confirming }) => {
   const isCancelled = item.status === 'cancelled';
   const isCompleted = item.status === 'completed';
+  const isMechanicCompleted = item.status === 'mechanic_completed';
   const isPending = item.status === 'pending';
   const canDelete = isPending;
   const canRate = !isPending && Boolean(item?.canRate);
-  const statusLabel = isCancelled ? 'Cancelled' : isCompleted ? 'Completed' : 'Pending';
-  const statusTextColor = isCancelled ? '#E85578' : isCompleted ? '#4CC968' : '#C8CCD8';
+  const statusLabel = isCancelled
+    ? 'Cancelled'
+    : isCompleted
+      ? 'Completed'
+      : isMechanicCompleted
+        ? 'Pending Confirm'
+        : 'Pending';
+  const statusTextColor = isCancelled
+    ? '#E85578'
+    : isCompleted
+      ? '#4CC968'
+      : isMechanicCompleted
+        ? '#FFC47A'
+        : '#C8CCD8';
   const filledStars = Math.round(Number(item?.rating || 0));
 
   return (
@@ -245,6 +276,21 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, cance
         </TouchableOpacity>
       </View>
 
+      {isMechanicCompleted ? (
+        <View style={styles.confirmRow}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[styles.actionBtn, styles.actionBtnConfirm, confirming ? styles.actionBtnDisabled : null]}
+            onPress={onConfirmCompletion}
+            disabled={confirming}
+          >
+            <AppText style={styles.actionBtnConfirmText}>
+              {confirming ? 'Confirming...' : 'Confirm Completion'}
+            </AppText>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {canDelete ? (
         <View style={styles.pendingMetaRow}>
           <TouchableOpacity
@@ -272,6 +318,7 @@ const HistoryScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [cancellingJobId, setCancellingJobId] = useState('');
   const [deletingJobId, setDeletingJobId] = useState('');
+  const [confirmingJobId, setConfirmingJobId] = useState('');
   const pullDistance = useRef(new Animated.Value(0)).current;
   const fetchHistoryRef = useRef(null);
 
@@ -399,6 +446,31 @@ const HistoryScreen = ({ navigation }) => {
     ]);
   }, [clearActiveConversation]);
 
+  const handleConfirmCompletion = useCallback((jobId) => {
+    const safeJobId = String(jobId || '').trim();
+    if (!safeJobId) { return; }
+    AppAlert.alert('Confirm completion', 'This confirms the mechanic completed the job. Continue?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, confirm',
+        onPress: async () => {
+          setConfirmingJobId(safeJobId);
+          try {
+            await confirmJob(safeJobId);
+            setJobs((prev) =>
+              prev.map((entry) => entry.jobId === safeJobId ? { ...entry, status: 'completed' } : entry)
+            );
+            AppAlert.alert('Confirmed', 'Job completion confirmed.');
+          } catch (requestError) {
+            AppAlert.alert('Error', requestError?.message || 'Could not confirm completion.');
+          } finally {
+            setConfirmingJobId('');
+          }
+        },
+      },
+    ]);
+  }, []);
+
   const filteredJobs = useMemo(() => {
     if (activeTab === 'all') {
       return jobs;
@@ -419,8 +491,10 @@ const HistoryScreen = ({ navigation }) => {
       onViewDetails={null}
       onCancel={() => handleCancelJob(item.jobId)}
       onDelete={() => handleDeleteJob(item.jobId)}
+      onConfirmCompletion={() => handleConfirmCompletion(item.jobId)}
       cancelling={cancellingJobId === item.jobId}
       deleting={deletingJobId === item.jobId}
+      confirming={confirmingJobId === item.jobId}
       onRate={() =>
         navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DETAILS, {
           jobId: item.jobId,
@@ -434,7 +508,7 @@ const HistoryScreen = ({ navigation }) => {
         })
       }
     />
-  ), [navigation, handleCancelJob, handleDeleteJob, cancellingJobId, deletingJobId]);
+  ), [navigation, handleCancelJob, handleDeleteJob, handleConfirmCompletion, cancellingJobId, deletingJobId, confirmingJobId]);
 
   const listHeader = useMemo(() => (
     <View style={styles.tabsWrap}>
@@ -733,6 +807,22 @@ const styles = StyleSheet.create({
   },
   actionBtnCancelText: {
     color: '#E85578',
+    fontSize: 15,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  confirmRow: {
+    marginTop: 10,
+  },
+  actionBtnConfirm: {
+    borderWidth: 0.5,
+    borderRadius: 18,
+    borderColor: '#4CC968',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  actionBtnConfirmText: {
+    color: '#4CC968',
     fontSize: 15,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },

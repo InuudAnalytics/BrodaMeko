@@ -17,6 +17,7 @@ import { useChat } from '../../../context';
 import { useNotifications } from '../../../context';
 import { useUserLocation } from '../../../hooks/useUserLocation';
 import { getMechanicsForJob, hireMechanicForJob } from '../../../services/jobs.service';
+import { getMechanicReviews } from '../../../services/mechanic-reviews.service';
 import { darkTheme } from '../../../theme';
 import { ROUTES } from '../../../utils';
 import { parseAddressComponents, reverseGeocode } from '../../../utils/places';
@@ -117,7 +118,17 @@ const toPriceRange = (services, fallbackIssueType) => {
   return '';
 };
 
-const normalizeMechanic = (item, index, fallbackIssueType = '') => {
+const haversineKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const normalizeMechanic = (item, index, fallbackIssueType = '', userLat = null, userLon = null) => {
   const user = item?.user || {};
   const fullName =
     item?.name ||
@@ -179,6 +190,18 @@ const normalizeMechanic = (item, index, fallbackIssueType = '') => {
     .filter(Boolean)
     .join(' • ');
 
+  const computedDistanceKm = (() => {
+    const backendDist = parseMaybeNumber(item?.distance_km || item?.distance || 0);
+    if (backendDist > 0) return backendDist;
+    if (!userLat || !userLon) return 0;
+    const addresses = Array.isArray(item?.shop_addresses) ? item.shop_addresses : [];
+    const addr =
+      addresses.find((a) => a.is_primary && a.latitude && a.longitude) ||
+      addresses.find((a) => a.latitude && a.longitude);
+    if (!addr) return 0;
+    return Math.round(haversineKm(userLat, userLon, addr.latitude, addr.longitude) * 10) / 10;
+  })();
+
   return {
     id: String(item?.id || item?._id || item?.mechanic_id || `mech-${index}`),
     name: fullName,
@@ -186,8 +209,8 @@ const normalizeMechanic = (item, index, fallbackIssueType = '') => {
     avatarUri,
     details,
     rating: parseMaybeNumber(item?.rating || item?.average_rating || user?.rating || user?.average_rating || 0),
-    distanceKm: parseMaybeNumber(item?.distance_km || item?.distance || 0),
-    etaMins: parseMaybeNumber(item?.eta_minutes || item?.eta || 0),
+    distanceKm: computedDistanceKm,
+    etaMins: parseMaybeNumber(item?.eta_minutes || item?.eta || 0) || (computedDistanceKm > 0 ? Math.round((computedDistanceKm / 30) * 60) : 0),
     priceRange: priceRange || 'Price on request',
     available: item?.available !== false,
     raw: item,
@@ -371,10 +394,27 @@ const FindMechanicsScreen = ({ navigation, route }) => {
       const response = await getMechanicsForJob(jobId);
       const issueType = readIssueType(response) || issueSummary?.issueType || '';
       setMatchedIssueType(issueType);
+      const userLat = location?.latitude ?? null;
+      const userLon = location?.longitude ?? null;
       const nextMechanics = readMechanics(response).map((item, index) =>
-        normalizeMechanic(item, index, issueType)
+        normalizeMechanic(item, index, issueType, userLat, userLon)
       );
       setMechanics(nextMechanics);
+
+      if (nextMechanics.length > 0) {
+        const ratingResults = await Promise.allSettled(
+          nextMechanics.map((m) => getMechanicReviews(m.id))
+        );
+        setMechanics(
+          nextMechanics.map((m, i) => {
+            const result = ratingResults[i];
+            if (result.status !== 'fulfilled') return m;
+            const summary = result.value?.summary || result.value?.data?.summary || {};
+            const avgRating = parseMaybeNumber(summary?.avg_rating || 0);
+            return avgRating > 0 ? { ...m, rating: avgRating } : m;
+          })
+        );
+      }
     } catch (fetchError) {
       setError(fetchError?.message || 'Could not load mechanics.');
       setMechanics([]);
@@ -382,7 +422,7 @@ const FindMechanicsScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  }, [issueSummary?.issueType, jobId]);
+  }, [issueSummary?.issueType, jobId, location]);
 
   useFocusEffect(
     useCallback(() => {
