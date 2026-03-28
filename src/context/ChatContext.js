@@ -689,6 +689,19 @@ export const ChatProvider = ({ children }) => {
             return;
           }
 
+          const normalizedType = String(normalized?.type || normalized?.msg_type || '').trim().toLowerCase();
+          const hasContent =
+            String(normalized?.text || normalized?.message || normalized?.content || '').trim().length > 0 ||
+            Number(normalized?.amount) > 0 ||
+            normalizedType === 'system' ||
+            QUOTE_MESSAGE_TYPES.has(normalizedType) ||
+            normalizedType === 'image' ||
+            (Array.isArray(normalized?.images) && normalized.images.length > 0);
+
+          if (!hasContent) {
+            return;
+          }
+
           appendMessage(normalized.conversation_id, normalized);
         } catch (parseError) {
           // Ignore malformed payloads

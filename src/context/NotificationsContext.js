@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, InteractionManager } from 'react-native';
 import { registerDevice } from '../services/device.service';
 import { getNotifications } from '../services/notifications.service';
 import { useAuth } from './AuthContext';
@@ -261,9 +261,17 @@ export const NotificationsProvider = ({ children }) => {
     const source = !hadTokenRef.current && hasTokenNow ? 'login_access' : 'provider_active';
     hadTokenRef.current = hasTokenNow;
     checkAndSyncToken(source);
+
+    let permissionTask = null;
     if (source === 'login_access') {
-      syncGrantedToken({ source: 'login_access_force_register', forceRegister: true });
-      promptPermissionIfNeeded('login_access_auto_prompt');
+      // Defer permission prompt until after navigation animations finish.
+      // Calling requestPermission() mid-transition causes iOS to silently drop the dialog.
+      // Also avoid calling syncGrantedToken here: getFcmToken() before permission is granted
+      // can interfere with Firebase's APNs registration on iOS. promptPermissionIfNeeded
+      // handles token sync internally after the user grants.
+      permissionTask = InteractionManager.runAfterInteractions(() => {
+        promptPermissionIfNeeded('login_access_auto_prompt');
+      });
     }
 
     const unsubscribeMessage = listenForForegroundMessages(handleForegroundMessage);
@@ -279,6 +287,7 @@ export const NotificationsProvider = ({ children }) => {
     });
 
     return () => {
+      permissionTask?.cancel();
       if (registerRetryRef.current) {
         clearTimeout(registerRetryRef.current);
         registerRetryRef.current = null;
@@ -287,7 +296,7 @@ export const NotificationsProvider = ({ children }) => {
       unsubscribeOpen?.();
       unsubscribeRefresh?.();
     };
-  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, promptPermissionIfNeeded, registerToken, syncGrantedToken, token]);
+  }, [checkAndSyncToken, handleForegroundMessage, handleNotificationOpen, isBootstrapped, promptPermissionIfNeeded, registerToken, token]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {

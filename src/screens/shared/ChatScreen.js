@@ -319,7 +319,6 @@ const SharedChatScreen = ({
     sendTypingEvent,
     sendQuotation,
     respondQuotation,
-    initiatePaymentForJob,
     wsStatus,
     setChatActive,
   } = useChat();
@@ -329,10 +328,24 @@ const SharedChatScreen = ({
     [route?.params],
   );
   const hasRealConversation = conversationId !== 'local-preview';
-  const messages = useMemo(
-    () => messagesByConversationId[conversationId] || [],
-    [conversationId, messagesByConversationId],
-  );
+  const messages = useMemo(() => {
+    const raw = messagesByConversationId[conversationId] || [];
+    return [...raw]
+      .filter(item => {
+        const msgType = String(item?.type || item?.msg_type || '').trim().toLowerCase();
+        const hasText = String(item?.text || item?.message || item?.content || '').trim().length > 0;
+        const hasAmount = Number(item?.amount) > 0;
+        const isSystem = msgType === 'system';
+        const isQuote = isPriceQuoteMessage(item);
+        const isImage = msgType === 'image' || Array.isArray(item?.images) && item.images.length > 0;
+        return hasText || hasAmount || isSystem || isQuote || isImage;
+      })
+      .sort((a, b) => {
+        const tA = new Date(a?.created_at || 0).getTime();
+        const tB = new Date(b?.created_at || 0).getTime();
+        return tA - tB;
+      });
+  }, [conversationId, messagesByConversationId]);
   const isMechanic =
     currentUserRole === ROLES.MECH || route?.params?.userRole === 'mechanic';
 
@@ -582,73 +595,20 @@ const SharedChatScreen = ({
 
     try {
       const wallet = await getWalletBalance();
-      const availableBalance = readWalletAmount(wallet);
-      if (availableBalance < quoteAmount) {
-        AppAlert.alert(
-          'Insufficient wallet balance',
-          `You need ₦${quoteAmount.toLocaleString('en-NG')} but have ₦${availableBalance.toLocaleString('en-NG')}. Please fund your wallet and retry.`,
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Fund wallet',
-              onPress: () =>
-                navigation.navigate(ROUTES.CAR_OWNER_FUND_WALLET, {
-                  source: 'chat_quote_accept',
-                  quotationId,
-                  conversationId,
-                  jobId,
-                }),
-            },
-          ],
-        );
-        return;
-      }
+      const walletBalance = readWalletAmount(wallet);
 
-      const quotationResponse = await respondQuotation(conversationId, {
-        quotation_id: quotationId,
-        action: 'accept',
+      navigation.navigate(ROUTES.CAR_OWNER_ESCROW_FUNDING, {
+        quotationId,
+        conversationId,
+        jobId,
+        quoteAmount,
+        walletBalance,
+        issueSummary: route?.params?.issueSummary || {},
+        mechanic: route?.params?.mechanic || {},
+        mechanicId: String(route?.params?.mechanicId || '').trim(),
       });
-      if (!quotationResponse) {
-        AppAlert.alert('Error', 'Could not accept quotation.');
-        return;
-      }
-
-      const walletPaymentResponse = await initiatePaymentForJob(jobId, 'wallet');
-      const paymentPayload = walletPaymentResponse?.data || walletPaymentResponse || {};
-      const paymentCode = String(paymentPayload?.code || '').trim().toUpperCase();
-      if (paymentCode === 'INSUFFICIENT_BALANCE') {
-        const required = Number(paymentPayload?.required || quoteAmount);
-        const available = Number(paymentPayload?.available || availableBalance);
-        AppAlert.alert(
-          'Insufficient wallet balance',
-          `You need ₦${required.toLocaleString('en-NG')} but have ₦${available.toLocaleString('en-NG')}. Please fund your wallet and retry.`,
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Fund wallet',
-              onPress: () =>
-                navigation.navigate(ROUTES.CAR_OWNER_FUND_WALLET, {
-                  source: 'chat_quote_accept_wallet_initiate',
-                  quotationId,
-                  conversationId,
-                  jobId,
-                }),
-            },
-          ],
-        );
-        return;
-      }
-      if (!walletPaymentResponse) {
-        AppAlert.alert('Error', 'Could not secure payment in escrow.');
-        return;
-      }
-
-      if (quotationKey) {
-        setQuotationDecisions((prev) => ({ ...prev, [quotationKey]: 'accepted' }));
-      }
-      AppAlert.alert('Success', 'Quotation accepted and payment secured in escrow.');
     } catch (acceptError) {
-      AppAlert.alert('Error', acceptError?.message || 'Could not process quotation acceptance.');
+      AppAlert.alert('Error', acceptError?.message || 'Could not load payment screen.');
     } finally {
       if (quotationKey) {
         setAcceptingQuotationId('');
