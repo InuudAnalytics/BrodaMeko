@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -99,6 +99,16 @@ const FundWalletScreen = ({ navigation, route }) => {
     .toLowerCase();
   const openedFromCheckout =
     source.includes('checkout') || Boolean(route?.params?.fromCheckout);
+  const returnRoute = String(route?.params?.returnRoute || '').trim();
+  const returnParams = route?.params?.returnParams || undefined;
+
+  const handleDone = useCallback(() => {
+    if (returnRoute) {
+      navigation.navigate(returnRoute, returnParams);
+    } else {
+      navigation.goBack();
+    }
+  }, [navigation, returnRoute, returnParams]);
 
   const canSubmit = useMemo(() => Number(amount) >= 100, [amount]);
 
@@ -108,6 +118,19 @@ const FundWalletScreen = ({ navigation, route }) => {
       screenActiveRef.current = false;
     };
   }, []);
+
+  // Auto-navigate after successful credit.
+  useEffect(() => {
+    if (paymentState !== 'success') {
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (screenActiveRef.current) {
+        handleDone();
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [paymentState, handleDone]);
 
   const waitForWalletWebhookCredit = async (baseBalance, creditAmount) => {
     const expectedBalance =
@@ -429,6 +452,14 @@ const FundWalletScreen = ({ navigation, route }) => {
           <AppText style={styles.delayText}>Still processing, we will update shortly.</AppText>
         ) : null}
 
+        {(paymentState === 'success' || paymentState === 'delayed') ? (
+          <AppButton
+            label="Done"
+            onPress={handleDone}
+            style={styles.doneBtn}
+          />
+        ) : null}
+
         {error ? <AppText style={styles.errorText}>{error}</AppText> : null}
         {info ? <AppText style={styles.infoText}>{info}</AppText> : null}
         {/* {reference.trim() ? (
@@ -610,6 +641,9 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     marginTop: 8,
+  },
+  doneBtn: {
+    marginTop: 16,
   },
   errorText: {
     marginTop: 12,
