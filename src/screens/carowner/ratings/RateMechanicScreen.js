@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { AppButton, AppText, LiftableTextInput, ScreenContainer } from '../../../components';
 import { leaveMechanicReview } from '../../../services/mechanic-reviews.service';
@@ -11,16 +11,47 @@ const pad2 = (value) => String(value).padStart(2, '0');
 
 const makeBmId = (date = new Date()) => `#BM-${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}`;
 
-const Star = ({ filled }) => {
+const StarShape = ({ filled }) => (
+  <Svg width={52} height={52} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
+      fill={filled ? '#E6C714' : 'transparent'}
+      stroke={filled ? '#E6C714' : 'rgba(245,245,245,0.8)'}
+      strokeWidth={1.25}
+    />
+  </Svg>
+);
+
+const AnimatedStar = ({ value, rating, onPress }) => {
+  const filled = value <= rating;
+  const fillOpacity = useRef(new Animated.Value(filled ? 1 : 0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(fillOpacity, {
+      toValue: value <= rating ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [fillOpacity, rating, value]);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.28, duration: 90, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+    onPress(value);
+  };
+
   return (
-    <Svg width={52} height={52} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9L12 3.5Z"
-        fill={filled ? '#E6C714' : 'transparent'}
-        stroke={filled ? '#E6C714' : 'rgba(245,245,245,0.8)'}
-        strokeWidth={1.25}
-      />
-    </Svg>
+    <Pressable onPress={handlePress} hitSlop={10}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <StarShape filled={false} />
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fillOpacity }]}>
+          <StarShape filled />
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
   );
 };
 
@@ -120,9 +151,7 @@ const RateMechanicScreen = ({ navigation, route }) => {
           <AppText style={styles.sectionTitle}>Service rating</AppText>
           <View style={styles.starRow}>
             {[1, 2, 3, 4, 5].map((value) => (
-              <Pressable key={value} onPress={() => setRating(value)} hitSlop={8}>
-                <Star filled={value <= rating} />
-              </Pressable>
+              <AnimatedStar key={value} value={value} rating={rating} onPress={setRating} />
             ))}
           </View>
         </View>

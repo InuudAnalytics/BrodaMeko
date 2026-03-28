@@ -36,6 +36,7 @@ const TRACKER_STEPS = [
   { key: 'en_route', label: 'En Route' },
   { key: 'arrived', label: 'Arrived' },
   { key: 'in_progress', label: 'Repairing' },
+  { key: 'mechanic_completed', label: 'Pending Confirm' },
   { key: 'completed', label: 'Completed' },
   { key: 'disputed', label: 'Disputed' },
 ];
@@ -65,6 +66,10 @@ const normalizeProgressStatus = (value) => {
 
   if (status === 'repairing' || status === 'in_progress') {
     return 'in_progress';
+  }
+
+  if (status === 'mechanic_completed') {
+    return 'mechanic_completed';
   }
 
   if (status === 'completed' || status === 'done') {
@@ -605,8 +610,9 @@ const DashboardScreen = ({ navigation, route }) => {
   const handleConfirmCompletion = async () => {
     const jobId = String(activeSession?.jobId || '').trim();
     const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+    const canConfirm = progressStatus === 'completed' || progressStatus === 'mechanic_completed';
 
-    if (!jobId || syncing || progressStatus !== 'completed') {
+    if (!jobId || syncing || !canConfirm) {
       return;
     }
 
@@ -636,8 +642,9 @@ const DashboardScreen = ({ navigation, route }) => {
   const handleDisputeJob = () => {
     const jobId = String(activeSession?.jobId || '').trim();
     const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+    const canDispute = progressStatus === 'completed' || progressStatus === 'mechanic_completed';
 
-    if (!jobId || progressStatus !== 'completed') {
+    if (!jobId || !canDispute) {
       return;
     }
     navigation.navigate(ROUTES.JOB_DISPUTE, { jobId });
@@ -663,6 +670,8 @@ const DashboardScreen = ({ navigation, route }) => {
     const currentStepIndex = TRACKER_STEPS.findIndex((item) => item.key === progressStatus);
     const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
     const isCompleted = progressStatus === 'completed';
+    const isMechanicCompleted = progressStatus === 'mechanic_completed';
+    const canConfirmOrDispute = isCompleted || isMechanicCompleted;
     const isDisputed = progressStatus === 'disputed';
     const canOwnerCancel = progressStatus === 'pending' || progressStatus === 'accepted';
     const isTransitOrRepair = progressStatus === 'en_route' || progressStatus === 'arrived' || progressStatus === 'in_progress';
@@ -698,7 +707,7 @@ const DashboardScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-        {!isCompleted ? (
+        {!canConfirmOrDispute ? (
           <View style={styles.trackActions}>
             <AppButton label="Message" onPress={handleOpenChat} style={styles.trackBtn} />
             {canOwnerCancel ? (
@@ -724,6 +733,13 @@ const DashboardScreen = ({ navigation, route }) => {
               </AppText>
             </View>
           ) : null}
+          {isMechanicCompleted ? (
+            <View style={styles.phaseNotice}>
+              <AppText style={styles.phaseNoticeText}>
+                Mechanic has marked this job complete. Please confirm or raise a dispute below.
+              </AppText>
+            </View>
+          ) : null}
           {isDisputed ? (
             <TouchableOpacity
               style={styles.secondaryAction}
@@ -738,7 +754,7 @@ const DashboardScreen = ({ navigation, route }) => {
               <AppText style={styles.secondaryActionText}>View dispute status</AppText>
             </TouchableOpacity>
           ) : null}
-          {isCompleted ? (
+          {canConfirmOrDispute ? (
             <>
               <View style={styles.postCompleteRow}>
                 <AppButton
