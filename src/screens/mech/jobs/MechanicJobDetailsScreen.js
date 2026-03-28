@@ -2,10 +2,12 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowLeft01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, CallAdd01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
 import { AppButton, AppText, ScreenContainer } from '../../../components';
 import { getMechanicAssignedJob, updateJobStatus } from '../../../services/jobs.service';
+import { startCall, getActiveCallForContext } from '../../../services/calls.service';
 import { darkTheme } from '../../../theme';
+import { ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
 const readJob = (response) => {
   const payload = response?.data || response || {};
@@ -185,6 +187,41 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
     }
   };
 
+  const calleeId = String(
+    job?.car_owner?.id || job?.owner?.id || job?.user?.id || '',
+  ).trim();
+
+  const handleCall = useCallback(async () => {
+    if (!calleeId || !jobId) {
+      AppAlert.alert('Error', 'Cannot start call — missing contact info.');
+      return;
+    }
+    const clientCallId = `app-job-${jobId}-${Date.now()}`;
+    const navParams = {
+      calleeName: customerName,
+      contextLabel: `Job #${jobId}`,
+      contextType: 'job',
+      contextId: jobId,
+    };
+    try {
+      const response = await startCall({ context_type: 'job', context_id: jobId, callee_id: calleeId, client_call_id: clientCallId });
+      const callId = response?.data?.call_id || response?.data?.id || response?.call_id || response?.id;
+      navigation.navigate(ROUTES.CALL_OUTGOING, { ...navParams, callId });
+    } catch {
+      try {
+        const existing = await getActiveCallForContext({ context_type: 'job', context_id: jobId });
+        const callId = existing?.data?.call_id || existing?.data?.id || existing?.call_id || existing?.id;
+        if (callId) {
+          navigation.navigate(ROUTES.CALL_OUTGOING, { ...navParams, callId });
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      AppAlert.alert('Error', 'Could not start call. Please try again.');
+    }
+  }, [calleeId, customerName, jobId, navigation]);
+
   return (
     <ScreenContainer style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -232,7 +269,14 @@ const MechanicJobDetailsScreen = ({ navigation, route }) => {
             </View>
             <View style={styles.row}>
               <AppText style={styles.label}>Customer</AppText>
-              <AppText style={styles.value}>{customerName}</AppText>
+              <View style={styles.customerCell}>
+                <AppText style={styles.value}>{customerName}</AppText>
+                {calleeId ? (
+                  <TouchableOpacity style={styles.callIconBtn} activeOpacity={0.8} onPress={handleCall}>
+                    <HugeiconsIcon icon={CallAdd01Icon} size={18} color={darkTheme.colors.accent} strokeWidth={2} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
 
             <AppText style={styles.imagesTitle}>Images</AppText>
@@ -352,6 +396,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
     textAlign: 'right',
+  },
+  customerCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    columnGap: 8,
+  },
+  callIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: darkTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   imagesTitle: {
     marginTop: 6,
