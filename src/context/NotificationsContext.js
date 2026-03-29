@@ -29,6 +29,50 @@ const normalizeRemoteMessage = (message) => {
   };
 };
 
+// Title-based fallback routing — used until backend sends data.screen on every notification.
+// When the backend adds data payloads, data.screen takes priority automatically.
+const TITLE_ROUTE_MAP = {
+  // Jobs — car owner receives
+  'Mechanic En Route':         { routeName: 'CarOwnerLiveTracking' },
+  'Mechanic Arrived':          { routeName: 'CarOwnerLiveTracking' },
+  'Job In Progress':           { routeName: 'CarOwnerLiveTracking' },
+  'Job Completed - Confirm?':  { routeName: 'CarOwnerHistory' },
+  'Job Cancelled':             { routeName: 'CarOwnerHistory' },
+  // Jobs — mechanic receives
+  'New Hire Request':          { routeName: 'MechanicDashboardTabs' },
+  'Payment Released':          { routeName: 'MechanicDashboardTabs' },
+  'Payment Released (Auto-Confirmed)': { routeName: 'MechanicDashboardTabs' },
+  'Job Disputed':              { routeName: 'Disputes' },
+  // Hire response — car owner receives
+  'Job Request Accepted':      { routeName: 'CarOwnerLiveTracking' },
+  'Job Request Declined':      { routeName: 'CarOwnerDashboard' },
+  // Chat & quotations
+  'New Quotation':             { routeName: 'CarOwnerHistory' },
+  'Quotation Rejected':        { routeName: 'MechanicDashboardTabs' },
+  'Job Assigned':              { routeName: 'MechanicDashboardTabs' },
+  'New Image':                 { routeName: 'Notifications' },
+  // Payments & wallet
+  'Payment Received':          { routeName: 'MechanicDashboardTabs' },
+  'Payment Secured':           { routeName: 'MechanicDashboardTabs' },
+  'Wallet Funded':             { routeName: 'CarOwnerDashboard' },
+  'Withdrawal Successful':     { routeName: 'CarOwnerDashboard' },
+  'Withdrawal Failed':         { routeName: 'CarOwnerDashboard' },
+  // Orders & marketplace
+  'Order Placed!':             { routeName: 'CarOwnerMarketplace' },
+  'Order Confirmed!':          { routeName: 'CarOwnerMarketplace' },
+  'New Order!':                { routeName: 'SparePartsTabs' },
+  // Disputes
+  'Dispute Filed':             { routeName: 'Disputes' },
+  'Order Dispute Filed':       { routeName: 'Disputes' },
+  'Dispute Under Review':      { routeName: 'Disputes' },
+  // Support
+  'Support Reply':             { routeName: 'SupportChat' },
+  'Support Image':             { routeName: 'SupportChat' },
+  'Ticket Resolved':           { routeName: 'Support' },
+  // Reviews
+  'New Review':                { routeName: 'UserReviews' },
+};
+
 const getNavigationTarget = (message) => {
   const data = message?.data || {};
   const callTarget = buildCallNavigationTarget(data);
@@ -36,6 +80,7 @@ const getNavigationTarget = (message) => {
     return callTarget;
   }
 
+  // Prefer explicit screen from backend data payload
   const routeName = String(data?.screen || data?.route || data?.screen_name || '').trim();
   let params = data?.params && typeof data.params === 'object' ? data.params : {};
   if (!Object.keys(params).length && typeof data?.params === 'string') {
@@ -51,6 +96,12 @@ const getNavigationTarget = (message) => {
 
   if (routeName) {
     return { routeName, params };
+  }
+
+  // Fall back to title-based routing
+  const title = String(message?.notification?.title || data?.title || '').trim();
+  if (title && TITLE_ROUTE_MAP[title]) {
+    return TITLE_ROUTE_MAP[title];
   }
 
   return { routeName: 'Notifications', params: {} };
