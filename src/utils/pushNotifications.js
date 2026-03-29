@@ -49,50 +49,69 @@ const normalizeMessagingAuthorizationStatus = (status) => {
 
 const checkAndroidNotificationPermission = async () => {
   try {
+    console.log('[Notifications][Android] Platform.Version:', Platform.Version);
     if (Platform.Version < 33) {
+      console.log('[Notifications][Android] Below API 33 — auto-granted');
       return 'granted';
     }
 
     const permission = PERMISSIONS.ANDROID.POST_NOTIFICATIONS;
+    console.log('[Notifications][Android] POST_NOTIFICATIONS constant:', permission);
     if (!permission) {
-      return 'granted';
+      console.warn('[Notifications][Android] POST_NOTIFICATIONS is undefined — react-native-permissions may need upgrading');
+      return 'unknown';
     }
 
     const result = await check(permission);
-    return normalizePermissionStatus(result);
+    const normalized = normalizePermissionStatus(result);
+    console.log('[Notifications][Android] check result:', result, '→', normalized);
+    return normalized;
   } catch (error) {
+    console.warn('[Notifications][Android] checkAndroidNotificationPermission error:', error?.message);
     return 'unknown';
   }
 };
 
 const requestAndroidNotificationPermission = async () => {
   try {
+    console.log('[Notifications][Android] Platform.Version:', Platform.Version);
     if (Platform.Version < 33) {
+      console.log('[Notifications][Android] Below API 33 — auto-granted');
       return 'granted';
     }
 
     const permission = PERMISSIONS.ANDROID.POST_NOTIFICATIONS;
+    console.log('[Notifications][Android] POST_NOTIFICATIONS constant:', permission);
     if (!permission) {
-      return 'granted';
+      console.warn('[Notifications][Android] POST_NOTIFICATIONS is undefined — react-native-permissions may need upgrading');
+      return 'unknown';
     }
 
     const current = await check(permission);
+    console.log('[Notifications][Android] pre-request check:', current);
     if (current === RESULTS.GRANTED) {
+      console.log('[Notifications][Android] already granted');
       return 'granted';
     }
     if (current === RESULTS.BLOCKED) {
+      console.log('[Notifications][Android] blocked — user must enable from Settings');
       return 'blocked';
     }
 
+    console.log('[Notifications][Android] calling request()...');
     const result = await request(permission);
-    return normalizePermissionStatus(result);
+    const normalized = normalizePermissionStatus(result);
+    console.log('[Notifications][Android] request result:', result, '→', normalized);
+    return normalized;
   } catch (error) {
+    console.warn('[Notifications][Android] requestAndroidNotificationPermission error:', error?.message);
     return 'unknown';
   }
 };
 
 const checkIosNotificationPermission = async (messagingState) => {
   if (!messagingState) {
+    console.warn('[Notifications][iOS] messagingState is null — Firebase messaging not available');
     return 'unknown';
   }
 
@@ -102,25 +121,33 @@ const checkIosNotificationPermission = async (messagingState) => {
       type === 'modular' && messagingModule?.hasPermission
         ? await messagingModule.hasPermission(messaging)
         : await messaging().hasPermission();
-    return normalizeMessagingAuthorizationStatus(status);
+    const normalized = normalizeMessagingAuthorizationStatus(status);
+    console.log('[Notifications][iOS] check status:', status, '→', normalized);
+    return normalized;
   } catch (error) {
+    console.warn('[Notifications][iOS] checkIosNotificationPermission error:', error?.message);
     return 'unknown';
   }
 };
 
 const requestIosNotificationPermission = async (messagingState) => {
   if (!messagingState) {
+    console.warn('[Notifications][iOS] messagingState is null — Firebase messaging not available');
     return 'unknown';
   }
 
   try {
     const { type, messaging, messagingModule } = messagingState;
+    console.log('[Notifications][iOS] calling requestPermission...');
     const status =
       type === 'modular' && messagingModule?.requestPermission
         ? await messagingModule.requestPermission(messaging)
         : await messaging().requestPermission();
-    return normalizePermissionStatus(status);
+    const normalized = normalizePermissionStatus(status);
+    console.log('[Notifications][iOS] request status:', status, '→', normalized);
+    return normalized;
   } catch (error) {
+    console.warn('[Notifications][iOS] requestIosNotificationPermission error:', error?.message);
     return 'unknown';
   }
 };
