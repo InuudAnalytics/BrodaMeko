@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { check, request, PERMISSIONS, RESULTS, checkNotifications, requestNotifications } from 'react-native-permissions';
 
 const loadMessagingModules = () => {
   try {
@@ -50,21 +50,9 @@ const normalizeMessagingAuthorizationStatus = (status) => {
 const checkAndroidNotificationPermission = async () => {
   try {
     console.log('[Notifications][Android] Platform.Version:', Platform.Version);
-    if (Platform.Version < 33) {
-      console.log('[Notifications][Android] Below API 33 — auto-granted');
-      return 'granted';
-    }
-
-    const permission = PERMISSIONS.ANDROID.POST_NOTIFICATIONS;
-    console.log('[Notifications][Android] POST_NOTIFICATIONS constant:', permission);
-    if (!permission) {
-      console.warn('[Notifications][Android] POST_NOTIFICATIONS is undefined — react-native-permissions may need upgrading');
-      return 'unknown';
-    }
-
-    const result = await check(permission);
-    const normalized = normalizePermissionStatus(result);
-    console.log('[Notifications][Android] check result:', result, '→', normalized);
+    const { status } = await checkNotifications();
+    const normalized = normalizePermissionStatus(status);
+    console.log('[Notifications][Android] checkNotifications status:', status, '→', normalized);
     return normalized;
   } catch (error) {
     console.warn('[Notifications][Android] checkAndroidNotificationPermission error:', error?.message);
@@ -75,33 +63,22 @@ const checkAndroidNotificationPermission = async () => {
 const requestAndroidNotificationPermission = async () => {
   try {
     console.log('[Notifications][Android] Platform.Version:', Platform.Version);
-    if (Platform.Version < 33) {
-      console.log('[Notifications][Android] Below API 33 — auto-granted');
-      return 'granted';
-    }
+    const { status: currentStatus } = await checkNotifications();
+    console.log('[Notifications][Android] pre-request checkNotifications:', currentStatus);
 
-    const permission = PERMISSIONS.ANDROID.POST_NOTIFICATIONS;
-    console.log('[Notifications][Android] POST_NOTIFICATIONS constant:', permission);
-    if (!permission) {
-      console.warn('[Notifications][Android] POST_NOTIFICATIONS is undefined — react-native-permissions may need upgrading');
-      return 'unknown';
-    }
-
-    const current = await check(permission);
-    console.log('[Notifications][Android] pre-request check:', current);
-    if (current === RESULTS.GRANTED) {
+    if (currentStatus === RESULTS.GRANTED) {
       console.log('[Notifications][Android] already granted');
       return 'granted';
     }
-    if (current === RESULTS.BLOCKED) {
+    if (currentStatus === RESULTS.BLOCKED) {
       console.log('[Notifications][Android] blocked — user must enable from Settings');
       return 'blocked';
     }
 
-    console.log('[Notifications][Android] calling request()...');
-    const result = await request(permission);
-    const normalized = normalizePermissionStatus(result);
-    console.log('[Notifications][Android] request result:', result, '→', normalized);
+    console.log('[Notifications][Android] calling requestNotifications...');
+    const { status } = await requestNotifications([]);
+    const normalized = normalizePermissionStatus(status);
+    console.log('[Notifications][Android] requestNotifications result:', status, '→', normalized);
     return normalized;
   } catch (error) {
     console.warn('[Notifications][Android] requestAndroidNotificationPermission error:', error?.message);
