@@ -86,20 +86,11 @@ const requestAndroidNotificationPermission = async () => {
   }
 };
 
-const checkIosNotificationPermission = async (messagingState) => {
-  if (!messagingState) {
-    console.warn('[Notifications][iOS] messagingState is null — Firebase messaging not available');
-    return 'unknown';
-  }
-
+const checkIosNotificationPermission = async () => {
   try {
-    const { type, messaging, messagingModule } = messagingState;
-    const status =
-      type === 'modular' && messagingModule?.hasPermission
-        ? await messagingModule.hasPermission(messaging)
-        : await messaging().hasPermission();
-    const normalized = normalizeMessagingAuthorizationStatus(status);
-    console.log('[Notifications][iOS] check status:', status, '→', normalized);
+    const { status } = await checkNotifications();
+    const normalized = normalizePermissionStatus(status);
+    console.log('[Notifications][iOS] checkNotifications status:', status, '→', normalized);
     return normalized;
   } catch (error) {
     console.warn('[Notifications][iOS] checkIosNotificationPermission error:', error?.message);
@@ -107,21 +98,20 @@ const checkIosNotificationPermission = async (messagingState) => {
   }
 };
 
-const requestIosNotificationPermission = async (messagingState) => {
-  if (!messagingState) {
-    console.warn('[Notifications][iOS] messagingState is null — Firebase messaging not available');
-    return 'unknown';
-  }
-
+const requestIosNotificationPermission = async () => {
   try {
-    const { type, messaging, messagingModule } = messagingState;
-    console.log('[Notifications][iOS] calling requestPermission...');
-    const status =
-      type === 'modular' && messagingModule?.requestPermission
-        ? await messagingModule.requestPermission(messaging)
-        : await messaging().requestPermission();
+    const { status: currentStatus } = await checkNotifications();
+    console.log('[Notifications][iOS] pre-request checkNotifications:', currentStatus);
+
+    if (currentStatus === RESULTS.BLOCKED) {
+      console.log('[Notifications][iOS] blocked — user must enable from Settings');
+      return 'blocked';
+    }
+
+    console.log('[Notifications][iOS] calling requestNotifications...');
+    const { status } = await requestNotifications(['alert', 'badge', 'sound']);
     const normalized = normalizePermissionStatus(status);
-    console.log('[Notifications][iOS] request status:', status, '→', normalized);
+    console.log('[Notifications][iOS] requestNotifications result:', status, '→', normalized);
     return normalized;
   } catch (error) {
     console.warn('[Notifications][iOS] requestIosNotificationPermission error:', error?.message);
@@ -130,23 +120,19 @@ const requestIosNotificationPermission = async (messagingState) => {
 };
 
 export const checkNotificationPermission = async () => {
-  const messagingState = getMessagingState();
-
   if (Platform.OS === 'android') {
     return checkAndroidNotificationPermission();
   }
 
-  return checkIosNotificationPermission(messagingState);
+  return checkIosNotificationPermission();
 };
 
 export const requestNotificationPermission = async () => {
-  const messagingState = getMessagingState();
-
   if (Platform.OS === 'android') {
     return requestAndroidNotificationPermission();
   }
 
-  return requestIosNotificationPermission(messagingState);
+  return requestIosNotificationPermission();
 };
 
 export const getFcmToken = async () => {
