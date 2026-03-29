@@ -189,7 +189,9 @@ const normalizeTransaction = (item, index, source) => {
   const createdAtMs = Number.isFinite(parsedTime) ? parsedTime : 0;
   const baseTitle = item?.title || item?.narration || item?.description || '';
   const isWithdrawal = source === 'withdrawals' || type.includes('withdraw');
-  const resolvedTitle = baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
+  const resolvedTitle = type === 'escrow_release'
+    ? 'Escrow Release'
+    : baseTitle || (isWithdrawal ? 'Withdrawn' : 'Transaction');
   const isDebitType =
     isWithdrawal ||
     type.includes('debit') ||
