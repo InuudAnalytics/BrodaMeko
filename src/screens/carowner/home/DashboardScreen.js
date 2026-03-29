@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Image, InteractionManager, PanResponder, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Image, InteractionManager, Linking, PanResponder, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowRight01Icon, Location06Icon, Mail01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
-import { openSettings } from 'react-native-permissions';
 import {
   AppBottomNav,
   AppButton,
@@ -257,7 +256,7 @@ const DashboardScreen = ({ navigation, route }) => {
     if (!LOCATION_ENABLED) {
       return;
     }
-    if (locationStatus !== 'unknown') {
+    if (locationStatus !== 'unknown' && locationStatus !== 'denied') {
       return;
     }
     if (notifStatus === 'unknown') {
@@ -893,7 +892,7 @@ const DashboardScreen = ({ navigation, route }) => {
           <LocationFallbackCard
             isBlocked={isLocationBlocked}
             onEnableLocation={handleEnableLocation}
-            onOpenSettings={openSettings}
+            onOpenSettings={() => Linking.openSettings()}
             loading={loading}
             locationEnabled={LOCATION_ENABLED}
           />

@@ -1,15 +1,20 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Image,
+  Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { check, PERMISSIONS, request, RESULTS } from 'react-native-permissions';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -41,6 +46,11 @@ import { getCarOwnerJobs, getMechanicAssignedJobs, getMechanicJobStats } from '.
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
+import { LOCATION_ENABLED } from '../../../config/featureFlags';
+
+const LOCATION_PERMISSION = Platform.OS === 'ios'
+  ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+  : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
 
 const getSettingsRows = (role) => {
   const rows = [
@@ -63,6 +73,13 @@ const getSettingsRows = (role) => {
 
   rows.push(
     { key: 'notifications', label: 'Notifications', icon: Notification01Icon },
+  );
+
+  if (LOCATION_ENABLED) {
+    rows.push({ key: 'location', label: 'Location', icon: Location01Icon });
+  }
+
+  rows.push(
     { key: 'legal_documents', label: 'Legal documents', icon: Briefcase01Icon },
     { key: 'help', label: 'Help & Support', icon: HelpCircleIcon },
     { key: 'logout', label: 'Logout', icon: Logout02Icon, tone: 'danger' }
@@ -131,6 +148,21 @@ const SettingRow = ({ label, icon, onPress, isLast, tone }) => {
   );
 };
 
+const LocationToggleRow = ({ isGranted, onToggle, isLast }) => (
+  <View style={[styles.settingRow, isLast ? styles.settingRowLast : null]}>
+    <View style={styles.settingLeft}>
+      <HugeiconsIcon icon={Location01Icon} size={20} color="rgba(255,255,255,0.42)" strokeWidth={1.9} />
+      <AppText style={styles.settingLabel}>Location</AppText>
+    </View>
+    <Switch
+      value={isGranted}
+      onValueChange={onToggle}
+      trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(230,199,20,0.55)' }}
+      thumbColor={isGranted ? darkTheme.colors.accent : 'rgba(255,255,255,0.55)'}
+    />
+  </View>
+);
+
 const UserProfileScreen = ({ navigation, onBack }) => {
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
@@ -149,6 +181,9 @@ const UserProfileScreen = ({ navigation, onBack }) => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [locationGranted, setLocationGranted] = useState(false);
+  const [showLocationOffModal, setShowLocationOffModal] = useState(false);
+  const appStateRef = useRef(AppState.currentState);
   const totalCountLabel = role === ROLES.SPARE_PARTS_SELLER ? 'Total orders' : 'Total jobs';
 
   const profile = readUser(user);
@@ -162,6 +197,52 @@ const UserProfileScreen = ({ navigation, onBack }) => {
   const currentRecoveryVerified = Boolean(
     user?.recovery_email_verified ?? user?.recoveryEmailVerified ?? false
   );
+
+  useEffect(() => {
+    if (!LOCATION_ENABLED) return;
+
+    const syncPermission = async () => {
+      try {
+        const result = await check(LOCATION_PERMISSION);
+        setLocationGranted(result === RESULTS.GRANTED || result === RESULTS.LIMITED);
+      } catch (_) {}
+    };
+
+    syncPermission();
+
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (appStateRef.current !== 'active' && nextState === 'active') {
+        syncPermission();
+      }
+      appStateRef.current = nextState;
+    });
+
+    return () => sub.remove();
+  }, []);
+
+  const handleLocationToggle = useCallback(async (value) => {
+    if (!value) {
+      setShowLocationOffModal(true);
+      return;
+    }
+    try {
+      const current = await check(LOCATION_PERMISSION);
+      console.log('[Location] check result:', current);
+      if (current === RESULTS.BLOCKED) {
+        setShowLocationOffModal(true);
+        return;
+      }
+      const result = await request(LOCATION_PERMISSION);
+      console.log('[Location] request result:', result);
+      const granted = result === RESULTS.GRANTED || result === RESULTS.LIMITED;
+      setLocationGranted(granted);
+      if (!granted) {
+        setShowLocationOffModal(true);
+      }
+    } catch (e) {
+      console.log('[Location] toggle error:', e);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -415,13 +496,25 @@ const UserProfileScreen = ({ navigation, onBack }) => {
 
         <AppText style={styles.settingsTitle}>Settings</AppText>
         <View style={styles.settingsCard}>
-          {getSettingsRows(role).map((row, index, array) => (
+          {getSettingsRows(role).map((row, index, array) => {
+            const isLast = index === array.length - 1;
+            if (row.key === 'location') {
+              return (
+                <LocationToggleRow
+                  key="location"
+                  isGranted={locationGranted}
+                  onToggle={handleLocationToggle}
+                  isLast={isLast}
+                />
+              );
+            }
+            return (
             <SettingRow
               key={row.key}
               label={row.key === 'logout' && isSigningOut ? 'Logging out...' : row.label}
               icon={row.icon}
               tone={row.tone}
-              isLast={index === array.length - 1}
+              isLast={isLast}
               onPress={() => {
                 if (row.key === 'help') {
                   setShowSupportSheet(true);
@@ -474,7 +567,8 @@ const UserProfileScreen = ({ navigation, onBack }) => {
                 }
               }}
             />
-          ))}
+            );
+          })}
         </View>
 
         <AppButton
@@ -645,6 +739,39 @@ const UserProfileScreen = ({ navigation, onBack }) => {
           </View>
         </View>
       </Modal>
+      <Modal
+        visible={showLocationOffModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLocationOffModal(false)}
+      >
+        <View style={styles.deleteModalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowLocationOffModal(false)} />
+          <View style={styles.deleteCard}>
+            <AppText style={styles.deleteTitle}>Manage location access</AppText>
+            <AppText style={styles.deleteSubtitle}>
+              Location permissions can only be changed from your phone's Settings. Tap below to open Settings and set access to "Allow" or "Ask every time" — then come back and tap the toggle once more to confirm.
+            </AppText>
+            <View style={styles.deleteActions}>
+              <AppButton
+                label="Open Settings"
+                onPress={() => {
+                  setShowLocationOffModal(false);
+                  Linking.openSettings();
+                }}
+              />
+              <TouchableOpacity
+                style={styles.cancelDeleteBtn}
+                activeOpacity={0.85}
+                onPress={() => setShowLocationOffModal(false)}
+              >
+                <AppText style={styles.cancelDeleteText}>Cancel</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </ScreenContainer>
   );
 };
