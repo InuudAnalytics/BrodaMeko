@@ -131,6 +131,13 @@ export const useUserLocation = () => {
     setLoading(true);
     setError(null);
 
+    // Safety net: if the OS drops the permission dialog (e.g., another dialog
+    // was active), request() can hang indefinitely. Clear loading after 12s.
+    let safetyTimer = setTimeout(() => {
+      safetyTimer = null;
+      setLoading(false);
+    }, 12000);
+
     try {
       const checkedStatus = await check(LOCATION_PERMISSION);
       let normalized = normalizePermissionStatus(checkedStatus);
@@ -155,6 +162,9 @@ export const useUserLocation = () => {
       setError(requestError?.message || 'Location permission request failed.');
       return PERMISSION_STATE.blocked;
     } finally {
+      if (safetyTimer !== null) {
+        clearTimeout(safetyTimer);
+      }
       setLoading(false);
     }
   }, [refreshOnce]);

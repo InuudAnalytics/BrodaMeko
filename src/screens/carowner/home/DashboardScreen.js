@@ -266,7 +266,11 @@ const DashboardScreen = ({ navigation, route }) => {
       return;
     }
     hasAutoRequestedLocationRef.current = true;
-    requestPermission();
+    // Delay so any active notification dialog fully dismisses before the
+    // location dialog appears — iOS silently drops dialogs shown simultaneously,
+    // which also causes the location request() promise to hang indefinitely.
+    const t = setTimeout(() => { requestPermission(); }, 900);
+    return () => clearTimeout(t);
   }, [notificationPermissionStatus, permissionStatus, requestPermission]);
 
   useFocusEffect(
