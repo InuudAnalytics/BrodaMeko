@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { check, request, PERMISSIONS, RESULTS, checkNotifications, requestNotifications } from 'react-native-permissions';
+import { RESULTS, checkNotifications, requestNotifications } from 'react-native-permissions';
 
 const loadMessagingModules = () => {
   try {
@@ -86,11 +86,24 @@ const requestAndroidNotificationPermission = async () => {
   }
 };
 
+// iOS: use Firebase messaging directly — it calls requestAuthorizationWithOptions
+// and immediately registers for APNs in the correct sequence. Using
+// react-native-permissions for notifications on iOS conflicts with Firebase
+// and can cause FCM token retrieval to fail (firebase-ios-sdk #7272).
 const checkIosNotificationPermission = async () => {
   try {
-    const { status } = await checkNotifications();
-    const normalized = normalizePermissionStatus(status);
-    console.log('[Notifications][iOS] checkNotifications status:', status, '→', normalized);
+    const messagingState = getMessagingState();
+    if (!messagingState) {
+      console.warn('[Notifications][iOS] Firebase messaging not available');
+      return 'unknown';
+    }
+    const { type, messaging, messagingModule } = messagingState;
+    const status =
+      type === 'modular' && messagingModule?.hasPermission
+        ? await messagingModule.hasPermission(messaging)
+        : await messaging().hasPermission();
+    const normalized = normalizeMessagingAuthorizationStatus(status);
+    console.log('[Notifications][iOS] messaging.hasPermission:', status, '→', normalized);
     return normalized;
   } catch (error) {
     console.warn('[Notifications][iOS] checkIosNotificationPermission error:', error?.message);
@@ -100,18 +113,35 @@ const checkIosNotificationPermission = async () => {
 
 const requestIosNotificationPermission = async () => {
   try {
-    const { status: currentStatus } = await checkNotifications();
-    console.log('[Notifications][iOS] pre-request checkNotifications:', currentStatus);
+    const messagingState = getMessagingState();
+    if (!messagingState) {
+      console.warn('[Notifications][iOS] Firebase messaging not available');
+      return 'unknown';
+    }
+    const { type, messaging, messagingModule } = messagingState;
 
-    if (currentStatus === RESULTS.BLOCKED) {
-      console.log('[Notifications][iOS] blocked — user must enable from Settings');
+    // Check current status first — if already granted or blocked, skip request
+    const currentStatus =
+      type === 'modular' && messagingModule?.hasPermission
+        ? await messagingModule.hasPermission(messaging)
+        : await messaging().hasPermission();
+    const currentNormalized = normalizeMessagingAuthorizationStatus(currentStatus);
+    console.log('[Notifications][iOS] pre-request hasPermission:', currentStatus, '→', currentNormalized);
+
+    if (currentNormalized === 'granted') {
+      return 'granted';
+    }
+    if (currentNormalized === 'blocked') {
       return 'blocked';
     }
 
-    console.log('[Notifications][iOS] calling requestNotifications...');
-    const { status } = await requestNotifications(['alert', 'badge', 'sound']);
-    const normalized = normalizePermissionStatus(status);
-    console.log('[Notifications][iOS] requestNotifications result:', status, '→', normalized);
+    console.log('[Notifications][iOS] calling messaging.requestPermission...');
+    const requestedStatus =
+      type === 'modular' && messagingModule?.requestPermission
+        ? await messagingModule.requestPermission(messaging)
+        : await messaging().requestPermission();
+    const normalized = normalizeMessagingAuthorizationStatus(requestedStatus);
+    console.log('[Notifications][iOS] requestPermission result:', requestedStatus, '→', normalized);
     return normalized;
   } catch (error) {
     console.warn('[Notifications][iOS] requestIosNotificationPermission error:', error?.message);

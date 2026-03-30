@@ -5,6 +5,16 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# react-native-permissions: opt-in native handlers (required in v5+)
+def node_require_permissions(script)
+  require Pod::Executable.execute_command('node', ['-p',
+    "require.resolve('#{script}', {paths: [process.argv[1]]})", __dir__]).strip
+end
+node_require_permissions('react-native-permissions/scripts/setup.rb')
+setup_permissions([
+  'LocationWhenInUse',
+])
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
