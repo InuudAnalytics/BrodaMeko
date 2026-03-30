@@ -84,8 +84,8 @@ android {
         applicationId "com.brodamekobare"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "1.0"
+        versionCode 8
+        versionName "1.1"
         manifestPlaceholders = [
             MAPS_API_KEY: (project.findProperty("MAPS_API_KEY") ?: System.getenv("MAPS_API_KEY") ?: "")
         ]
