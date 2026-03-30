@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
@@ -75,6 +76,7 @@ const SignUpScreen = ({ navigation, route }) => {
     signUp,
     signInWithGoogle: signUpWithGoogle,
     signInWithApple: signUpWithApple,
+    completeAppleSignIn,
     isLoading,
     error,
     clearError,
@@ -96,6 +98,9 @@ const SignUpScreen = ({ navigation, route }) => {
   const [localError, setLocalError] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isTermsVisible, setIsTermsVisible] = useState(false);
+  const [roleMismatch, setRoleMismatch] = useState(null);
+  const [pendingAppleData, setPendingAppleData] = useState(null);
+  const [appleNameInput, setAppleNameInput] = useState('');
   const termsTranslateY = useState(
     new Animated.Value(screenHeight * TERMS_SHEET_HEIGHT_RATIO),
   )[0];
@@ -154,6 +159,23 @@ const SignUpScreen = ({ navigation, route }) => {
         setIsTermsVisible(false);
       }
     });
+  };
+
+  const handleAppleSignUp = async () => {
+    const result = await signUpWithApple({ role: selectedRole });
+    if (result?.roleMismatch) {
+      setRoleMismatch(result.existingRole);
+    } else if (result?.needsName) {
+      setPendingAppleData(result.pendingAppleData);
+      setAppleNameInput('');
+    }
+  };
+
+  const handleCompleteAppleName = async () => {
+    const ok = await completeAppleSignIn({ name: appleNameInput, pendingAppleData });
+    if (ok) {
+      setPendingAppleData(null);
+    }
   };
 
   const handleSignUp = async () => {
@@ -478,7 +500,7 @@ const SignUpScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   disabled={isLoading || Platform.OS !== 'ios'}
-                  onPress={() => signUpWithApple({ role: selectedRole })}
+                  onPress={handleAppleSignUp}
                   style={[
                     styles.appleButton,
                     isLoading || Platform.OS !== 'ios' ? styles.appleButtonDisabled : null,
@@ -571,6 +593,86 @@ const SignUpScreen = ({ navigation, route }) => {
             </Animated.View>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      <Modal
+        visible={roleMismatch !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoleMismatch(null)}
+      >
+        <Pressable style={styles.roleMismatchBackdrop} onPress={() => setRoleMismatch(null)}>
+          <Pressable onPress={() => {}} style={styles.roleMismatchCard}>
+            <AppText style={styles.roleMismatchTitle}>Account Already Exists</AppText>
+            <AppText style={styles.roleMismatchBody}>
+              You already have a BrodaMeko account as a{' '}
+              <AppText style={styles.roleMismatchHighlight}>
+                {ROLE_LABELS[roleMismatch] || roleMismatch}
+              </AppText>
+              . What would you like to do?
+            </AppText>
+            <TouchableOpacity
+              style={styles.roleMismatchPrimary}
+              activeOpacity={0.85}
+              onPress={() => {
+                setRoleMismatch(null);
+                navigation.navigate(ROUTES.LOGIN);
+              }}
+            >
+              <AppText style={styles.roleMismatchPrimaryLabel}>Sign In</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.roleMismatchSecondary}
+              activeOpacity={0.85}
+              onPress={() => {
+                setRoleMismatch(null);
+                navigation.navigate(ROUTES.ONBOARDING_CAROUSEL);
+              }}
+            >
+              <AppText style={styles.roleMismatchSecondaryLabel}>Switch Role</AppText>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={pendingAppleData !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingAppleData(null)}
+      >
+        <KeyboardAvoidingView
+          style={styles.roleMismatchBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable onPress={() => {}} style={styles.roleMismatchCard}>
+            <AppText style={styles.roleMismatchTitle}>One Last Thing</AppText>
+            <AppText style={styles.roleMismatchBody}>
+              Apple didn't share your name with us. Please enter it to complete your sign-up.
+            </AppText>
+            <TextInput
+              style={styles.appleNameInput}
+              placeholder="Your full name"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              value={appleNameInput}
+              onChangeText={setAppleNameInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleCompleteAppleName}
+            />
+            <TouchableOpacity
+              style={[styles.roleMismatchPrimary, !appleNameInput.trim() ? { opacity: 0.45 } : null]}
+              activeOpacity={0.85}
+              disabled={!appleNameInput.trim() || isLoading}
+              onPress={handleCompleteAppleName}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={darkTheme.colors.background} />
+              ) : (
+                <AppText style={styles.roleMismatchPrimaryLabel}>Continue</AppText>
+              )}
+            </TouchableOpacity>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );
@@ -748,6 +850,72 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.sm,
     textDecorationLine: 'underline',
     marginTop: darkTheme.spacing.xs,
+    marginBottom: darkTheme.spacing.md,
+  },
+  roleMismatchBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: darkTheme.spacing.xl,
+  },
+  roleMismatchCard: {
+    width: '100%',
+    backgroundColor: darkTheme.colors.background,
+    borderRadius: darkTheme.radius.xl,
+    padding: darkTheme.spacing.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  roleMismatchTitle: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    marginBottom: darkTheme.spacing.sm,
+  },
+  roleMismatchBody: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: darkTheme.typography.fontSizes.sm,
+    lineHeight: 22,
+    marginBottom: darkTheme.spacing.lg,
+  },
+  roleMismatchHighlight: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  roleMismatchPrimary: {
+    backgroundColor: darkTheme.colors.accent,
+    borderRadius: darkTheme.radius.lg,
+    paddingVertical: darkTheme.spacing.md,
+    alignItems: 'center',
+    marginBottom: darkTheme.spacing.sm,
+  },
+  roleMismatchPrimaryLabel: {
+    color: darkTheme.colors.background,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    fontSize: darkTheme.typography.fontSizes.md,
+  },
+  roleMismatchSecondary: {
+    borderRadius: darkTheme.radius.lg,
+    paddingVertical: darkTheme.spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+  },
+  roleMismatchSecondaryLabel: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+    fontSize: darkTheme.typography.fontSizes.md,
+  },
+  appleNameInput: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: darkTheme.colors.inputBorder,
+    borderRadius: darkTheme.radius.lg,
+    paddingHorizontal: darkTheme.spacing.md,
+    paddingVertical: darkTheme.spacing.md,
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.md,
     marginBottom: darkTheme.spacing.md,
   },
 });

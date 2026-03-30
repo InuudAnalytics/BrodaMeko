@@ -4,18 +4,19 @@ import { WebView } from 'react-native-webview';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { AppText, ScreenContainer } from '../../components';
-import { LEGAL_LAST_UPDATED, TERMS_SECTIONS } from '../../content/legalContent';
 import { darkTheme } from '../../theme';
-import { ScrollView } from 'react-native';
 
 const PRIVACY_URL = 'https://brodameko.app/privacy-policy-for-brodameko-mobile-application/';
+const TERMS_URL = 'https://brodameko.app/brodameko-terms-and-conditions/';
 
 const PrivacyPolicyScreen = ({ navigation, route }) => {
   const initialDoc = String(route?.params?.documentType || 'privacy').toLowerCase() === 'terms' ? 'terms' : 'privacy';
   const [activeDoc, setActiveDoc] = useState(initialDoc);
   const [webLoading, setWebLoading] = useState(true);
   const [webError, setWebError] = useState(false);
-  const webViewRef = useRef(null);
+  const privacyRef = useRef(null);
+  const termsRef = useRef(null);
+  const webViewRef = privacyRef;
 
   return (
     <ScreenContainer padded={false} edges={['top', 'left', 'right', 'bottom']} style={styles.screen}>
@@ -38,55 +39,75 @@ const PrivacyPolicyScreen = ({ navigation, route }) => {
         <TouchableOpacity
           style={[styles.tabBtn, activeDoc === 'terms' ? styles.tabBtnActive : null]}
           activeOpacity={0.85}
-          onPress={() => setActiveDoc('terms')}
+          onPress={() => { setActiveDoc('terms'); setWebError(false); setWebLoading(true); }}
         >
           <AppText style={[styles.tabLabel, activeDoc === 'terms' ? styles.tabLabelActive : null]}>Terms & Conditions</AppText>
         </TouchableOpacity>
       </View>
 
-      {activeDoc === 'privacy' ? (
-        <View style={styles.webContainer}>
-          {webError ? (
-            <View style={styles.errorState}>
-              <AppText style={styles.errorText}>Could not load the page.</AppText>
-              <TouchableOpacity
-                style={styles.retryBtn}
-                activeOpacity={0.85}
-                onPress={() => { setWebError(false); setWebLoading(true); webViewRef.current?.reload(); }}
-              >
-                <AppText style={styles.retryText}>Retry</AppText>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <WebView
-                ref={webViewRef}
-                source={{ uri: PRIVACY_URL }}
-                style={styles.webView}
-                onLoadStart={() => { setWebLoading(true); setWebError(false); }}
-                onLoadEnd={() => setWebLoading(false)}
-                onError={() => { setWebLoading(false); setWebError(true); }}
-                onHttpError={() => { setWebLoading(false); setWebError(true); }}
-              />
-              {webLoading && (
-                <View style={styles.webLoader}>
-                  <ActivityIndicator size="large" color={darkTheme.colors.accent} />
-                </View>
-              )}
-            </>
-          )}
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <AppText style={styles.updatedText}>Last updated: {LEGAL_LAST_UPDATED}</AppText>
-          {TERMS_SECTIONS.map(section => (
-            <View key={section.title} style={styles.section}>
-              <AppText style={styles.sectionTitle}>{section.title}</AppText>
-              <AppText style={styles.sectionBody}>{section.body}</AppText>
-            </View>
-          ))}
-        </ScrollView>
-      )}
+      <View style={[styles.webContainer, activeDoc !== 'privacy' ? styles.hidden : null]}>
+        {webError && activeDoc === 'privacy' ? (
+          <View style={styles.errorState}>
+            <AppText style={styles.errorText}>Could not load the page.</AppText>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              activeOpacity={0.85}
+              onPress={() => { setWebError(false); setWebLoading(true); privacyRef.current?.reload(); }}
+            >
+              <AppText style={styles.retryText}>Retry</AppText>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <WebView
+              ref={privacyRef}
+              source={{ uri: PRIVACY_URL }}
+              style={styles.webView}
+              onLoadStart={() => { if (activeDoc === 'privacy') { setWebLoading(true); setWebError(false); } }}
+              onLoadEnd={() => { if (activeDoc === 'privacy') setWebLoading(false); }}
+              onError={() => { if (activeDoc === 'privacy') { setWebLoading(false); setWebError(true); } }}
+              onHttpError={() => { if (activeDoc === 'privacy') { setWebLoading(false); setWebError(true); } }}
+            />
+            {webLoading && activeDoc === 'privacy' && (
+              <View style={styles.webLoader}>
+                <ActivityIndicator size="large" color={darkTheme.colors.accent} />
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <View style={[styles.webContainer, activeDoc !== 'terms' ? styles.hidden : null]}>
+        {webError && activeDoc === 'terms' ? (
+          <View style={styles.errorState}>
+            <AppText style={styles.errorText}>Could not load the page.</AppText>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              activeOpacity={0.85}
+              onPress={() => { setWebError(false); setWebLoading(true); termsRef.current?.reload(); }}
+            >
+              <AppText style={styles.retryText}>Retry</AppText>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <WebView
+              ref={termsRef}
+              source={{ uri: TERMS_URL }}
+              style={styles.webView}
+              onLoadStart={() => { if (activeDoc === 'terms') { setWebLoading(true); setWebError(false); } }}
+              onLoadEnd={() => { if (activeDoc === 'terms') setWebLoading(false); }}
+              onError={() => { if (activeDoc === 'terms') { setWebLoading(false); setWebError(true); } }}
+              onHttpError={() => { if (activeDoc === 'terms') { setWebLoading(false); setWebError(true); } }}
+            />
+            {webLoading && activeDoc === 'terms' && (
+              <View style={styles.webLoader}>
+                <ActivityIndicator size="large" color={darkTheme.colors.accent} />
+              </View>
+            )}
+          </>
+        )}
+      </View>
     </ScreenContainer>
   );
 };
@@ -147,6 +168,9 @@ const styles = StyleSheet.create({
   },
   webContainer: {
     flex: 1,
+  },
+  hidden: {
+    display: 'none',
   },
   webView: {
     flex: 1,

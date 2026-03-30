@@ -798,6 +798,17 @@ export const AuthProvider = ({ children }) => {
         .join(' ')
         .trim();
 
+      if (!fullName) {
+        return {
+          needsName: true,
+          pendingAppleData: {
+            identityToken,
+            email: appleResponse?.email || '',
+            role: normalizedSelectedRole,
+          },
+        };
+      }
+
       const response = await appleLoginService({
         identityToken,
         fullName,
@@ -811,6 +822,11 @@ export const AuthProvider = ({ children }) => {
         throw new Error(
           'Apple login succeeded but no app token was returned.',
         );
+      }
+
+      const returnedRole = normalizeRole(authPayload.role);
+      if (returnedRole && returnedRole !== normalizedSelectedRole) {
+        return { roleMismatch: true, existingRole: returnedRole };
       }
 
       await setAuthedState({
@@ -831,6 +847,40 @@ export const AuthProvider = ({ children }) => {
       }
 
       setError(errorMessage);
+      return false;
+    } finally {
+      setIsLoading(false);
+      setIsBootstrapped(true);
+    }
+  };
+
+  const completeAppleSignIn = async ({ name, pendingAppleData }) => {
+    setIsLoading(true);
+    clearError();
+    try {
+      const safeName = String(name || '').trim();
+      if (!safeName) {
+        throw new Error('Please enter your name.');
+      }
+      const response = await appleLoginService({
+        identityToken: pendingAppleData.identityToken,
+        fullName: safeName,
+        email: pendingAppleData.email,
+        role: pendingAppleData.role,
+      });
+      const authPayload = pickAuthPayload(response);
+      if (!authPayload.token) {
+        throw new Error('Apple login succeeded but no app token was returned.');
+      }
+      await setAuthedState({
+        nextToken: authPayload.token,
+        nextUser: authPayload.user,
+        nextRole: authPayload.role || pendingAppleData.role,
+      });
+      await refreshUserProfile(authPayload.token).catch(() => {});
+      return true;
+    } catch (err) {
+      setError(err?.message || 'Apple Sign-In failed.');
       return false;
     } finally {
       setIsLoading(false);
@@ -878,6 +928,7 @@ export const AuthProvider = ({ children }) => {
         signIn,
         signInWithGoogle,
         signInWithApple,
+        completeAppleSignIn,
         signUp,
         verifyOtp,
         resendOtp,
