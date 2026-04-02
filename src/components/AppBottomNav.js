@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: darkTheme.colors.inputBorder,
     paddingTop: darkTheme.spacing.sm,
-    //paddingBottom: darkTheme.spacing.md,
+    paddingBottom: 14,
     paddingHorizontal: darkTheme.spacing.sm,
   },
   tabButton: {

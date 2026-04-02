@@ -5,13 +5,23 @@ import AppText from './AppText';
 
 const TINT = 'rgba(186, 194, 210, 0.46)';
 
-const NoInternetIcon = ({ size = 112, color = TINT }) => {
-  const strokeWidth = Math.max(2, Math.round(size * 0.03));
-  const center = size / 2;
+// Detect raw HTML responses (e.g. Nginx error pages) and replace with a
+// human-readable fallback so the tester never sees a wall of markup.
+const sanitizeMessage = (msg) => {
+  const raw = String(msg || '').trim();
+  if (!raw) return '';
+  if (/<[a-z][\s\S]*>/i.test(raw)) {
+    return 'Something went wrong on our end. Pull down to refresh or tap Reload.';
+  }
+  return raw;
+};
+
+const NoInternetIcon = ({ size = 70, color = TINT }) => {
+  const strokeWidth = Math.max(1.8, Math.round(size * 0.04));
 
   return (
     <Svg width={size} height={size} viewBox="0 0 120 120">
-      <Circle cx={center} cy={center} r={center - 6} fill="rgba(255,255,255,0.03)" stroke={color} strokeWidth={1.2} />
+      <Circle cx={60} cy={60} r={54} fill="rgba(255,255,255,0.03)" stroke={color} strokeWidth={1.2} />
       <Path d="M30 70c16-16 44-16 60 0" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
       <Path d="M42 82c10-10 26-10 36 0" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
       <Path d="M55 93c3-3 7-3 10 0" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
@@ -21,17 +31,19 @@ const NoInternetIcon = ({ size = 112, color = TINT }) => {
 };
 
 const NoInternetState = ({
-  title = 'Network error',
-  message = 'Please check your connection and try again.',
+  title = 'No internet connection',
+  message = 'Pull down to refresh or tap Reload.',
   onRetry,
   retryLabel = 'Reload',
   style,
 }) => {
+  const safeMessage = sanitizeMessage(message);
+
   return (
     <View style={[styles.wrap, style]}>
       <NoInternetIcon />
       <AppText style={styles.title}>{title}</AppText>
-      <AppText style={styles.message}>{message}</AppText>
+      {safeMessage ? <AppText style={styles.message}>{safeMessage}</AppText> : null}
       {typeof onRetry === 'function' ? (
         <TouchableOpacity style={styles.retryBtn} activeOpacity={0.85} onPress={onRetry}>
           <AppText style={styles.retryText}>{retryLabel}</AppText>
@@ -51,17 +63,18 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 12,
     color: TINT,
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
     textAlign: 'center',
   },
   message: {
-    marginTop: 8,
+    marginTop: 6,
     color: TINT,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    maxWidth: 320,
+    maxWidth: 280,
   },
   retryBtn: {
     marginTop: 14,

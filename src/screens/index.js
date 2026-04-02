@@ -3,7 +3,6 @@ export * from './auth';
 export { CarOwnerDashboardScreen } from './carowner/home';
 export { default as CarOwnerHistoryScreen } from './carowner/history/HistoryScreen';
 export { default as CarOwnerMechanicDetailsScreen } from './carowner/history/MechanicDetailsScreen';
-export { default as CarOwnerMechanicReviewsScreen } from './carowner/history/MechanicReviewsScreen';
 export { default as CarOwnerRewardsScreen } from './carowner/wallet/WalletScreen';
 export { default as CarOwnerFundWalletScreen } from './carowner/wallet/FundWalletScreen';
 export { default as CarOwnerTransactionDetailsScreen } from './carowner/wallet/TransactionDetailsScreen';

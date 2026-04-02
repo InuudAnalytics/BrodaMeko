@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createQuotation,
@@ -290,6 +291,35 @@ const readMessageId = (item) =>
 const readMessageQuotationId = (item) =>
   String(item?.quotation_id || item?.quote_id || '').trim();
 
+const SHORTCUT_KEYS = {
+  carOwner: '@brodameko/chat_shortcut_car_owner',
+  mechanic: '@brodameko/chat_shortcut_mechanic',
+};
+
+const persistShortcut = async (key, payload) => {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(payload));
+  } catch {}
+};
+
+const removeShortcut = async (key) => {
+  try {
+    await AsyncStorage.removeItem(key);
+  } catch {}
+};
+
+const loadShortcut = async (key) => {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.conversationId || !parsed?.jobId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 export const ChatProvider = ({ children }) => {
   const { token } = useAuth();
   const [conversations, setConversations] = useState([]);
@@ -371,18 +401,21 @@ export const ChatProvider = ({ children }) => {
       return;
     }
 
-    setCarOwnerChatShortcutState({
+    const shortcut = {
       conversationId,
       jobId,
       mechanicId: payload?.mechanicId || null,
       mechanic: payload?.mechanic || null,
       issueSummary: payload?.issueSummary || null,
       progressStatus: payload?.progressStatus || '',
-    });
+    };
+    setCarOwnerChatShortcutState(shortcut);
+    persistShortcut(SHORTCUT_KEYS.carOwner, shortcut);
   }, []);
 
   const clearCarOwnerChatShortcut = useCallback(() => {
     setCarOwnerChatShortcutState(null);
+    removeShortcut(SHORTCUT_KEYS.carOwner);
   }, []);
 
   const setMechanicChatShortcut = useCallback((payload) => {
@@ -396,18 +429,21 @@ export const ChatProvider = ({ children }) => {
       return;
     }
 
-    setMechanicChatShortcutState({
+    const shortcut = {
       conversationId,
       jobId,
       mechanicId: payload?.mechanicId || null,
       customer: payload?.customer || null,
       issueSummary: payload?.issueSummary || null,
       progressStatus: payload?.progressStatus || '',
-    });
+    };
+    setMechanicChatShortcutState(shortcut);
+    persistShortcut(SHORTCUT_KEYS.mechanic, shortcut);
   }, []);
 
   const clearMechanicChatShortcut = useCallback(() => {
     setMechanicChatShortcutState(null);
+    removeShortcut(SHORTCUT_KEYS.mechanic);
   }, []);
 
   const appendMessage = useCallback((conversationId, message) => {
@@ -1183,6 +1219,22 @@ export const ChatProvider = ({ children }) => {
     close();
   }, [clearReconnectTimer, clearConnectTimeout]);
 
+  // Restore persisted chat shortcuts when the user logs in.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      const [co, mech] = await Promise.all([
+        loadShortcut(SHORTCUT_KEYS.carOwner),
+        loadShortcut(SHORTCUT_KEYS.mechanic),
+      ]);
+      if (cancelled) return;
+      if (co) setCarOwnerChatShortcutState(co);
+      if (mech) setMechanicChatShortcutState(mech);
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
   // When the auth token changes (logout, login as different user, role switch),
   // fully tear down the existing socket and reset all chat state so the new
   // session starts clean. Without this the old authenticated socket leaks into
@@ -1219,6 +1271,12 @@ export const ChatProvider = ({ children }) => {
     activeConversationIdRef.current = '';
     reconnectAttemptsRef.current = 0;
     setError(null);
+
+    // If logging out (token becomes null), clear persisted shortcuts too.
+    if (!token) {
+      removeShortcut(SHORTCUT_KEYS.carOwner);
+      removeShortcut(SHORTCUT_KEYS.mechanic);
+    }
   }, [token, clearReconnectTimer, clearConnectTimeout]);
 
   const value = useMemo(

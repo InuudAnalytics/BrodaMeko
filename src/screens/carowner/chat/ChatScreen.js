@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import SharedChatScreen from '../../shared/ChatScreen';
 import { AppBottomNav, AppText } from '../../../components';
 import { useChat } from '../../../context';
+import { getCarOwnerJob } from '../../../services/jobs.service';
 import { darkTheme } from '../../../theme';
 import { ROLES, ROUTES } from '../../../utils';
 
@@ -101,6 +102,33 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
       setProgressStatus(fromParams);
     }
   }, [route?.params?.progressStatus]);
+
+  // On mount: if progressStatus is not already known, fetch the job to determine
+  // whether payment has been made so the live tracking button can appear.
+  useEffect(() => {
+    const currentStatus = String(route?.params?.progressStatus || '').toLowerCase().trim();
+    if (currentStatus || !jobId) {
+      return;
+    }
+    let active = true;
+    const fetchJobStatus = async () => {
+      try {
+        const response = await getCarOwnerJob(jobId);
+        const payload = response?.data || response || {};
+        const job = payload?.job || payload?.data?.job || payload?.data || payload;
+        const status = String(
+          job?.status || job?.progress_status || job?.progressStatus || '',
+        ).toLowerCase().trim();
+        if (active && status) {
+          setProgressStatus(status);
+        }
+      } catch {
+        // silently ignore — button stays hidden if we can't confirm status
+      }
+    };
+    fetchJobStatus();
+    return () => { active = false; };
+  }, [jobId, route?.params?.progressStatus]);
 
   useEffect(() => {
     if (hasValidParams) {
@@ -212,9 +240,7 @@ const CarOwnerChatScreen = ({ navigation, route }) => {
             activeOpacity={0.85}
             onPress={handleOpenTracking}
           >
-            <AppText style={styles.trackingBtnText}>
-              Mechanic assigned - View live tracking
-            </AppText>
+            <AppText style={styles.trackingBtnText}>Open live tracking</AppText>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -282,7 +308,6 @@ const styles = StyleSheet.create({
     minHeight: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: hexToRgba(darkTheme.colors.accent, 0.08),
   },
   trackingBtnText: {
     color: darkTheme.colors.accent,

@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, DeviceEventEmitter, Image, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { FilterHorizontalIcon, Message01Icon, Search01Icon } from '@hugeicons/core-free-icons';
+import { FilterHorizontalIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { AppText, CenteredHeader, NoInternetState, PullToRefreshIndicator, ScreenContainer, ScrollableTabs } from '../../../components';
-import { confirmMarketplaceOrderItem, getMarketplaceOrder } from '../../../services/marketplace.service';
+import { cancelMarketplaceOrder, confirmMarketplaceOrderItem, getMarketplaceOrder } from '../../../services/marketplace.service';
 import { getActiveCallForContext, startCall } from '../../../services/calls.service';
 import { getSellerOrders } from '../../../services/spareParts.service';
 import { darkTheme } from '../../../theme';
@@ -72,8 +72,9 @@ const resolveImageUri = (value) => {
 
 const toStatusKey = (value) => {
   const status = String(value || '').toLowerCase();
-  if (['new', 'pending', 'confirmed'].includes(status)) return 'new';
-  if (['preparing', 'processing'].includes(status)) return 'preparing';
+  // 'processing' is the item's initial state after checkout — treat as actionable/new
+  if (['new', 'pending', 'confirmed', 'paid', 'processing'].includes(status)) return 'new';
+  if (['preparing', 'ready_for_pickup'].includes(status)) return 'preparing';
   if (['shipped', 'in_transit', 'out_for_delivery'].includes(status)) return 'in_transit';
   if (['completed', 'delivered', 'received'].includes(status)) return 'completed';
   if ([
@@ -122,12 +123,22 @@ const OrdersScreen = ({ navigation }) => {
           resolveImageUri(firstItem?.part?.image) ||
           resolveImageUri(order?.image);
 
+        const resolveItemId = (item) =>
+          String(
+            item?.id || item?.item_id || item?.order_item_id || item?._id || ''
+          ).trim();
+
+        const itemIds = detailItems
+          .map(resolveItemId)
+          .filter(Boolean);
+
         return {
           id: orderId || `order-${index}`,
           orderId,
-          itemId: String(firstItem?.id || firstItem?._id || '').trim(),
-          status: toStatusKey(order?.status || firstItem?.status),
-          rawStatus: String(order?.status || firstItem?.status || '').toLowerCase(),
+          itemId: itemIds[0] || '',
+          itemIds,
+          status: toStatusKey(firstItem?.status || order?.status),
+          rawStatus: String(firstItem?.status || order?.status || '').toLowerCase(),
           name: firstItem?.part_name || order?.name || `Order ${orderId.slice(0, 8)}`,
           qty: Number(firstItem?.quantity || order?.quantity || 1),
           total: Number(order?.total_amount || firstItem?.subtotal || 0),
@@ -136,6 +147,9 @@ const OrdersScreen = ({ navigation }) => {
           buyerId: String(order?.buyer_id || detail?.buyer_id || detail?.buyer?.id || '').trim(),
           buyerPhone: String(order?.buyer_phone || detail?.buyer_phone || detail?.buyer?.phone || '').trim(),
           deliveryType: String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase(),
+          isPickup: ['pickup', 'pick_up', 'pick-up', 'collect', 'collection'].includes(
+            String(order?.fulfillment_type || detail?.fulfillment_type || '').toLowerCase()
+          ),
           pickupCode: '',
           shopName: firstItem?.store_name || 'Spare parts shop',
           image: itemImage,
@@ -203,18 +217,52 @@ const OrdersScreen = ({ navigation }) => {
   }, [orders]);
 
   const handleConfirmItem = async (order) => {
-    if (!order?.orderId || !order?.itemId) {
+    const orderId = String(order?.orderId || '').trim();
+    const itemIds =
+      Array.isArray(order?.itemIds) && order.itemIds.length > 0
+        ? order.itemIds
+        : order?.itemId
+        ? [order.itemId]
+        : [];
+
+    if (!orderId || itemIds.length === 0) {
       AppAlert.alert('Missing order info', 'Unable to update this order right now.');
       return;
     }
 
     try {
-      await confirmMarketplaceOrderItem(order.orderId, order.itemId);
+      await Promise.all(
+        itemIds.map((itemId) => confirmMarketplaceOrderItem(orderId, itemId))
+      );
       fetchOrders();
     } catch (error) {
       AppAlert.alert('Could not update order', error?.message || 'Please try again.');
     }
   };
+
+  const handleCancelOrder = useCallback((order) => {
+    const orderId = String(order?.orderId || '').trim();
+    if (!orderId) return;
+    AppAlert.alert(
+      'Cancel order?',
+      'The buyer will be refunded immediately. This cannot be undone.',
+      [
+        { text: 'No, keep it', style: 'cancel' },
+        {
+          text: 'Yes, cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelMarketplaceOrder(orderId);
+              fetchOrders();
+            } catch (error) {
+              AppAlert.alert('Could not cancel', error?.message || 'Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  }, [fetchOrders]);
 
   const isPickupOrder = useCallback((order) => {
     const mode = String(order?.deliveryType || '').toLowerCase();
@@ -404,35 +452,41 @@ const OrdersScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {isPickupOrder(order) ? (
-                  <View style={styles.pickupBadge}>
-                    <AppText style={styles.pickupBadgeText}>Pickup order</AppText>
+                <View style={styles.fulfillmentBadgeRow}>
+                  <View style={[styles.fulfillmentBadge, order.isPickup ? styles.pickupBadgeStyle : styles.deliveryBadgeStyle]}>
+                    <AppText style={[styles.fulfillmentBadgeText, order.isPickup ? styles.pickupBadgeTextStyle : styles.deliveryBadgeTextStyle]}>
+                      {order.isPickup ? 'Pickup' : 'Delivery'}
+                    </AppText>
                   </View>
-                ) : null}
+                </View>
 
                 {order.status === 'new' ? (
-                  <TouchableOpacity
-                    style={styles.primaryButton}
-                    activeOpacity={0.85}
-                    onPress={() => handleConfirmItem(order)}
-                  >
-                    <AppText style={styles.primaryButtonText}>Prepare package</AppText>
-                  </TouchableOpacity>
-                ) : null}
-
-                {order.status === 'preparing' ? (
                   <View style={styles.prepRow}>
                     <TouchableOpacity
-                      style={styles.secondaryButton}
+                      style={styles.primaryButton}
                       activeOpacity={0.85}
                       onPress={() => handleConfirmItem(order)}
                     >
-                      <AppText style={styles.secondaryButtonText}>Mark as ready</AppText>
+                      <AppText style={styles.primaryButtonText}>Prepare package</AppText>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconButton} activeOpacity={0.85}>
-                      <HugeiconsIcon icon={Message01Icon} size={18} color="#E6C714" strokeWidth={2} />
+                    <TouchableOpacity
+                      style={styles.cancelButton}
+                      activeOpacity={0.85}
+                      onPress={() => handleCancelOrder(order)}
+                    >
+                      <AppText style={styles.cancelButtonText}>Cancel</AppText>
                     </TouchableOpacity>
                   </View>
+                ) : null}
+
+                {order.status === 'preparing' && order.isPickup ? (
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    activeOpacity={0.85}
+                    onPress={() => handleOpenOrder(order)}
+                  >
+                    <AppText style={styles.primaryButtonText}>Enter pickup code</AppText>
+                  </TouchableOpacity>
                 ) : null}
 
                 {order.status === 'in_transit' ? (
@@ -452,14 +506,15 @@ const OrdersScreen = ({ navigation }) => {
                         </AppText>
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity style={styles.outlineButton} activeOpacity={0.85}>
-                      <AppText style={styles.outlineButtonText}>Track order</AppText>
-                    </TouchableOpacity>
                   </View>
                 ) : null}
 
                 {order.status === 'completed' ? (
-                  <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.85}>
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate(ROUTES.USER_REVIEWS)}
+                  >
                     <AppText style={styles.secondaryButtonText}>View ratings</AppText>
                   </TouchableOpacity>
                 ) : null}
@@ -537,18 +592,31 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
   },
-  pickupBadge: {
+  fulfillmentBadgeRow: {
     marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(230,199,20,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(230,199,20,0.55)',
+    flexDirection: 'row',
+  },
+  fulfillmentBadge: {
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
+    borderWidth: 1,
   },
-  pickupBadgeText: {
+  pickupBadgeStyle: {
+    backgroundColor: 'rgba(230,199,20,0.15)',
+    borderColor: 'rgba(230,199,20,0.5)',
+  },
+  pickupBadgeTextStyle: {
     color: '#E6C714',
+  },
+  deliveryBadgeStyle: {
+    backgroundColor: 'rgba(59,130,246,0.15)',
+    borderColor: 'rgba(59,130,246,0.5)',
+  },
+  deliveryBadgeTextStyle: {
+    color: '#93C5FD',
+  },
+  fulfillmentBadgeText: {
     fontSize: 11,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
@@ -606,7 +674,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   primaryButton: {
-    marginTop: 12,
+    flex: 1,
     height: 42,
     borderRadius: 10,
     backgroundColor: '#E6C714',
@@ -615,6 +683,21 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#1A1A1A',
+    fontSize: 12,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
+  cancelButton: {
+    height: 42,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.08)',
+  },
+  cancelButtonText: {
+    color: '#EF4444',
     fontSize: 12,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
@@ -638,17 +721,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     columnGap: 10,
   },
-  iconButton: {
-    width: 46,
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  dualRow: {
+dualRow: {
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',

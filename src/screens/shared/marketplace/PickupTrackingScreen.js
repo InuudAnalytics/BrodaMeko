@@ -111,7 +111,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     .slice(0, 4);
   const orderId = String(route?.params?.orderId || route?.params?.order_id || '').trim();
   const pickupCode = resolvedPickupCode || incomingCode;
-  const isOrderCompleted = orderStatus === 'completed';
+  const isOrderCompleted = ['completed', 'received'].includes(orderStatus);
   const isOrderCancelled = orderStatus === 'cancelled';
 
   const shopCoordinates = useMemo(() => {
@@ -175,12 +175,13 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         if (active && code.length === 4) {
           setResolvedPickupCode(code);
         }
-        if (active) {
-          setOrderStatus(String(data?.status || '').trim().toLowerCase());
-        }
-
         const items = data?.items || data?.order_items || data?.products || [];
         const firstItem = items?.[0] || {};
+        if (active) {
+          const itemStatus = String(firstItem?.status || '').trim().toLowerCase();
+          const orderLevelStatus = String(data?.status || '').trim().toLowerCase();
+          setOrderStatus(itemStatus || orderLevelStatus);
+        }
         const part = firstItem?.part || firstItem?.product || firstItem?.spare_part || {};
         const store = part?.store || data?.store || data?.seller || {};
         const itemStoreName = String(firstItem?.store_name || '').trim();

@@ -586,7 +586,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signInWithGoogle = async ({ role: selectedRoleInput }) => {
+  const signInWithGoogle = async ({ role: selectedRoleInput, isSignUp = false }) => {
     setIsLoading(true);
     clearError();
 
@@ -631,6 +631,13 @@ export const AuthProvider = ({ children }) => {
         );
       }
 
+      if (isSignUp) {
+        const returnedRole = normalizeRole(authPayload.role);
+        if (returnedRole && returnedRole !== normalizedSelectedRole) {
+          return { roleMismatch: true, existingRole: returnedRole };
+        }
+      }
+
       await setAuthedState({
         nextToken: authPayload.token,
         nextUser: authPayload.user,
@@ -647,7 +654,13 @@ export const AuthProvider = ({ children }) => {
       } else if (googleError.code === statusCodes.IN_PROGRESS) {
         errorMessage = 'Sign in is in progress.';
       } else if (googleError.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        errorMessage = 'Play services not available.';
+        errorMessage = 'Google Play Services not available or outdated.';
+      } else if (
+        googleError.code === statusCodes.DEVELOPER_ERROR ||
+        googleError.code === 10 ||
+        String(googleError.message || '').toUpperCase().includes('DEVELOPER_ERROR')
+      ) {
+        errorMessage = 'Google Sign-In is not configured for this build. Please contact support.';
       } else {
         errorMessage = googleError.message || errorMessage;
       }

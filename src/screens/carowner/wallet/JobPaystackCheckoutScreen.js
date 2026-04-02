@@ -96,14 +96,15 @@ const JobPaystackCheckoutScreen = ({ navigation, route }) => {
 
       navigation.replace(ROUTES.CAR_OWNER_PAYMENT_SUCCESS, {
         payeeName: params.mechanic?.name || params.mechanic?.full_name || 'Assigned mechanic',
-        nextRoute: ROUTES.CAR_OWNER_CHAT,
+        nextRoute: ROUTES.CAR_OWNER_LIVE_TRACKING,
         nextParams: {
-          conversationId: params.conversationId,
           jobId: params.jobId,
-          mechanic: params.mechanic,
           mechanicId: params.mechanicId,
+          mechanic: params.mechanic,
+          conversationId: params.conversationId,
           issueSummary: params.issueSummary,
           progressStatus: 'accepted',
+          trackingStatus: 'accepted',
         },
       });
       setComplete(true);

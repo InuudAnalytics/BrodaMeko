@@ -191,16 +191,26 @@ export const CartProvider = ({ children }) => {
       return;
     }
 
+    // Optimistic update — reflect instantly in UI
+    setItems((prev) =>
+      prev.map((item) =>
+        String(item?.id || '').trim() === targetId
+          ? { ...item, quantity: nextQty }
+          : item
+      )
+    );
+
     try {
       await updateMarketplaceCartItem(targetId, { quantity: nextQty });
+    } catch (updateError) {
+      // Revert to previous quantity on failure
       setItems((prev) =>
         prev.map((item) =>
           String(item?.id || '').trim() === targetId
-            ? { ...item, quantity: nextQty }
+            ? { ...item, quantity: target.quantity }
             : item
         )
       );
-    } catch (updateError) {
       setError(updateError?.message || 'Could not update quantity.');
     }
   }, [findCartItem, removeFromCart]);

@@ -1,8 +1,31 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Image, InteractionManager, Linking, PanResponder, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  BackHandler,
+  Image,
+  InteractionManager,
+  Linking,
+  PanResponder,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { ArrowRight01Icon, Location06Icon, Mail01Icon, Notification01Icon } from '@hugeicons/core-free-icons';
+import {
+  ArrowRight01Icon,
+  Location06Icon,
+  Mail01Icon,
+  Notification01Icon,
+} from '@hugeicons/core-free-icons';
 import {
   AppBottomNav,
   AppButton,
@@ -25,11 +48,15 @@ import {
   updateJobStatus,
 } from '../../../services/jobs.service';
 import { getNotifications } from '../../../services/notifications.service';
-import { closeScoped, connectScoped, sendScoped } from '../../../services/ws.service';
+import {
+  closeScoped,
+  connectScoped,
+  sendScoped,
+} from '../../../services/ws.service';
 import { darkTheme, withAlpha } from '../../../theme';
 import { getWATGreeting, ROUTES } from '../../../utils';
 import AppAlert from '../../../components/AppAlert';
-const PANEL_MAX_DOWN = 320;
+const PANEL_MAX_DOWN = 260;
 const TRACKER_STEPS = [
   { key: 'accepted', label: 'Accepted' },
   { key: 'en_route', label: 'En Route' },
@@ -40,8 +67,10 @@ const TRACKER_STEPS = [
   { key: 'disputed', label: 'Disputed' },
 ];
 
-const normalizeProgressStatus = (value) => {
-  const status = String(value || '').trim().toLowerCase();
+const normalizeProgressStatus = value => {
+  const status = String(value || '')
+    .trim()
+    .toLowerCase();
 
   if (!status) {
     return 'accepted';
@@ -55,7 +84,11 @@ const normalizeProgressStatus = (value) => {
     return 'accepted';
   }
 
-  if (status === 'en_route' || status === 'enroute' || status === 'on_the_way') {
+  if (
+    status === 'en_route' ||
+    status === 'enroute' ||
+    status === 'on_the_way'
+  ) {
     return 'en_route';
   }
 
@@ -82,7 +115,7 @@ const normalizeProgressStatus = (value) => {
   return 'accepted';
 };
 
-const extractSingleJob = (response) => {
+const extractSingleJob = response => {
   const root = response?.data || response || {};
 
   if (!root || typeof root !== 'object') {
@@ -104,16 +137,22 @@ const extractSingleJob = (response) => {
   return root;
 };
 
-const extractFirstName = (user) => {
-  const rawName = user?.first_name || user?.firstName || user?.full_name || user?.fullName || user?.name || '';
+const extractFirstName = user => {
+  const rawName =
+    user?.first_name ||
+    user?.firstName ||
+    user?.full_name ||
+    user?.fullName ||
+    user?.name ||
+    '';
   const fullName = String(rawName).trim();
   return fullName ? fullName.split(/\s+/)[0] : '';
 };
 
-const readUserId = (user) =>
+const readUserId = user =>
   String(user?.id || user?._id || user?.user_id || '').trim();
 
-const normalizeAvatarUri = (value) => {
+const normalizeAvatarUri = value => {
   const raw = String(value || '').trim();
   if (!raw) {
     return '';
@@ -123,12 +162,14 @@ const normalizeAvatarUri = (value) => {
     return raw;
   }
 
-  const base = String(BASE_URL || '').trim().replace(/\/+$/, '');
+  const base = String(BASE_URL || '')
+    .trim()
+    .replace(/\/+$/, '');
   const path = raw.replace(/^\/+/, '');
   return base ? `${base}/${path}` : raw;
 };
 
-const readAvatarUri = (user) =>
+const readAvatarUri = user =>
   normalizeAvatarUri(
     user?.avatar ||
       user?.avatar_url ||
@@ -139,10 +180,10 @@ const readAvatarUri = (user) =>
       user?.profile_picture ||
       user?.image_url ||
       user?.photo_url ||
-      ''
+      '',
   );
 
-const readUnreadCount = (payload) => {
+const readUnreadCount = payload => {
   const count = Number(
     payload?.unread_count ??
       payload?.data?.unread_count ??
@@ -153,17 +194,37 @@ const readUnreadCount = (payload) => {
 };
 
 const HelpActionRow = ({ label, onPress }) => (
-  <TouchableOpacity style={styles.helpRow} activeOpacity={0.9} onPress={onPress}>
+  <TouchableOpacity
+    style={styles.helpRow}
+    activeOpacity={0.9}
+    onPress={onPress}
+  >
     <AppText style={styles.helpRowText}>{label}</AppText>
-    <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#1A1A1A" strokeWidth={2} />
+    <HugeiconsIcon
+      icon={ArrowRight01Icon}
+      size={20}
+      color="#1A1A1A"
+      strokeWidth={2}
+    />
   </TouchableOpacity>
 );
 
-const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loading, locationEnabled }) => (
+const LocationFallbackCard = ({
+  isBlocked,
+  onEnableLocation,
+  onOpenSettings,
+  loading,
+  locationEnabled,
+}) => (
   <View style={styles.locationFallbackWrap}>
     <View style={styles.locationFallbackCard}>
       <View style={styles.locationIconWrap}>
-        <HugeiconsIcon icon={Location06Icon} size={20} color={darkTheme.colors.accent} strokeWidth={2} />
+        <HugeiconsIcon
+          icon={Location06Icon}
+          size={20}
+          color={darkTheme.colors.accent}
+          strokeWidth={2}
+        />
       </View>
       <AppText style={styles.locationFallbackTitle}>Location is off</AppText>
       <AppText style={styles.locationFallbackBody}>
@@ -174,7 +235,10 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
 
       <TouchableOpacity
         activeOpacity={0.9}
-        style={[styles.locationActionBtn, loading ? styles.locationActionBtnDisabled : null]}
+        style={[
+          styles.locationActionBtn,
+          loading ? styles.locationActionBtnDisabled : null,
+        ]}
         onPress={onEnableLocation}
         disabled={loading}
       >
@@ -188,7 +252,11 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
       </TouchableOpacity>
 
       {isBlocked ? (
-        <TouchableOpacity activeOpacity={0.9} style={styles.settingsBtn} onPress={onOpenSettings}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.settingsBtn}
+          onPress={onOpenSettings}
+        >
           <AppText style={styles.settingsBtnText}>Open settings</AppText>
         </TouchableOpacity>
       ) : null}
@@ -199,8 +267,18 @@ const LocationFallbackCard = ({ isBlocked, onEnableLocation, onOpenSettings, loa
 const DashboardScreen = ({ navigation, route }) => {
   const { user, token } = useAuth();
   const { carOwnerChatShortcut, clearCarOwnerChatShortcut } = useChat();
-  const { unreadTick, permissionStatus: notificationPermissionStatus, promptPermissionIfNeeded } = useNotifications();
-  const { location, permissionStatus, loading, requestPermission, refreshOnce } = useUserLocation();
+  const {
+    unreadTick,
+    permissionStatus: notificationPermissionStatus,
+    promptPermissionIfNeeded,
+  } = useNotifications();
+  const {
+    location,
+    permissionStatus,
+    loading,
+    requestPermission,
+    refreshOnce,
+  } = useUserLocation();
   const [activeSession, setActiveSession] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -225,7 +303,7 @@ const DashboardScreen = ({ navigation, route }) => {
   useEffect(() => {
     const sessionParam = route?.params?.activeSession;
     if (sessionParam && typeof sessionParam === 'object') {
-      setActiveSession((prev) => ({
+      setActiveSession(prev => ({
         ...(prev || {}),
         ...sessionParam,
         progressStatus: normalizeProgressStatus(sessionParam?.progressStatus),
@@ -236,23 +314,28 @@ const DashboardScreen = ({ navigation, route }) => {
 
   const firstName = extractFirstName(user);
   const greetingPrefix = getWATGreeting();
-  const greetingText = firstName ? `${greetingPrefix}, ${firstName}` : greetingPrefix;
+  const greetingText = firstName
+    ? `${greetingPrefix}, ${firstName}`
+    : greetingPrefix;
   const avatarInitial = firstName.charAt(0).toUpperCase() || 'U';
   const avatarUri = readAvatarUri(user);
   const userId = readUserId(user);
-  const hasLocationPermission = LOCATION_ENABLED && permissionStatus === 'granted';
+  const hasLocationPermission =
+    LOCATION_ENABLED && permissionStatus === 'granted';
   const isLocationBlocked = LOCATION_ENABLED && permissionStatus === 'blocked';
 
   useFocusEffect(
     useCallback(() => {
       promptPermissionIfNeeded?.('car_owner_dashboard_focus');
       return undefined;
-    }, [promptPermissionIfNeeded])
+    }, [promptPermissionIfNeeded]),
   );
 
   useEffect(() => {
     const locationStatus = String(permissionStatus || '').toLowerCase();
-    const notifStatus = String(notificationPermissionStatus || '').toLowerCase();
+    const notifStatus = String(
+      notificationPermissionStatus || '',
+    ).toLowerCase();
     if (!LOCATION_ENABLED) {
       return;
     }
@@ -269,7 +352,9 @@ const DashboardScreen = ({ navigation, route }) => {
     // Delay so any active notification dialog fully dismisses before the
     // location dialog appears — iOS silently drops dialogs shown simultaneously,
     // which also causes the location request() promise to hang indefinitely.
-    const t = setTimeout(() => { requestPermission(); }, 900);
+    const t = setTimeout(() => {
+      requestPermission();
+    }, 900);
     return () => clearTimeout(t);
   }, [notificationPermissionStatus, permissionStatus, requestPermission]);
 
@@ -280,14 +365,17 @@ const DashboardScreen = ({ navigation, route }) => {
       }
       refreshOnce();
       return undefined;
-    }, [hasLocationPermission, refreshOnce])
+    }, [hasLocationPermission, refreshOnce]),
   );
 
   useFocusEffect(
     useCallback(() => {
-      const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => true,
+      );
       return () => subscription.remove();
-    }, [])
+    }, []),
   );
 
   useFocusEffect(
@@ -298,7 +386,7 @@ const DashboardScreen = ({ navigation, route }) => {
       });
 
       return () => task?.cancel?.();
-    }, [panelY])
+    }, [panelY]),
   );
 
   useFocusEffect(
@@ -319,14 +407,25 @@ const DashboardScreen = ({ navigation, route }) => {
       return () => {
         active = false;
       };
-    }, [unreadTick])
+    }, [unreadTick]),
   );
 
   useEffect(() => {
     const jobId = String(activeSession?.jobId || '').trim();
     const safeToken = String(token || '').trim();
-    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
-    const trackingAllowed = ['accepted', 'en_route', 'arrived', 'in_progress'].includes(progressStatus);
+    const progressStatus = normalizeProgressStatus(
+      activeSession?.progressStatus,
+    );
+    // mechanic_completed = mechanic marked done, car owner hasn't confirmed yet.
+    // Keep the map and both pins visible so the car owner can still see where the
+    // mechanic is while deciding whether to confirm completion.
+    const trackingAllowed = [
+      'accepted',
+      'en_route',
+      'arrived',
+      'in_progress',
+      'mechanic_completed',
+    ].includes(progressStatus);
 
     if (!jobId || !safeToken || !trackingAllowed) {
       setTrackedLocation(null);
@@ -336,7 +435,7 @@ const DashboardScreen = ({ navigation, route }) => {
 
     lastLocationUpdateRef.current = 0;
 
-    const handleMessage = (event) => {
+    const handleMessage = event => {
       if (!event?.data) {
         return;
       }
@@ -352,9 +451,16 @@ const DashboardScreen = ({ navigation, route }) => {
           return;
         }
 
-        const senderRole = String(payload?.sender_role || payload?.role || '').trim().toLowerCase();
-        const senderId = String(payload?.sender_id || payload?.user_id || '').trim();
-        if (senderRole === 'car_owner' || (senderId && userId && senderId === userId)) {
+        const senderRole = String(payload?.sender_role || payload?.role || '')
+          .trim()
+          .toLowerCase();
+        const senderId = String(
+          payload?.sender_id || payload?.user_id || '',
+        ).trim();
+        if (
+          senderRole === 'car_owner' ||
+          (senderId && userId && senderId === userId)
+        ) {
           return;
         }
 
@@ -416,11 +522,37 @@ const DashboardScreen = ({ navigation, route }) => {
 
     locationPollRef.current = interval;
 
+    // Stale-WS fallback: if no WebSocket location update has arrived in 20 s
+    // (other user offline, WS dropped, etc.) poll the REST API to keep the
+    // mechanic's pin alive at their last server-stored position.
+    const STALE_THRESHOLD_MS = 20000;
+    const staleFallbackInterval = setInterval(async () => {
+      const sinceLastUpdate = Date.now() - lastLocationUpdateRef.current;
+      if (
+        lastLocationUpdateRef.current === 0 ||
+        sinceLastUpdate < STALE_THRESHOLD_MS
+      ) {
+        return;
+      }
+      try {
+        const latestPayload = await getLatestJobLocation(jobId);
+        const root = latestPayload?.data || latestPayload || {};
+        const lat = Number(root?.lat ?? root?.latitude);
+        const lng = Number(root?.lng ?? root?.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          setTrackedLocation({ latitude: lat, longitude: lng });
+        }
+      } catch {
+        // best-effort; ignore errors
+      }
+    }, 15000);
+
     return () => {
       if (locationPollRef.current) {
         clearInterval(locationPollRef.current);
         locationPollRef.current = null;
       }
+      clearInterval(staleFallbackInterval);
       closeScoped('job_location');
     };
   }, [
@@ -451,7 +583,7 @@ const DashboardScreen = ({ navigation, route }) => {
           return;
         }
 
-        setActiveSession((prev) => {
+        setActiveSession(prev => {
           if (!prev) {
             return prev;
           }
@@ -481,10 +613,12 @@ const DashboardScreen = ({ navigation, route }) => {
     if (!location) {
       return 'Detecting location...';
     }
-    return `Lat ${location.latitude.toFixed(4)} - Lng ${location.longitude.toFixed(4)}`;
+    return `Lat ${location.latitude.toFixed(
+      4,
+    )} - Lng ${location.longitude.toFixed(4)}`;
   }, [location]);
 
-  const handleTabPress = (routeName) => {
+  const handleTabPress = routeName => {
     if (routeName === ROUTES.CAR_OWNER_DASHBOARD) {
       return;
     }
@@ -505,10 +639,17 @@ const DashboardScreen = ({ navigation, route }) => {
     setRefreshing(true);
     try {
       const jobId = String(activeSession?.jobId || '').trim();
-      const notificationsPromise = getNotifications({ page: 1, limit: 1 }).catch(() => null);
+      const notificationsPromise = getNotifications({
+        page: 1,
+        limit: 1,
+      }).catch(() => null);
       const locationPromise =
-        LOCATION_ENABLED && hasLocationPermission ? refreshOnce().catch(() => null) : Promise.resolve(null);
-      const latestLocationPromise = jobId ? getLatestJobLocation(jobId).catch(() => null) : Promise.resolve(null);
+        LOCATION_ENABLED && hasLocationPermission
+          ? refreshOnce().catch(() => null)
+          : Promise.resolve(null);
+      const latestLocationPromise = jobId
+        ? getLatestJobLocation(jobId).catch(() => null)
+        : Promise.resolve(null);
 
       const [notificationsRes, , latestLocationRes] = await Promise.all([
         notificationsPromise,
@@ -522,7 +663,8 @@ const DashboardScreen = ({ navigation, route }) => {
       }
 
       if (latestLocationRes) {
-        const latestPayload = latestLocationRes?.data || latestLocationRes || {};
+        const latestPayload =
+          latestLocationRes?.data || latestLocationRes || {};
         const lat = Number(latestPayload?.lat ?? latestPayload?.latitude);
         const lng = Number(latestPayload?.lng ?? latestPayload?.longitude);
         if (Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -536,7 +678,7 @@ const DashboardScreen = ({ navigation, route }) => {
   }, [activeSession?.jobId, hasLocationPermission, refreshOnce]);
 
   const animatePanelTo = useCallback(
-    (toValue) => {
+    toValue => {
       Animated.spring(panelY, {
         toValue,
         useNativeDriver: true,
@@ -544,18 +686,28 @@ const DashboardScreen = ({ navigation, route }) => {
         tension: 55,
       }).start();
     },
-    [panelY]
+    [panelY],
   );
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+        // Capture phase: when panel is down, claim upward drags before children see them
+        onMoveShouldSetPanResponderCapture: (_, gesture) =>
+          panelYRef.current > PANEL_MAX_DOWN * 0.1 && gesture.dy < -5,
+        // Bubble phase: when panel is up, claim downward drags
+        onMoveShouldSetPanResponder: (_, gesture) => {
+          const isDown = panelYRef.current > PANEL_MAX_DOWN * 0.1;
+          return isDown ? gesture.dy < -5 : gesture.dy > 5;
+        },
         onPanResponderGrant: () => {
           dragStartRef.current = panelYRef.current;
         },
         onPanResponderMove: (_, gesture) => {
-          const next = Math.max(0, Math.min(PANEL_MAX_DOWN, dragStartRef.current + gesture.dy));
+          const next = Math.max(
+            0,
+            Math.min(PANEL_MAX_DOWN, dragStartRef.current + gesture.dy),
+          );
           panelY.setValue(next);
         },
         onPanResponderRelease: (_, gesture) => {
@@ -567,7 +719,7 @@ const DashboardScreen = ({ navigation, route }) => {
           }
         },
       }),
-    [animatePanelTo, panelY]
+    [animatePanelTo, panelY],
   );
 
   const handleOpenChat = () => {
@@ -588,11 +740,16 @@ const DashboardScreen = ({ navigation, route }) => {
 
   const handleCancelJob = async () => {
     const jobId = String(activeSession?.jobId || '').trim();
-    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
+    const progressStatus = normalizeProgressStatus(
+      activeSession?.progressStatus,
+    );
     const cancellableStatuses = new Set(['pending', 'accepted']);
     if (!jobId || cancelling || !cancellableStatuses.has(progressStatus)) {
       if (progressStatus && !cancellableStatuses.has(progressStatus)) {
-        AppAlert.alert('Cannot cancel', 'You can only cancel while job is pending or accepted.');
+        AppAlert.alert(
+          'Cannot cancel',
+          'You can only cancel while job is pending or accepted.',
+        );
       }
       return;
     }
@@ -612,8 +769,11 @@ const DashboardScreen = ({ navigation, route }) => {
 
   const handleConfirmCompletion = async () => {
     const jobId = String(activeSession?.jobId || '').trim();
-    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
-    const canConfirm = progressStatus === 'completed' || progressStatus === 'mechanic_completed';
+    const progressStatus = normalizeProgressStatus(
+      activeSession?.progressStatus,
+    );
+    const canConfirm =
+      progressStatus === 'completed' || progressStatus === 'mechanic_completed';
 
     if (!jobId || syncing || !canConfirm) {
       return;
@@ -632,20 +792,26 @@ const DashboardScreen = ({ navigation, route }) => {
               await confirmJob(jobId);
               AppAlert.alert('Success', 'Job completion confirmed.');
             } catch (error) {
-              AppAlert.alert('Error', error?.message || 'Could not confirm completion.');
+              AppAlert.alert(
+                'Error',
+                error?.message || 'Could not confirm completion.',
+              );
             } finally {
               setSyncing(false);
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleDisputeJob = () => {
     const jobId = String(activeSession?.jobId || '').trim();
-    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
-    const canDispute = progressStatus === 'completed' || progressStatus === 'mechanic_completed';
+    const progressStatus = normalizeProgressStatus(
+      activeSession?.progressStatus,
+    );
+    const canDispute =
+      progressStatus === 'completed' || progressStatus === 'mechanic_completed';
 
     if (!jobId || !canDispute) {
       return;
@@ -661,23 +827,45 @@ const DashboardScreen = ({ navigation, route }) => {
       <AppText variant="muted" style={styles.sheetSubtitle}>
         Our certified mechanics are nearby
       </AppText>
-      <HelpActionRow label="I know the issues" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)} />
-      <HelpActionRow label="Diagnose my car" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_DIAGNOSTIC_EXPERTS)} />
-      <HelpActionRow label="Help tow my vehicle" onPress={() => navigation.navigate(ROUTES.CAR_OWNER_TOWING_COMPANIES)} />
+      <HelpActionRow
+        label="I know the issues"
+        onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)}
+      />
+      <HelpActionRow
+        label="Diagnose my car"
+        onPress={() => navigation.navigate(ROUTES.CAR_OWNER_DIAGNOSTIC_EXPERTS)}
+      />
+      <HelpActionRow
+        label="Help tow my vehicle"
+        onPress={() => navigation.navigate(ROUTES.CAR_OWNER_TOWING_COMPANIES)}
+      />
     </>
   );
 
   const renderTrackingContent = () => {
-    const mechanic = activeSession?.mechanic || { name: 'Assigned mechanic', initials: 'M', rating: '4.8' };
-    const progressStatus = normalizeProgressStatus(activeSession?.progressStatus);
-    const currentStepIndex = TRACKER_STEPS.findIndex((item) => item.key === progressStatus);
-    const currentLabel = TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
+    const mechanic = activeSession?.mechanic || {
+      name: 'Assigned mechanic',
+      initials: 'M',
+      rating: '4.8',
+    };
+    const progressStatus = normalizeProgressStatus(
+      activeSession?.progressStatus,
+    );
+    const currentStepIndex = TRACKER_STEPS.findIndex(
+      item => item.key === progressStatus,
+    );
+    const currentLabel =
+      TRACKER_STEPS[Math.max(0, currentStepIndex)]?.label || 'Accepted';
     const isCompleted = progressStatus === 'completed';
     const isMechanicCompleted = progressStatus === 'mechanic_completed';
     const canConfirmOrDispute = isCompleted || isMechanicCompleted;
     const isDisputed = progressStatus === 'disputed';
-    const canOwnerCancel = progressStatus === 'pending' || progressStatus === 'accepted';
-    const isTransitOrRepair = progressStatus === 'en_route' || progressStatus === 'arrived' || progressStatus === 'in_progress';
+    const canOwnerCancel =
+      progressStatus === 'pending' || progressStatus === 'accepted';
+    const isTransitOrRepair =
+      progressStatus === 'en_route' ||
+      progressStatus === 'arrived' ||
+      progressStatus === 'in_progress';
 
     return (
       <>
@@ -691,55 +879,86 @@ const DashboardScreen = ({ navigation, route }) => {
             const active = index <= currentStepIndex;
             return (
               <View key={step.key} style={styles.trackerStep}>
-                <View style={[styles.trackerDot, active ? styles.trackerDotActive : null]} />
-                <AppText style={[styles.trackerText, active ? styles.trackerTextActive : null]}>{step.label}</AppText>
+                <View
+                  style={[
+                    styles.trackerDot,
+                    active ? styles.trackerDotActive : null,
+                  ]}
+                />
+                <AppText
+                  style={[
+                    styles.trackerText,
+                    active ? styles.trackerTextActive : null,
+                  ]}
+                >
+                  {step.label}
+                </AppText>
               </View>
             );
           })}
         </View>
-        <AppText style={styles.trackerHint}>Current progress: {currentLabel}</AppText>
+        <AppText style={styles.trackerHint}>
+          Current progress: {currentLabel}
+        </AppText>
 
         <View style={styles.trackCard}>
           <View style={styles.trackRow}>
             <View style={styles.trackAvatar}>
-              <AppText style={styles.trackAvatarText}>{mechanic.initials || 'M'}</AppText>
+              <AppText style={styles.trackAvatarText}>
+                {mechanic.initials || 'M'}
+              </AppText>
             </View>
             <View style={styles.trackInfo}>
               <AppText style={styles.trackName}>{mechanic.name}</AppText>
-              <AppText style={styles.trackMeta}>Rating {mechanic.rating || '4.8'}</AppText>
+              <AppText style={styles.trackMeta}>
+                Rating {mechanic.rating || '4.8'}
+              </AppText>
             </View>
           </View>
 
-        {!canConfirmOrDispute ? (
-          <View style={styles.trackActions}>
-            <AppButton label="Message" onPress={handleOpenChat} style={styles.trackBtn} />
-            {canOwnerCancel ? (
-              <TouchableOpacity
-                style={styles.callBtn}
-                activeOpacity={0.88}
-                onPress={handleCancelJob}
-                disabled={cancelling}
-              >
-                <HugeiconsIcon icon={Mail01Icon} size={16} color={darkTheme.colors.accent} strokeWidth={2} />
-                <AppText style={styles.callBtnText}>{cancelling ? 'Cancelling...' : 'Cancel'}</AppText>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ) : null}
+          {!canConfirmOrDispute ? (
+            <View style={styles.trackActions}>
+              <AppButton
+                label="Message"
+                onPress={handleOpenChat}
+                style={styles.trackBtn}
+              />
+              {canOwnerCancel ? (
+                <TouchableOpacity
+                  style={styles.callBtn}
+                  activeOpacity={0.88}
+                  onPress={handleCancelJob}
+                  disabled={cancelling}
+                >
+                  <HugeiconsIcon
+                    icon={Mail01Icon}
+                    size={16}
+                    color={darkTheme.colors.accent}
+                    strokeWidth={2}
+                  />
+                  <AppText style={styles.callBtnText}>
+                    {cancelling ? 'Cancelling...' : 'Cancel'}
+                  </AppText>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.trackFooterActions}>
           {isTransitOrRepair ? (
             <View style={styles.phaseNotice}>
               <AppText style={styles.phaseNoticeText}>
-                Job is in progress. Completion actions become available after mechanic marks it completed.
+                Job is in progress. Completion actions become available after
+                mechanic marks it completed.
               </AppText>
             </View>
           ) : null}
           {isMechanicCompleted ? (
             <View style={styles.phaseNotice}>
               <AppText style={styles.phaseNoticeText}>
-                Mechanic has marked this job complete. Please confirm or raise a dispute below.
+                Mechanic has marked this job complete. Please confirm or raise a
+                dispute below.
               </AppText>
             </View>
           ) : null}
@@ -754,7 +973,9 @@ const DashboardScreen = ({ navigation, route }) => {
                 })
               }
             >
-              <AppText style={styles.secondaryActionText}>View dispute status</AppText>
+              <AppText style={styles.secondaryActionText}>
+                View dispute status
+              </AppText>
             </TouchableOpacity>
           ) : null}
           {canConfirmOrDispute ? (
@@ -788,7 +1009,9 @@ const DashboardScreen = ({ navigation, route }) => {
                     })
                   }
                 >
-                  <AppText style={styles.secondaryActionText}>Rate mechanic</AppText>
+                  <AppText style={styles.secondaryActionText}>
+                    Rate mechanic
+                  </AppText>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.secondaryActionHalf}
@@ -798,15 +1021,21 @@ const DashboardScreen = ({ navigation, route }) => {
                     clearCarOwnerChatShortcut();
                   }}
                 >
-                  <AppText style={styles.secondaryActionText}>Back to home</AppText>
+                  <AppText style={styles.secondaryActionText}>
+                    Back to home
+                  </AppText>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={styles.secondaryAction}
                 activeOpacity={0.88}
-                onPress={() => navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)}
+                onPress={() =>
+                  navigation.navigate(ROUTES.CAR_OWNER_REPORT_ISSUE)
+                }
               >
-                <AppText style={styles.secondaryActionText}>Report an issue</AppText>
+                <AppText style={styles.secondaryActionText}>
+                  Report an issue
+                </AppText>
               </TouchableOpacity>
             </>
           ) : null}
@@ -820,19 +1049,22 @@ const DashboardScreen = ({ navigation, route }) => {
       carOwnerChatShortcut?.mechanic?.avatarUrl ||
       carOwnerChatShortcut?.mechanic?.avatarUri ||
       carOwnerChatShortcut?.mechanic?.ownerAvatar ||
-      ''
+      '',
   );
-  const shortcutInitial = String(
-    carOwnerChatShortcut?.mechanic?.initials ||
-      carOwnerChatShortcut?.mechanic?.name ||
-      'M'
-  )
-    .trim()
-    .charAt(0)
-    .toUpperCase() || 'M';
+  const shortcutInitial =
+    String(
+      carOwnerChatShortcut?.mechanic?.initials ||
+        carOwnerChatShortcut?.mechanic?.name ||
+        'M',
+    )
+      .trim()
+      .charAt(0)
+      .toUpperCase() || 'M';
 
   const handleOpenFloatingChat = useCallback(() => {
-    const conversationId = String(carOwnerChatShortcut?.conversationId || '').trim();
+    const conversationId = String(
+      carOwnerChatShortcut?.conversationId || '',
+    ).trim();
     const jobId = String(carOwnerChatShortcut?.jobId || '').trim();
     if (!conversationId || !jobId) {
       return;
@@ -850,99 +1082,141 @@ const DashboardScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.root}>
-      <ScreenContainer padded={false} edges={['top', 'left', 'right']} style={styles.screen}>
-      <PersonalInfoAlert />
-      <View style={styles.listWrap}>
-        <PullToRefreshIndicator pullDistance={pullDistance} refreshing={refreshing} />
-        <Animated.ScrollView
-          style={styles.mapBackdrop}
-          contentContainerStyle={styles.mapBackdropContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={(event) => {
-            const offsetY = event.nativeEvent?.contentOffset?.y || 0;
-            const pullValue = offsetY < 0 ? Math.min(120, -offsetY) : 0;
-            pullDistance.setValue(pullValue);
-          }}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={darkTheme.colors.accent}
-              colors={[darkTheme.colors.accent]}
-              progressBackgroundColor={darkTheme.colors.background}
-            />
-          }
-        >
-        {hasLocationPermission ? (
-          <>
-            <OpenStreetMapView
-              latitude={location?.latitude}
-              longitude={location?.longitude}
-              otherLatitude={trackedLocation?.latitude}
-              otherLongitude={trackedLocation?.longitude}
-            />
-            {!location ? (
-              <View style={styles.locationLoadingOverlay}>
-                <ActivityIndicator size="small" color={darkTheme.colors.accent} />
-                <AppText style={styles.locationLoadingText}>Getting your location...</AppText>
-              </View>
-            ) : null}
-            <View style={styles.locationLiveBadge}>
-              <AppText style={styles.locationLiveBadgeText}>{locationBadgeText}</AppText>
-            </View>
-          </>
-        ) : (
-          <LocationFallbackCard
-            isBlocked={isLocationBlocked}
-            onEnableLocation={handleEnableLocation}
-            onOpenSettings={() => Linking.openSettings()}
-            loading={loading}
-            locationEnabled={LOCATION_ENABLED}
+      <ScreenContainer
+        padded={false}
+        edges={['top', 'left', 'right']}
+        style={styles.screen}
+      >
+        <PersonalInfoAlert />
+        <View style={styles.listWrap}>
+          <PullToRefreshIndicator
+            pullDistance={pullDistance}
+            refreshing={refreshing}
           />
-        )}
+          <Animated.ScrollView
+            style={styles.mapBackdrop}
+            contentContainerStyle={styles.mapBackdropContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={event => {
+              const offsetY = event.nativeEvent?.contentOffset?.y || 0;
+              const pullValue = offsetY < 0 ? Math.min(120, -offsetY) : 0;
+              pullDistance.setValue(pullValue);
+            }}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={darkTheme.colors.accent}
+                colors={[darkTheme.colors.accent]}
+                progressBackgroundColor={darkTheme.colors.background}
+              />
+            }
+          >
+            {hasLocationPermission ? (
+              <>
+                <OpenStreetMapView
+                  latitude={location?.latitude}
+                  longitude={location?.longitude}
+                  otherLatitude={trackedLocation?.latitude}
+                  otherLongitude={trackedLocation?.longitude}
+                />
+                {!location ? (
+                  <View style={styles.locationLoadingOverlay}>
+                    <ActivityIndicator
+                      size="small"
+                      color={darkTheme.colors.accent}
+                    />
+                    <AppText style={styles.locationLoadingText}>
+                      Getting your location...
+                    </AppText>
+                  </View>
+                ) : null}
+                <View style={styles.locationLiveBadge}>
+                  <AppText style={styles.locationLiveBadgeText}>
+                    {locationBadgeText}
+                  </AppText>
+                </View>
+              </>
+            ) : (
+              <LocationFallbackCard
+                isBlocked={isLocationBlocked}
+                onEnableLocation={handleEnableLocation}
+                onOpenSettings={() => Linking.openSettings()}
+                loading={loading}
+                locationEnabled={LOCATION_ENABLED}
+              />
+            )}
 
-        <View style={styles.topOverlayGlass}>
-          <View style={styles.topBar}>
-            <View style={styles.avatarWrap}>
-              <View style={styles.avatar}>
-                {avatarUri ? <Image source={{ uri: avatarUri }} style={styles.avatarImage} /> : <AppText style={styles.avatarText}>{avatarInitial}</AppText>}
+            <View style={styles.topOverlayGlass}>
+              <View style={styles.topBar}>
+                <View style={styles.avatarWrap}>
+                  <View style={styles.avatar}>
+                    {avatarUri ? (
+                      <Image
+                        source={{ uri: avatarUri }}
+                        style={styles.avatarImage}
+                      />
+                    ) : (
+                      <AppText style={styles.avatarText}>
+                        {avatarInitial}
+                      </AppText>
+                    )}
+                  </View>
+                  <View>
+                    <AppText variant="body" style={styles.greeting}>
+                      {greetingText}
+                    </AppText>
+                    <AppText variant="muted" style={styles.greetingSub}>
+                      Ready for the road?
+                    </AppText>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.bellButton}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('Notifications')}
+                >
+                  <HugeiconsIcon
+                    icon={Notification01Icon}
+                    size={22}
+                    color={darkTheme.colors.text}
+                    strokeWidth={1.8}
+                  />
+                  {unreadCount > 0 ? (
+                    <View style={styles.bellBadge}>
+                      <AppText style={styles.bellBadgeText}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
               </View>
-              <View>
-                <AppText variant="body" style={styles.greeting}>
-                  {greetingText}
-                </AppText>
-                <AppText variant="muted" style={styles.greetingSub}>
-                  Ready for the road?
-                </AppText>
+              <View style={styles.notificationChipWrap}>
+                <NotificationPermissionChip />
               </View>
             </View>
-
-            <TouchableOpacity style={styles.bellButton} activeOpacity={0.85} onPress={() => navigation.navigate('Notifications')}>
-              <HugeiconsIcon icon={Notification01Icon} size={22} color={darkTheme.colors.text} strokeWidth={1.8} />
-              {unreadCount > 0 ? (
-                <View style={styles.bellBadge}>
-                  <AppText style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</AppText>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          </View>
-          <View style={styles.notificationChipWrap}>
-            <NotificationPermissionChip />
-          </View>
+          </Animated.ScrollView>
         </View>
-        </Animated.ScrollView>
-      </View>
 
-      <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]} {...panResponder.panHandlers}>
-        <View style={styles.handle} />
-        <View style={styles.contentArea}>{activeSession ? renderTrackingContent() : renderDefaultContent()}</View>
-      </Animated.View>
+        <Animated.View
+          style={[styles.bottomSheet, { transform: [{ translateY: panelY }] }]}
+          {...panResponder.panHandlers}
+        >
+          <View style={styles.handle} />
+          <View style={styles.contentArea}>
+            {activeSession ? renderTrackingContent() : renderDefaultContent()}
+          </View>
+        </Animated.View>
 
-      <TouchableOpacity style={styles.peekHandle} activeOpacity={0.9} onPress={() => animatePanelTo(0)}>
-        <View style={styles.peekPill} />
-      </TouchableOpacity>
-
+        <TouchableOpacity
+          style={styles.peekHandle}
+          activeOpacity={0.9}
+          onPress={() => animatePanelTo(0)}
+        >
+          <View style={styles.peekPill} />
+        </TouchableOpacity>
       </ScreenContainer>
 
       {carOwnerChatShortcut?.conversationId ? (
@@ -952,19 +1226,33 @@ const DashboardScreen = ({ navigation, route }) => {
           onPress={handleOpenFloatingChat}
         >
           {shortcutAvatarUri ? (
-            <Image source={{ uri: shortcutAvatarUri }} style={styles.floatingChatAvatarImage} />
+            <Image
+              source={{ uri: shortcutAvatarUri }}
+              style={styles.floatingChatAvatarImage}
+            />
           ) : (
             <View style={styles.floatingChatAvatarFallback}>
-              <AppText style={styles.floatingChatAvatarText}>{shortcutInitial}</AppText>
+              <AppText style={styles.floatingChatAvatarText}>
+                {shortcutInitial}
+              </AppText>
             </View>
           )}
           <View style={styles.floatingChatBadge}>
-            <HugeiconsIcon icon={Mail01Icon} size={12} color="#1A1A1A" strokeWidth={2} />
+            <HugeiconsIcon
+              icon={Mail01Icon}
+              size={12}
+              color="#1A1A1A"
+              strokeWidth={2}
+            />
           </View>
         </TouchableOpacity>
       ) : null}
 
-      <AppBottomNav activeTab={ROUTES.CAR_OWNER_DASHBOARD} onTabPress={handleTabPress} style={styles.stickyFooter} />
+      <AppBottomNav
+        activeTab={ROUTES.CAR_OWNER_DASHBOARD}
+        onTabPress={handleTabPress}
+        style={styles.stickyFooter}
+      />
     </View>
   );
 };
@@ -1032,9 +1320,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: darkTheme.spacing.sm,
   },
-  locationLiveBadgeText: { color: darkTheme.colors.accent, fontSize: darkTheme.typography.fontSizes.xs },
-  locationLoadingText: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.sm },
-  locationFallbackWrap: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', paddingHorizontal: darkTheme.spacing.lg },
+  locationLiveBadgeText: {
+    color: darkTheme.colors.accent,
+    fontSize: darkTheme.typography.fontSizes.xs,
+  },
+  locationLoadingText: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.sm,
+  },
+  locationFallbackWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: darkTheme.spacing.lg,
+  },
   locationFallbackCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -1055,7 +1353,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: darkTheme.spacing.sm,
   },
-  locationFallbackTitle: { color: darkTheme.colors.text, fontSize: darkTheme.typography.fontSizes.lg, fontWeight: darkTheme.typography.fontWeights.semibold },
+  locationFallbackTitle: {
+    color: darkTheme.colors.text,
+    fontSize: darkTheme.typography.fontSizes.lg,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
   locationFallbackBody: {
     marginTop: darkTheme.spacing.xs,
     color: darkTheme.colors.muted,
@@ -1074,10 +1376,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: darkTheme.spacing.lg,
   },
   locationActionBtnDisabled: { opacity: 0.85 },
-  locationActionBtnText: { color: '#1A1A1A', fontSize: darkTheme.typography.fontSizes.sm, fontWeight: darkTheme.typography.fontWeights.medium },
-  settingsBtn: { marginTop: darkTheme.spacing.sm, paddingVertical: 6, paddingHorizontal: 8 },
-  settingsBtnText: { color: darkTheme.colors.text, textDecorationLine: 'underline', fontSize: darkTheme.typography.fontSizes.sm },
-  avatarWrap: { flexDirection: 'row', alignItems: 'center', gap: darkTheme.spacing.sm },
+  locationActionBtnText: {
+    color: '#1A1A1A',
+    fontSize: darkTheme.typography.fontSizes.sm,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  settingsBtn: {
+    marginTop: darkTheme.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  settingsBtnText: {
+    color: darkTheme.colors.text,
+    textDecorationLine: 'underline',
+    fontSize: darkTheme.typography.fontSizes.sm,
+  },
+  avatarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: darkTheme.spacing.sm,
+  },
   avatar: {
     width: 42,
     height: 42,
@@ -1088,7 +1406,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  avatarText: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.bold },
+  avatarText: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.bold,
+  },
   greeting: {
     color: '#FFFFFF',
     fontWeight: darkTheme.typography.fontWeights.semibold,
@@ -1150,7 +1471,7 @@ const styles = StyleSheet.create({
   peekHandle: {
     position: 'absolute',
     alignSelf: 'center',
-    bottom: 66,
+    bottom: 80,
     width: 92,
     height: 18,
     alignItems: 'center',
@@ -1162,7 +1483,14 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: 'rgba(255,255,255,0.55)',
   },
-  handle: { alignSelf: 'center', width: 76, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.65)', marginBottom: darkTheme.spacing.md },
+  handle: {
+    alignSelf: 'center',
+    width: 76,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    marginBottom: darkTheme.spacing.md,
+  },
   contentArea: { width: '100%' },
   sheetTitle: {
     color: darkTheme.colors.text,
@@ -1190,7 +1518,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: darkTheme.spacing.md,
   },
-  helpRowText: { color: '#1A1A1A', fontSize: 14, lineHeight: 20, fontWeight: darkTheme.typography.fontWeights.regular },
+  helpRowText: {
+    color: '#1A1A1A',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: darkTheme.typography.fontWeights.regular,
+  },
   trackTitle: {
     color: darkTheme.colors.text,
     fontSize: 22,
@@ -1229,7 +1562,10 @@ const styles = StyleSheet.create({
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   trackInfo: { flex: 1 },
-  trackName: { color: darkTheme.colors.text, fontWeight: darkTheme.typography.fontWeights.semibold },
+  trackName: {
+    color: darkTheme.colors.text,
+    fontWeight: darkTheme.typography.fontWeights.semibold,
+  },
   trackMeta: { color: darkTheme.colors.muted, marginTop: 2 },
   trackerWrap: {
     borderWidth: 1,
@@ -1278,7 +1614,10 @@ const styles = StyleSheet.create({
     fontSize: darkTheme.typography.fontSizes.xs,
     textAlign: 'center',
   },
-  trackActions: { marginTop: darkTheme.spacing.md, rowGap: darkTheme.spacing.sm },
+  trackActions: {
+    marginTop: darkTheme.spacing.md,
+    rowGap: darkTheme.spacing.sm,
+  },
   trackBtn: { minHeight: 44 },
   callBtn: {
     minHeight: 44,
@@ -1290,8 +1629,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     columnGap: darkTheme.spacing.xs,
   },
-  callBtnText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
-  trackFooterActions: { marginTop: darkTheme.spacing.md, rowGap: darkTheme.spacing.sm },
+  callBtnText: {
+    color: darkTheme.colors.accent,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
+  trackFooterActions: {
+    marginTop: darkTheme.spacing.md,
+    rowGap: darkTheme.spacing.sm,
+  },
   postCompleteRow: {
     flexDirection: 'row',
     columnGap: darkTheme.spacing.sm,
@@ -1313,7 +1658,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryActionText: { color: darkTheme.colors.accent, fontWeight: darkTheme.typography.fontWeights.medium },
+  secondaryActionText: {
+    color: darkTheme.colors.accent,
+    fontWeight: darkTheme.typography.fontWeights.medium,
+  },
   actionDisabled: { opacity: 0.65 },
   floatingChatBtn: {
     position: 'absolute',
@@ -1375,6 +1723,3 @@ const styles = StyleSheet.create({
 });
 
 export default DashboardScreen;
-
-
-

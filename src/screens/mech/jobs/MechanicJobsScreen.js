@@ -42,8 +42,9 @@ const TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 
-const COMPLETED_STATUSES = new Set(['completed']);
-const FINAL_STATUSES = new Set(['completed', 'cancelled', 'disputed']);
+// mechanic_completed = mechanic marked done, awaiting car owner confirmation
+const COMPLETED_STATUSES = new Set(['completed', 'mechanic_completed']);
+const FINAL_STATUSES = new Set(['completed', 'mechanic_completed', 'cancelled', 'disputed']);
 
 const readOwnerName = (item, fallback = 'Customer') => {
   const firstName =
@@ -246,7 +247,7 @@ const JobCard = ({
                   : styles.finalBadgeTextCompleted,
               ]}
             >
-              {formatStatus(normalizedStatus)}
+              {normalizedStatus === 'mechanic_completed' ? 'Pending Confirmation' : formatStatus(normalizedStatus)}
             </AppText>
           </View>
         ) : (
@@ -285,6 +286,9 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
   const [busyStatusJobId, setBusyStatusJobId] = useState('');
   const [busyStatusAction, setBusyStatusAction] = useState('');
   const pullDistance = useRef(new Animated.Value(0)).current;
+  // Jobs accepted this session that may not yet appear in getMechanicAssignedJobs.
+  // Cleared once the backend confirms the job (or it reaches a final status).
+  const localAcceptedRef = useRef([]);
   const { permissionStatus, requestPermission } = useUserLocation();
 
   const requestedJobId = String(route?.params?.requestJobId || '').trim();
@@ -301,10 +305,23 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
 
       const pending = readList(pendingRes).map(normalizePendingRequest);
       const assigned = readList(assignedRes).map(normalizeAssignedJob);
-      setPendingRequests(pending);
-      setActiveJobs(
-        assigned.filter(item => !COMPLETED_STATUSES.has(item.status)),
+
+      // Prune locally-cached accepted jobs that are now confirmed by the backend
+      // or have reached a final status.
+      const backendIds = new Set(assigned.map(j => j.id));
+      localAcceptedRef.current = localAcceptedRef.current.filter(
+        j => !backendIds.has(j.id) && !FINAL_STATUSES.has(j.status),
       );
+
+      const backendActive = assigned.filter(item => !COMPLETED_STATUSES.has(item.status));
+      // Inject any locally-accepted jobs the backend hasn't confirmed yet.
+      const mergedActive = [
+        ...backendActive,
+        ...localAcceptedRef.current.filter(j => !backendIds.has(j.id)),
+      ];
+
+      setPendingRequests(pending);
+      setActiveJobs(mergedActive);
       setCompletedJobs(
         assigned.filter(item => COMPLETED_STATUSES.has(item.status)),
       );
@@ -357,6 +374,30 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
     try {
       const response = await respondToJobRequest(safeJobId, action);
       if (action === 'accept') {
+        // Optimistically add the accepted job to the active list so it shows
+        // immediately when the mechanic returns from chat, even if the backend
+        // hasn't moved it to getMechanicAssignedJobs yet (pre-quotation window).
+        const optimisticJob = {
+          id: safeJobId,
+          ownerId: item.ownerId || '',
+          ownerName: item.ownerName,
+          issue: item.issue,
+          carMake: item.carMake,
+          // 'awaiting_quotation' is a local-only status — not in the flow array,
+          // so canMechanicProgressStatus returns false → shows "Awaiting acceptance"
+          // (disabled). Replaced by the real status once backend confirms.
+          status: 'awaiting_quotation',
+          urgent: item.urgent,
+          avatarUri: item.avatarUri,
+          ownerAvatar: item.ownerAvatar,
+          distanceText: item.distanceText,
+          etaText: item.etaText,
+        };
+        localAcceptedRef.current = [
+          ...localAcceptedRef.current.filter(j => j.id !== safeJobId),
+          optimisticJob,
+        ];
+
         const payload = response?.data || response || {};
         let conversationId = String(payload?.conversation_id || payload?.conversationId || '').trim();
         if (!conversationId) {
@@ -492,6 +533,7 @@ const MechanicJobsScreen = ({ navigation, route, onBackToHome }) => {
 
       if (normalized === 'completed' || normalized === 'cancelled' || normalized === 'disputed') {
         clearMechanicChatShortcut();
+        localAcceptedRef.current = localAcceptedRef.current.filter(j => j.id !== safeJobId);
       }
       await fetchData();
     } catch (requestError) {

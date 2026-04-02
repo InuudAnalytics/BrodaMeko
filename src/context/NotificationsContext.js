@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, InteractionManager } from 'react-native';
+import { AppState, InteractionManager, Platform } from 'react-native';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { registerDevice } from '../services/device.service';
 import { getNotifications } from '../services/notifications.service';
 import { useAuth } from './AuthContext';
@@ -15,6 +16,18 @@ import {
 } from '../utils/pushNotifications';
 import { buildCallNavigationTarget } from '../utils/callRouting';
 import { trackTelemetryEvent } from '../services/telemetry.service';
+
+const ANDROID_CHANNEL_ID = 'brodameko_default';
+
+const ensureAndroidChannel = async () => {
+  if (Platform.OS !== 'android') return;
+  await notifee.createChannel({
+    id: ANDROID_CHANNEL_ID,
+    name: 'BrodaMeko Notifications',
+    importance: AndroidImportance.HIGH,
+    sound: 'default',
+  });
+};
 
 const NotificationsContext = createContext(undefined);
 
@@ -271,13 +284,50 @@ export const NotificationsProvider = ({ children }) => {
   }, []);
 
   const handleForegroundMessage = useCallback(
-    (message) => {
+    async (message) => {
       const normalized = normalizeRemoteMessage(message);
       if (!normalized) {
         return;
       }
       setLastNotification(normalized);
       setUnreadTick((prev) => prev + 1);
+
+      // Incoming calls must take over the screen immediately — do not wait for banner tap.
+      const callTarget = buildCallNavigationTarget(normalized?.data || {});
+      if (callTarget?.routeName === 'CallIncoming') {
+        if (navigationRef.isReady()) {
+          navigationRef.navigate(callTarget.routeName, callTarget.params);
+        }
+        return;
+      }
+
+      // Show a visible banner while the app is in the foreground.
+      // Firebase suppresses the system notification when the app is open —
+      // notifee displays it locally instead.
+      try {
+        const channelId = Platform.OS === 'android' ? ANDROID_CHANNEL_ID : undefined;
+        await notifee.displayNotification({
+          title: normalized.title || 'BrodaMeko',
+          body: normalized.body || '',
+          data: normalized.data || {},
+          android: channelId ? {
+            channelId,
+            importance: AndroidImportance.HIGH,
+            pressAction: { id: 'default' },
+            smallIcon: 'ic_launcher',
+          } : undefined,
+          ios: {
+            sound: 'default',
+            foregroundPresentationOptions: {
+              alert: true,
+              badge: true,
+              sound: true,
+            },
+          },
+        });
+      } catch (e) {
+        if (__DEV__) console.warn('[Notifications] notifee displayNotification error:', e?.message);
+      }
     },
     []
   );
@@ -296,6 +346,29 @@ export const NotificationsProvider = ({ children }) => {
       navigationRef.navigate(target.routeName, target.params);
     }
   }, [logTelemetry]);
+
+  useEffect(() => {
+    ensureAndroidChannel();
+
+    // Handle taps on notifee-displayed notifications while app is foregrounded.
+    const unsubscribeNotifee = notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.PRESS && detail?.notification) {
+        const message = {
+          notification: {
+            title: detail.notification.title,
+            body: detail.notification.body,
+          },
+          data: detail.notification.data || {},
+        };
+        handleNotificationOpen(message);
+      }
+    });
+
+    return () => {
+      unsubscribeNotifee();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isBootstrapped) {

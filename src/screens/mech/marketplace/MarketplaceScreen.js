@@ -361,6 +361,7 @@ const styles = StyleSheet.create({
   },
   cardWrap: {
     flex: 1,
+    maxWidth: '50%',
   },
   skeletonCard: {
     backgroundColor: '#1A1A4A',

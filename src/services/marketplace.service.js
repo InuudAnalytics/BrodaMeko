@@ -146,7 +146,7 @@ export const sellerConfirmMarketplacePickup = async (orderId, pickupCode) => {
   }
   const response = await api.patch(ENDPOINTS.marketplace.orderPickupConfirm(safeOrderId), {
     pickup_code: safePickupCode,
-  });
+  }, { skipUnauthorizedHandler: true });
   return response.data;
 };
 

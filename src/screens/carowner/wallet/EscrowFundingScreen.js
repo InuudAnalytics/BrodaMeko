@@ -124,7 +124,16 @@ const EscrowFundingScreen = ({ navigation, route }) => {
         }
         navigation.navigate(ROUTES.CAR_OWNER_PAYMENT_SUCCESS, {
           payeeName: mechanicName,
-          nextRoute: ROUTES.CAR_OWNER_DASHBOARD,
+          nextRoute: ROUTES.CAR_OWNER_LIVE_TRACKING,
+          nextParams: {
+            jobId,
+            mechanicId,
+            mechanic,
+            conversationId,
+            issueSummary,
+            progressStatus: 'accepted',
+            trackingStatus: 'accepted',
+          },
         });
         return;
       }
@@ -267,8 +276,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.xl,
-    lineHeight: 30,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: darkTheme.typography.fontWeights.medium,
   },
   headerSpacer: {
@@ -283,8 +292,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.xl,
-    lineHeight: 28,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
     marginBottom: darkTheme.spacing.sm,
   },
@@ -296,14 +305,14 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     color: 'rgba(255,255,255,0.55)',
-    fontSize: darkTheme.typography.fontSizes.md,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.regular,
   },
   rowValue: {
     color: 'rgba(255,255,255,0.85)',
-    fontSize: darkTheme.typography.fontSizes.md,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: darkTheme.typography.fontWeights.regular,
     textTransform: 'capitalize',
   },
@@ -315,14 +324,14 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     color: darkTheme.colors.text,
-    fontSize: darkTheme.typography.fontSizes.lg,
-    lineHeight: 26,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   totalValue: {
     color: darkTheme.colors.accent,
-    fontSize: darkTheme.typography.fontSizes.lg,
-    lineHeight: 26,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
   paymentOption: {
@@ -331,9 +340,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     alignItems: 'center',
@@ -341,15 +350,15 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: darkTheme.colors.accent,
   },
   paymentLabel: {
     color: 'rgba(255,255,255,0.82)',
-    fontSize: darkTheme.typography.fontSizes.md,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
   },
   balanceText: {
     fontSize: 12,
@@ -378,8 +387,8 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: darkTheme.colors.background,
-    fontSize: darkTheme.typography.fontSizes.lg,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: darkTheme.typography.fontWeights.semibold,
   },
 });

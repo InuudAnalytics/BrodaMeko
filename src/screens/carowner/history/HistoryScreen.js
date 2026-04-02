@@ -120,7 +120,26 @@ const normalizeJob = (job, index) => {
     null;
   const safeRating = Number.isFinite(rating) ? Math.max(0, Math.min(5, rating)) : 0;
   const hasMechanicIdentity = Boolean(mechanicId || String(mechanicName || '').trim());
-  const canRate = safeStatus !== 'pending' && hasMechanicIdentity;
+
+  const conversationId = String(
+    job?.conversation_id ||
+    job?.conversationId ||
+    job?.conversation?.id ||
+    job?.conversation?._id ||
+    '',
+  ).trim();
+
+  const confirmedAt = job?.confirmed_at || job?.confirmedAt || null;
+
+  // A job is truly "completed" only once the car owner has confirmed.
+  // Until then (mechanic marked done but owner hasn't confirmed) it sits
+  // in a "pending confirm" state even though backend status is 'completed'.
+  const isTrulyCompleted = safeStatus === 'completed' && Boolean(confirmedAt);
+  const derivedStatus = safeStatus === 'completed' && !confirmedAt
+    ? 'mechanic_completed'
+    : safeStatus;
+
+  const resolvedCanRate = isTrulyCompleted && hasMechanicIdentity;
 
   return {
     id: jobId,
@@ -131,9 +150,12 @@ const normalizeJob = (job, index) => {
     rating: safeRating,
     amount,
     hasAmount,
-    status: safeStatus,
+    status: derivedStatus,
     avatarUrl,
-    canRate,
+    canRate: resolvedCanRate,
+    conversationId,
+    confirmedAt,
+    mechanic: job?.mechanic || job?.assigned_mechanic || null,
   };
 };
 
@@ -186,27 +208,34 @@ const HistorySkeleton = () => {
   );
 };
 
-const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, onConfirmCompletion, cancelling, deleting, confirming }) => {
+const ACTIVE_JOB_STATUSES = new Set(['accepted', 'en_route', 'arrived', 'in_progress']);
+
+const JobHistoryCard = ({ item, onRate, onViewDetails, onCancel, onDelete, onConfirmCompletion, onMessage, onTracking, cancelling, deleting, confirming }) => {
   const isCancelled = item.status === 'cancelled';
   const isCompleted = item.status === 'completed';
   const isMechanicCompleted = item.status === 'mechanic_completed';
   const isPending = item.status === 'pending';
+  const isActive = ACTIVE_JOB_STATUSES.has(item.status);
   const canDelete = isPending;
-  const canRate = !isPending && Boolean(item?.canRate);
+  const canRate = Boolean(item?.canRate);
   const statusLabel = isCancelled
     ? 'Cancelled'
     : isCompleted
       ? 'Completed'
       : isMechanicCompleted
         ? 'Pending Confirm'
-        : 'Pending';
+        : isActive
+          ? 'Active'
+          : 'Pending';
   const statusTextColor = isCancelled
     ? '#E85578'
     : isCompleted
       ? '#4CC968'
       : isMechanicCompleted
         ? '#FFC47A'
-        : '#C8CCD8';
+        : isActive
+          ? '#7BC8FF'
+          : '#C8CCD8';
   const filledStars = Math.round(Number(item?.rating || 0));
 
   return (
@@ -248,7 +277,9 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, onCon
                 ? styles.statusBadgeCancelled
                 : isCompleted
                   ? styles.statusBadgeCompleted
-                  : styles.statusBadgePending,
+                  : isActive
+                    ? styles.statusBadgeActive
+                    : styles.statusBadgePending,
             ]}
           >
             <AppText style={[styles.statusText, { color: statusTextColor }]}>{statusLabel}</AppText>
@@ -258,22 +289,55 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, onCon
       </View>
 
       <View style={styles.actionsRow}>
-        {typeof onViewDetails === 'function' ? (
-          <TouchableOpacity activeOpacity={0.85} style={[styles.actionBtn, styles.actionBtnView]} onPress={onViewDetails}>
-            <AppText style={styles.actionBtnViewText}>View details</AppText>
+        {isPending ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[styles.actionBtn, styles.actionBtnCancel]}
+            onPress={onCancel}
+            disabled={cancelling || deleting}
+          >
+            <AppText style={styles.actionBtnCancelText}>
+              {cancelling ? 'Cancelling...' : 'Cancel'}
+            </AppText>
           </TouchableOpacity>
+        ) : isActive ? (
+          <>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.actionBtn, styles.actionBtnView]}
+              onPress={onMessage}
+            >
+              <AppText style={styles.actionBtnViewText}>Message</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.actionBtn, styles.actionBtnRate]}
+              onPress={onTracking}
+            >
+              <AppText style={styles.actionBtnRateText}>Tracking</AppText>
+            </TouchableOpacity>
+          </>
+        ) : isCompleted ? (
+          <>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.actionBtn, styles.actionBtnView]}
+              onPress={onViewDetails}
+            >
+              <AppText style={styles.actionBtnViewText}>View Details</AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[styles.actionBtn, styles.actionBtnRate, !canRate ? styles.actionBtnDisabled : null]}
+              onPress={onRate}
+              disabled={!canRate}
+            >
+              <AppText style={[styles.actionBtnRateText, !canRate ? styles.actionBtnDisabledText : null]}>
+                Rate
+              </AppText>
+            </TouchableOpacity>
+          </>
         ) : null}
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.actionBtn, isPending ? styles.actionBtnCancel : styles.actionBtnRate, !isPending && !canRate ? styles.actionBtnDisabled : null]}
-          onPress={isPending ? onCancel : onRate}
-          disabled={(isPending && (cancelling || deleting)) || (!isPending && !canRate)}
-        >
-          <AppText style={[isPending ? styles.actionBtnCancelText : styles.actionBtnRateText, !isPending && !canRate ? styles.actionBtnDisabledText : null]}>
-            {isPending ? (cancelling ? 'Cancelling...' : 'Cancel') : 'Rate'}
-          </AppText>
-        </TouchableOpacity>
       </View>
 
       {isMechanicCompleted ? (
@@ -297,7 +361,7 @@ const JobHistoryCard = ({ item, onViewDetails, onRate, onCancel, onDelete, onCon
             style={styles.deleteIconBtn}
             activeOpacity={0.85}
             onPress={onDelete}
-            disabled={deleting || (isPending && cancelling)}
+            disabled={deleting || cancelling}
           >
             <HugeiconsIcon icon={Delete02Icon} size={18} color={deleting ? '#B75A6F' : '#F87171'} strokeWidth={2} />
           </TouchableOpacity>
@@ -488,23 +552,50 @@ const HistoryScreen = ({ navigation }) => {
   const renderItem = useCallback(({ item }) => (
     <JobHistoryCard
       item={item}
-      onViewDetails={null}
       onCancel={() => handleCancelJob(item.jobId)}
       onDelete={() => handleDeleteJob(item.jobId)}
       onConfirmCompletion={() => handleConfirmCompletion(item.jobId)}
       cancelling={cancellingJobId === item.jobId}
       deleting={deletingJobId === item.jobId}
       confirming={confirmingJobId === item.jobId}
-      onRate={() =>
-        navigation.navigate(ROUTES.CAR_OWNER_MECHANIC_DETAILS, {
+      onMessage={() =>
+        navigation.navigate(ROUTES.CAR_OWNER_CHAT, {
+          conversationId: item.conversationId,
           jobId: item.jobId,
           mechanicId: item.mechanicId,
+          mechanic: item.mechanic,
+          issueSummary: { issueType: item.issueSummary },
+          progressStatus: item.status,
+        })
+      }
+      onTracking={() =>
+        navigation.navigate(ROUTES.CAR_OWNER_LIVE_TRACKING, {
+          jobId: item.jobId,
+          mechanicId: item.mechanicId,
+          mechanic: item.mechanic,
+          conversationId: item.conversationId,
+          issueSummary: { issueType: item.issueSummary },
+          progressStatus: item.status,
+          trackingStatus: item.status,
+        })
+      }
+      onViewDetails={() =>
+        navigation.navigate(ROUTES.CAR_OWNER_JOB_DETAILS, {
+          jobId: item.jobId,
           preview: {
-            mechanicId: item.mechanicId,
             mechanicName: item.mechanicName,
-            rating: item.rating,
             avatarUrl: item.avatarUrl,
+            status: item.status,
           },
+        })
+      }
+      onRate={() =>
+        navigation.navigate(ROUTES.CAR_OWNER_RATE_MECHANIC, {
+          mechanicId: item.mechanicId,
+          mechanicName: item.mechanicName,
+          avatarUrl: item.avatarUrl,
+          issueName: item.issueSummary,
+          jobId: item.jobId,
         })
       }
     />
@@ -738,6 +829,9 @@ const styles = StyleSheet.create({
   },
   statusBadgePending: {
     backgroundColor: 'rgba(154, 161, 181, 0.28)',
+  },
+  statusBadgeActive: {
+    backgroundColor: 'rgba(123, 200, 255, 0.18)',
   },
   statusText: {
     fontSize: 11,

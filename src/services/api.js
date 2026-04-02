@@ -33,13 +33,14 @@ const normalizeError = (error) => {
     const statusCode = error.response.status;
     const isUnauthorized = statusCode === 401;
     const isPublicAuthRequest = Boolean(error?.config?.skipAuth);
+    const skipUnauthorizedHandler = Boolean(error?.config?.skipUnauthorizedHandler);
     const serverMessage = pickErrorMessage(payload);
-    if (isUnauthorized && !isPublicAuthRequest && typeof onUnauthorized === 'function') {
+    if (isUnauthorized && !isPublicAuthRequest && !skipUnauthorizedHandler && typeof onUnauthorized === 'function') {
       onUnauthorized();
     }
 
     return {
-      message: isUnauthorized
+      message: isUnauthorized && !skipUnauthorizedHandler
         ? (isPublicAuthRequest
             ? serverMessage || 'Request failed'
             : 'Your session is unauthorized. Please sign in again.')

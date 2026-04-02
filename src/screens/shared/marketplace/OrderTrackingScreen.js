@@ -110,6 +110,8 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
   const activeItem =
     items.find((entry) => readItemId(entry) === preferredItemId) || items[0] || {};
   const itemId = readItemId(activeItem) || preferredItemId;
+  const fulfillmentType = String(data?.fulfillment_type || prev?.fulfillmentType || '').trim().toLowerCase();
+  const pickupCode = String(data?.pickup_code || prev?.pickupCode || '').trim();
   const part = activeItem?.part || activeItem?.product || activeItem?.spare_part || {};
   const store = part?.store || data?.store || data?.seller || {};
   const itemStoreName = String(activeItem?.store_name || '').trim();
@@ -164,7 +166,8 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
     addressPayload?.street
       ? `${addressPayload.street}, ${addressPayload.city || ''} ${addressPayload.state || ''}`.trim()
       : String(data?.delivery_address_text || '').trim();
-  const resolvedStatus = String(data?.status || readItemStatus(activeItem) || '').trim().toLowerCase();
+  // Use item-level status first — order-level status stays 'paid' and never advances
+  const resolvedStatus = String(readItemStatus(activeItem) || data?.status || '').trim().toLowerCase();
 
   return {
     ...prev,
@@ -174,39 +177,53 @@ const mapOrderToState = ({ data, prev, selectedItemId }) => {
     storeName: resolvedSeller.name,
     storeAddress: String(store?.address || resolvedAddress || '').trim(),
     storeInfo: String(store?.description || itemStorePhone || store?.phone || '').trim(),
-    statusTimeline: resolvedStatus ? extractTimeline(resolvedStatus) : [],
+    statusTimeline: resolvedStatus ? extractTimeline(resolvedStatus, fulfillmentType) : [],
     itemId: itemId || prev?.itemId || '',
     orderItems: trackingItems,
     subtotal: computedSubtotal || prev?.subtotal || 0,
     serviceCharge: backendServiceCharge || prev?.serviceCharge || 0,
     totalAmount: backendTotal || prev?.totalAmount || computedSubtotal + backendServiceCharge,
     orderStatus: resolvedStatus,
+    fulfillmentType,
+    pickupCode,
   };
 };
 
-const extractTimeline = (statusValue) => {
+const extractTimeline = (statusValue, fulfillmentType = '') => {
   const status = String(statusValue || '').toLowerCase();
-  const steps = [
-    { id: 'confirmed', label: 'Order confirmed' },
-    { id: 'preparing', label: 'Seller preparing package' },
-    { id: 'out_for_delivery', label: 'Out for delivery' },
-    { id: 'delivered', label: 'Delivered' },
-  ];
+  const isPickup = ['pickup', 'pick_up', 'pick-up', 'collect', 'collection'].includes(
+    String(fulfillmentType || '').toLowerCase()
+  );
 
-  const statusMap = {
-    confirmed: 0,
-    pending: 0,
-    new: 0,
+  const steps = isPickup
+    ? [
+        { id: 'confirmed', label: 'Order confirmed' },
+        { id: 'preparing', label: 'Seller preparing package' },
+        { id: 'ready', label: 'Ready for pickup' },
+        { id: 'collected', label: 'Collected' },
+      ]
+    : [
+        { id: 'confirmed', label: 'Order confirmed' },
+        { id: 'preparing', label: 'Seller preparing package' },
+        { id: 'out_for_delivery', label: 'Out for delivery' },
+        { id: 'delivered', label: 'Delivered' },
+      ];
+
+  const deliveryStatusMap = {
+    processing: 0, paid: 0, pending: 0, new: 0, confirmed: 0,
     preparing: 1,
-    processing: 1,
-    shipped: 2,
-    in_transit: 2,
-    out_for_delivery: 2,
-    delivered: 3,
-    completed: 3,
-    received: 3,
+    shipped: 2, in_transit: 2, out_for_delivery: 2,
+    delivered: 3, completed: 3, received: 3,
   };
 
+  const pickupStatusMap = {
+    processing: 0, paid: 0, pending: 0, new: 0, confirmed: 0,
+    preparing: 1,
+    ready_for_pickup: 2,
+    completed: 3, received: 3,
+  };
+
+  const statusMap = isPickup ? pickupStatusMap : deliveryStatusMap;
   const currentIndex = statusMap[status] ?? 0;
   return steps.map((step, index) => ({
     ...step,
@@ -243,6 +260,8 @@ const OrderTrackingScreen = ({ navigation, route }) => {
       toMoney(route?.params?.subtotal) + toMoney(route?.params?.serviceCharge),
     ),
     orderStatus: String(route?.params?.status || '').trim().toLowerCase(),
+    fulfillmentType: String(route?.params?.fulfillmentType || '').trim().toLowerCase(),
+    pickupCode: String(route?.params?.pickupCode || '').trim(),
   });
   const [orderData, setOrderData] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
@@ -263,11 +282,17 @@ const OrderTrackingScreen = ({ navigation, route }) => {
     serviceCharge,
     totalAmount,
     orderStatus,
+    fulfillmentType,
+    pickupCode,
   } = orderState;
-  const isOrderCompleted = orderStatus === 'completed';
+  const isPickupOrder = ['pickup', 'pick_up', 'pick-up', 'collect', 'collection'].includes(fulfillmentType);
+  const isOrderCompleted = ['completed', 'received'].includes(orderStatus);
   const isOrderCancelled = orderStatus === 'cancelled';
   const isOrderDisputed = orderStatus === 'disputed';
+  const isOrderShipped = orderStatus === 'shipped' || orderStatus === 'in_transit' || orderStatus === 'out_for_delivery';
+  const isOrderProcessing = ['processing', 'paid', 'new', 'pending', 'confirmed'].includes(orderStatus);
   const isTerminalOrderState = isOrderCompleted || isOrderCancelled || isOrderDisputed;
+  const canCancel = isOrderProcessing && !isTerminalOrderState;
   const shopCoordinates = useMemo(
     () => buildStoreCoordinates({ route, orderState }),
     [orderState, route]
@@ -860,20 +885,49 @@ const OrderTrackingScreen = ({ navigation, route }) => {
                   <AppText style={styles.disputeStatusBody}>View dispute status and support follow-up.</AppText>
                 </TouchableOpacity>
               ) : null}
-              <AppButton
-                label="Confirm delivery"
-                onPress={handleConfirmDelivery}
-                disabled={loadingOrder || !itemId || isTerminalOrderState}
-              />
-              <TouchableOpacity
-                style={styles.secondaryAction}
-                onPress={isOrderDisputed ? handleOpenDisputeDetail : ((isOrderCompleted || isOrderCancelled) ? handleReportIssue : handleCancelOrder)}
-                activeOpacity={0.85}
-              >
-                <AppText style={styles.secondaryActionText}>
-                  {isOrderDisputed ? 'View dispute status' : ((isOrderCompleted || isOrderCancelled) ? 'Report an issue' : 'Cancel order')}
-                </AppText>
-              </TouchableOpacity>
+
+              {isPickupOrder && !isTerminalOrderState ? (
+                pickupCode ? (
+                  <View style={styles.pickupCodeCard}>
+                    <AppText style={styles.pickupCodeLabel}>Your pickup code</AppText>
+                    <AppText style={styles.pickupCodeValue}>{pickupCode}</AppText>
+                    <AppText style={styles.pickupCodeHint}>Show this code to the seller when collecting your order.</AppText>
+                  </View>
+                ) : (
+                  <View style={styles.pickupCodeCard}>
+                    <AppText style={styles.pickupCodeLabel}>Awaiting pickup confirmation</AppText>
+                    <AppText style={styles.pickupCodeHint}>The seller will notify you when your order is ready for collection.</AppText>
+                  </View>
+                )
+              ) : null}
+
+              {!isPickupOrder ? (
+                <AppButton
+                  label="Confirm delivery"
+                  onPress={handleConfirmDelivery}
+                  disabled={loadingOrder || !itemId || !isOrderShipped || isTerminalOrderState}
+                />
+              ) : null}
+
+              {canCancel ? (
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={handleCancelOrder}
+                  activeOpacity={0.85}
+                >
+                  <AppText style={styles.secondaryActionText}>Cancel order</AppText>
+                </TouchableOpacity>
+              ) : (isOrderCompleted || isOrderCancelled) ? (
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={isOrderDisputed ? handleOpenDisputeDetail : handleReportIssue}
+                  activeOpacity={0.85}
+                >
+                  <AppText style={styles.secondaryActionText}>
+                    {isOrderDisputed ? 'View dispute status' : 'Report an issue'}
+                  </AppText>
+                </TouchableOpacity>
+              ) : null}
             </View>
             </Animated.ScrollView>
           </View>
@@ -1201,6 +1255,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 10,
+  },
+  pickupCodeCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.45)',
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  pickupCodeLabel: {
+    color: '#93C5FD',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  pickupCodeValue: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 8,
+    marginBottom: 6,
+  },
+  pickupCodeHint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   disputeStatusTitle: {
     color: '#F4DE7A',

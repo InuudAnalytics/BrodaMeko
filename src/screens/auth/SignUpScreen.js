@@ -161,6 +161,13 @@ const SignUpScreen = ({ navigation, route }) => {
     });
   };
 
+  const handleGoogleSignUp = async () => {
+    const result = await signUpWithGoogle({ role: selectedRole, isSignUp: true });
+    if (result?.roleMismatch) {
+      setRoleMismatch(result.existingRole);
+    }
+  };
+
   const handleAppleSignUp = async () => {
     const result = await signUpWithApple({ role: selectedRole });
     if (result?.roleMismatch) {
@@ -494,7 +501,7 @@ const SignUpScreen = ({ navigation, route }) => {
                 <DividerOr />
                 <GoogleButton
                   label="Sign up with Google"
-                  onPress={() => signUpWithGoogle({ role: selectedRole })}
+                  onPress={handleGoogleSignUp}
                   disabled={isLoading}
                 />
                 <TouchableOpacity

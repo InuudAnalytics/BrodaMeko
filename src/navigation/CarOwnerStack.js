@@ -9,7 +9,6 @@ import {
   CarOwnerDiagnosticExpertsScreen,
   CarOwnerHistoryScreen,
   CarOwnerMechanicDetailsScreen,
-  CarOwnerMechanicReviewsScreen,
   CarOwnerLiveTrackingScreen,
   CarOwnerMechanicDiscoveryScreen,
   CarOwnerProfileScreen,
@@ -21,6 +20,7 @@ import {
 } from '../screens';
 import RateMechanicScreen from '../screens/carowner/ratings/RateMechanicScreen';
 import EditJobScreen from '../screens/carowner/history/EditJobScreen';
+import JobDetailsScreen from '../screens/carowner/history/JobDetailsScreen';
 import VerifyTopUpScreen from '../screens/carowner/wallet/VerifyTopUpScreen';
 import EscrowFundingScreen from '../screens/carowner/wallet/EscrowFundingScreen';
 import CardPaymentScreen from '../screens/carowner/wallet/CardPaymentScreen';
@@ -179,8 +179,8 @@ const CarOwnerStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name={ROUTES.CAR_OWNER_MECHANIC_REVIEWS}
-        component={CarOwnerMechanicReviewsScreen}
+        name={ROUTES.CAR_OWNER_JOB_DETAILS}
+        component={JobDetailsScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

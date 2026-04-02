@@ -27,10 +27,15 @@ const normalizeStatusLabel = (status) => {
   return 'Pickup pending';
 };
 
+const MAX_ATTEMPTS = 3;
+
 const PickupOrderDetailsScreen = ({ navigation, route }) => {
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [attemptError, setAttemptError] = useState('');
   const order = route?.params?.order || {};
+  const isLocked = attempts >= MAX_ATTEMPTS;
 
   const orderId = String(order?.id || '').trim();
   const imageUri = resolveImageUri(order?.image);
@@ -39,9 +44,11 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
   const statusLabel = normalizeStatusLabel(order?.status);
 
   const handleConfirmPickup = async () => {
+    if (isLocked) return;
+
     const code = pickupCodeInput.replace(/\D/g, '').slice(0, 4);
     if (code.length !== 4) {
-      AppAlert.alert('Invalid code', 'Enter the 4-digit pickup code provided by the buyer.');
+      setAttemptError('Enter the full 4-digit code.');
       return;
     }
 
@@ -51,18 +58,36 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
     }
 
     setIsSubmitting(true);
+    setAttemptError('');
     try {
       await sellerConfirmMarketplacePickup(orderId, code);
-
       DeviceEventEmitter.emit('sellerPickupConfirmed', { orderId });
       AppAlert.alert('Pickup confirmed', 'Order has been marked as completed.', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      AppAlert.alert('Could not confirm pickup', error?.message || 'Please try again.');
+      const nextAttempts = attempts + 1;
+      setAttempts(nextAttempts);
+      setPickupCodeInput('');
+      if (nextAttempts >= MAX_ATTEMPTS) {
+        setAttemptError('Too many wrong attempts. Use the button below to report this issue.');
+      } else {
+        const remaining = MAX_ATTEMPTS - nextAttempts;
+        setAttemptError(
+          `Wrong code. You have ${remaining} more ${remaining === 1 ? 'try' : 'tries'}.`
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleReportIssue = () => {
+    AppAlert.alert(
+      'Report an issue',
+      'Please contact support about this pickup order.',
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -129,21 +154,38 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
             <AppText style={styles.inputLabel}>Enter pickup code</AppText>
             <TextInput
               value={pickupCodeInput}
-              onChangeText={(text) => setPickupCodeInput(text.replace(/\D/g, '').slice(0, 4))}
+              onChangeText={(text) => {
+                setAttemptError('');
+                setPickupCodeInput(text.replace(/\D/g, '').slice(0, 4));
+              }}
               keyboardType="number-pad"
               maxLength={4}
               placeholder="0000"
               placeholderTextColor="rgba(255,255,255,0.45)"
-              style={styles.input}
+              style={[styles.input, isLocked && styles.inputDisabled]}
+              editable={!isLocked}
             />
+            {attemptError ? (
+              <AppText style={styles.attemptError}>{attemptError}</AppText>
+            ) : null}
           </View>
 
-          <AppButton
-            label={isSubmitting ? 'Confirming...' : 'Confirm pickup'}
-            onPress={handleConfirmPickup}
-            disabled={isSubmitting}
-            style={styles.confirmButton}
-          />
+          {isLocked ? (
+            <TouchableOpacity
+              style={styles.reportButton}
+              activeOpacity={0.85}
+              onPress={handleReportIssue}
+            >
+              <AppText style={styles.reportButtonText}>Report an issue</AppText>
+            </TouchableOpacity>
+          ) : (
+            <AppButton
+              label={isSubmitting ? 'Confirming...' : 'Confirm pickup'}
+              onPress={handleConfirmPickup}
+              disabled={isSubmitting}
+              style={styles.confirmButton}
+            />
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
@@ -309,6 +351,30 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     marginTop: 4,
+  },
+  inputDisabled: {
+    opacity: 0.4,
+  },
+  attemptError: {
+    marginTop: 8,
+    color: '#EF4444',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  reportButton: {
+    marginTop: 4,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.5)',
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportButtonText: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

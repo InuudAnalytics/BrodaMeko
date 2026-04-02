@@ -9,6 +9,37 @@ import { getMechanicAssignedJob } from '../services/jobs.service';
 const ownerNameCache = new Map();
 const ownerNameInflight = new Map();
 
+const formatEta = (raw) => {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+
+  // Already contains 'h' formatting — leave as-is.
+  if (/\dh/i.test(text)) return text;
+
+  // Try to extract total minutes from strings like "90 minutes", "45 mins", "90", "1 hour 30 min"
+  let totalMinutes = null;
+
+  const hoursMatch = text.match(/(\d+(?:\.\d+)?)\s*h(?:ou?r?s?)?/i);
+  const minsMatch = text.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?/i);
+
+  if (hoursMatch || minsMatch) {
+    const h = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
+    const m = minsMatch ? parseFloat(minsMatch[1]) : 0;
+    totalMinutes = Math.round(h * 60 + m);
+  } else {
+    // Plain number — treat as minutes.
+    const plain = parseFloat(text);
+    if (Number.isFinite(plain)) totalMinutes = Math.round(plain);
+  }
+
+  if (totalMinutes === null) return text;
+
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+};
+
 const initialsFromName = (name) =>
   String(name || 'M')
     .split(/\s+/)
@@ -143,7 +174,7 @@ const MechanicJobCard = ({
   }, [name, safeJobId]);
 
   const distance = String(distanceText || '').trim() || 'Distance unavailable';
-  const eta = String(etaText || '').trim() || 'ETA unavailable';
+  const eta = formatEta(etaText) || 'ETA unavailable';
 
   return (
     <View style={[styles.card, style]}>
