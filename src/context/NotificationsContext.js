@@ -18,12 +18,19 @@ import { buildCallNavigationTarget } from '../utils/callRouting';
 import { trackTelemetryEvent } from '../services/telemetry.service';
 
 const ANDROID_CHANNEL_ID = 'brodameko_default';
+const ANDROID_CALLS_CHANNEL_ID = 'brodameko_calls';
 
 const ensureAndroidChannel = async () => {
   if (Platform.OS !== 'android') return;
   await notifee.createChannel({
     id: ANDROID_CHANNEL_ID,
     name: 'BrodaMeko Notifications',
+    importance: AndroidImportance.HIGH,
+    sound: 'default',
+  });
+  await notifee.createChannel({
+    id: ANDROID_CALLS_CHANNEL_ID,
+    name: 'Incoming Calls',
     importance: AndroidImportance.HIGH,
     sound: 'default',
   });
@@ -349,6 +356,26 @@ export const NotificationsProvider = ({ children }) => {
 
   useEffect(() => {
     ensureAndroidChannel();
+
+    // Handle taps on notifee notifications when the app was killed and launched
+    // by the user tapping the notification (e.g. a full-screen-intent call notification).
+    notifee.getInitialNotification().then((initial) => {
+      if (!initial) return;
+      const data = initial.notification?.data || {};
+      const callTarget = buildCallNavigationTarget(data);
+      if (callTarget && navigationRef.isReady()) {
+        navigationRef.navigate(callTarget.routeName, callTarget.params);
+        return;
+      }
+      const message = {
+        notification: {
+          title: initial.notification?.title || '',
+          body: initial.notification?.body || '',
+        },
+        data,
+      };
+      handleNotificationOpen(message);
+    }).catch(() => {});
 
     // Handle taps on notifee-displayed notifications while app is foregrounded.
     const unsubscribeNotifee = notifee.onForegroundEvent(({ type, detail }) => {

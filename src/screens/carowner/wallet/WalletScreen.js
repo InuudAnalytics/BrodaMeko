@@ -177,6 +177,9 @@ const resolveTransactionStatusBadge = (item) => {
   return { label: 'Processing', tone: 'neutral' };
 };
 
+const UUID_RE = /\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const stripUuids = (s) => String(s || '').replace(UUID_RE, '').replace(/\s{2,}/g, ' ').trim();
+
 const normalizeTransaction = (item, index, source) => {
   const amount = Number(item?.amount || item?.value || 0);
   const inferredType =
@@ -187,7 +190,7 @@ const normalizeTransaction = (item, index, source) => {
   const createdAtRaw = item?.created_at || item?.createdAt || item?.date || '';
   const parsedTime = Date.parse(String(createdAtRaw || ''));
   const createdAtMs = Number.isFinite(parsedTime) ? parsedTime : 0;
-  const baseTitle = item?.title || item?.narration || item?.description || '';
+  const baseTitle = stripUuids(item?.title || item?.narration || item?.description || '');
   const isWithdrawal = source === 'withdrawals' || type.includes('withdraw');
   const resolvedTitle = type === 'escrow_release'
     ? 'Escrow Release'
@@ -719,7 +722,16 @@ const WalletScreen = ({ navigation }) => {
                     return;
                   }
 
-                  navigation.navigate(ROUTES.CAR_OWNER_TRANSACTION_DETAILS, { reference: txn.reference });
+                  navigation.navigate(ROUTES.CAR_OWNER_TRANSACTION_DETAILS, {
+                    reference: txn.reference,
+                    preview: {
+                      title: txn.title,
+                      amountText: txn.amountText,
+                      positive: txn.positive,
+                      time: txn.time,
+                      subtitle: txn.subtitle,
+                    },
+                  });
                 }}
               />
             ))}

@@ -226,8 +226,8 @@ export const ENDPOINTS = {
       `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/items/${encodeURIComponent(
         String(itemId || '')
       )}/received`,
-    orderPickupConfirm: (orderId) =>
-      `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/pickup-confirm`,
+    orderPickupConfirm: (orderId, itemId) =>
+      `/api/v1/marketplace/orders/${encodeURIComponent(String(orderId || ''))}/items/${encodeURIComponent(String(itemId || ''))}/pickup-confirm`,
     checkout: '/api/v1/marketplace/orders/checkout',
     sellerParts: '/api/v1/marketplace/seller/parts',
     sellerPartsMe: '/api/v1/marketplace/seller/parts/me',

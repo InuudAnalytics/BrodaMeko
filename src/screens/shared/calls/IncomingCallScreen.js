@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import notifee from '@notifee/react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ArrowLeft01Icon,
@@ -22,6 +23,10 @@ const IncomingCallScreen = ({ navigation, route }) => {
   const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
+    // The user has the call screen open — dismiss the persistent notifee notification
+    // (shown on lock screen / in tray) so it doesn't linger alongside the in-app UI.
+    notifee.cancelNotification('incoming_call').catch(() => {});
+
     trackTelemetryEvent('incoming_screen_shown', {
       call_id: callId,
       context_type: contextType,

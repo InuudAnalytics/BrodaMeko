@@ -544,6 +544,8 @@ const MechanicDetailsScreen = ({ navigation, route }) => {
                             }
                             placeholder="Write a reply..."
                             placeholderTextColor="rgba(255,255,255,0.36)"
+                            multiline
+                            textAlignVertical="top"
                             style={styles.replyInput}
                           />
                           {replyError[review.id] ? (
@@ -713,7 +715,7 @@ const styles = StyleSheet.create({
     marginTop: 4, backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 10, padding: 10,
   },
-  replyInput: { minHeight: 52, color: '#FFFFFF', fontSize: 13 },
+  replyInput: { minHeight: 52, color: '#FFFFFF', fontSize: 13, backgroundColor: 'transparent' },
   replyError: { color: '#F87171', fontSize: 11, marginTop: 4 },
   replyButton: { marginTop: 8 },
 

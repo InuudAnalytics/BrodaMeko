@@ -38,6 +38,7 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
   const isLocked = attempts >= MAX_ATTEMPTS;
 
   const orderId = String(order?.id || '').trim();
+  const itemId = String(order?.itemId || '').trim();
   const imageUri = resolveImageUri(order?.image);
   const displayOrderId = orderId || 'N/A';
 
@@ -52,15 +53,15 @@ const PickupOrderDetailsScreen = ({ navigation, route }) => {
       return;
     }
 
-    if (!orderId) {
-      AppAlert.alert('Missing order info', 'Order reference is missing.');
+    if (!orderId || !itemId) {
+      AppAlert.alert('Missing order info', 'Order or item reference is missing.');
       return;
     }
 
     setIsSubmitting(true);
     setAttemptError('');
     try {
-      await sellerConfirmMarketplacePickup(orderId, code);
+      await sellerConfirmMarketplacePickup(orderId, itemId, code);
       DeviceEventEmitter.emit('sellerPickupConfirmed', { orderId });
       AppAlert.alert('Pickup confirmed', 'Order has been marked as completed.', [
         { text: 'OK', onPress: () => navigation.goBack() },

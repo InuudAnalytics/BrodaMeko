@@ -139,7 +139,7 @@ const CartItem = ({ item, onRemove, onQtyChange }) => {
 
 // ─── VendorSection ───────────────────────────────────────────────────────────
 
-const VendorSection = ({ group, onRemove, onQtyChange }) => {
+const VendorSection = ({ group, onRemove, onQtyChange, onCheckout }) => {
   const sub = vendorSubtotal(group.items);
   return (
     <View style={styles.vendorSection}>
@@ -166,13 +166,18 @@ const VendorSection = ({ group, onRemove, onQtyChange }) => {
         />
       ))}
 
-      {/* vendor subtotal */}
+      {/* vendor footer: subtotal + checkout */}
       <View style={styles.vendorFooter}>
         <AppText style={styles.vendorSubLabel}>
           {group.items.length} item{group.items.length !== 1 ? 's' : ''}
         </AppText>
         <AppText style={styles.vendorSubValue}>{formatNaira(sub)}</AppText>
       </View>
+      <AppButton
+        label={`Checkout · ${formatNaira(sub * 1.08)}`}
+        onPress={() => onCheckout(group)}
+        style={styles.vendorCheckoutBtn}
+      />
     </View>
   );
 };
@@ -186,8 +191,16 @@ const CartScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = React.useState(false);
 
   const isMechanic = route?.params?.marketplaceRole === 'mechanic';
-  const subtotal = calculateTotal();
   const vendorGroups = useMemo(() => groupByVendor(items), [items]);
+
+  const handleVendorCheckout = group => {
+    const itemIds = group.items.map(item => String(item.id || '')).filter(Boolean);
+    navigation.navigate('Checkout', {
+      itemIds,
+      vendorLabel: group.label,
+      vendorSubtotal: vendorSubtotal(group.items),
+    });
+  };
 
   const handleCarOwnerTabPress = routeName => navigation.navigate(routeName);
   const handleMechanicTabPress = tabKey => {
@@ -312,12 +325,13 @@ const CartScreen = ({ navigation, route }) => {
                 group={group}
                 onRemove={removeFromCart}
                 onQtyChange={updateQuantity}
+                onCheckout={handleVendorCheckout}
               />
             ))}
 
             {/* order summary */}
             <View style={styles.summaryCard}>
-              <AppText style={styles.summaryTitle}>Order Summary</AppText>
+              <AppText style={styles.summaryTitle}>Cart Summary</AppText>
 
               <View style={styles.summaryRow}>
                 <AppText style={styles.summaryLabel}>
@@ -325,44 +339,16 @@ const CartScreen = ({ navigation, route }) => {
                   {vendorGroups.length} seller
                   {vendorGroups.length !== 1 ? 's' : ''}
                 </AppText>
-              </View>
-
-              <View style={styles.summaryDivider} />
-
-              <View style={styles.summaryRow}>
-                <AppText style={styles.summaryLabel}>Subtotal</AppText>
                 <AppText style={styles.summaryValue}>
-                  {formatNaira(subtotal)}
-                </AppText>
-              </View>
-              <View style={styles.summaryRow}>
-                <AppText style={styles.summaryLabel}>Service fee (8%)</AppText>
-                <AppText style={styles.summaryValue}>
-                  {formatNaira(subtotal * 0.08)}
-                </AppText>
-              </View>
-
-              <View style={styles.summaryDivider} />
-
-              <View style={styles.summaryRow}>
-                <AppText style={styles.totalLabel}>Estimated total</AppText>
-                <AppText style={styles.totalValue}>
-                  {formatNaira(subtotal * 1.08)}
+                  {formatNaira(calculateTotal())}
                 </AppText>
               </View>
 
               <AppText style={styles.deliveryNote}>
-                Delivery fee (if applicable) calculated at checkout
+                Each store is checked out separately. Service fee (8%) and delivery fee apply per order.
               </AppText>
             </View>
           </Animated.ScrollView>
-        </View>
-
-        <View style={styles.bottomButton}>
-          <AppButton
-            label={`Checkout · ${formatNaira(subtotal * 1.08)}`}
-            onPress={() => navigation.navigate('Checkout')}
-          />
         </View>
       </ScreenContainer>
       {renderBottomNav()}
@@ -427,7 +413,7 @@ const styles = StyleSheet.create({
   },
 
   listWrap: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
 
   // vendor section
   vendorSection: {
@@ -460,6 +446,7 @@ const styles = StyleSheet.create({
   },
   vendorSubLabel: { color: '#6B7280', fontSize: 12 },
   vendorSubValue: { color: '#E6C714', fontSize: 13, fontWeight: '700' },
+  vendorCheckoutBtn: { marginTop: 10 },
 
   // item card
   itemCard: {
@@ -543,15 +530,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  summaryLabel: { color: '#9CA3AF', fontSize: 13 },
-  summaryValue: { color: '#FFFFFF', fontSize: 13 },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginVertical: 10,
-  },
-  totalLabel: { color: '#E6C714', fontSize: 14, fontWeight: '700' },
-  totalValue: { color: '#E6C714', fontSize: 14, fontWeight: '700' },
+  summaryLabel: { color: '#9CA3AF', fontSize: 13, flex: 1 },
+  summaryValue: { color: '#E6C714', fontSize: 13, fontWeight: '700' },
   deliveryNote: {
     color: '#6B7280',
     fontSize: 11,
@@ -559,15 +539,6 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
 
-  // checkout button
-  bottomButton: {
-    paddingHorizontal: 20,
-    paddingBottom: 72,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.07)',
-    backgroundColor: '#000033',
-  },
 });
 
 export default CartScreen;

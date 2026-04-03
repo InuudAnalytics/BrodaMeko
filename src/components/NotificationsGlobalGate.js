@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import notifee from '@notifee/react-native';
 import { openSettings } from 'react-native-permissions';
 import AppText from './AppText';
 import ForegroundNotificationToast from './ForegroundNotificationToast';
@@ -62,6 +63,15 @@ const NotificationsGlobalGate = () => {
       return;
     }
 
+    const callId = String(signal?.payload?.call_id || '').trim();
+    const signalType = String(signal?.type || '').trim().toLowerCase();
+
+    // Dismiss the persistent notifee incoming-call notification when the caller
+    // ends, the callee rejects, or the call is marked missed.
+    if (signalType === 'call.ended' || signalType === 'call.rejected' || signalType === 'call.missed') {
+      notifee.cancelNotification('incoming_call').catch(() => {});
+    }
+
     const target = buildCallNavigationTarget({
       ...signal?.payload,
       type: signal?.type,
@@ -70,8 +80,6 @@ const NotificationsGlobalGate = () => {
       return;
     }
 
-    const callId = String(signal?.payload?.call_id || '').trim();
-    const signalType = String(signal?.type || '').trim().toLowerCase();
     const dedupeKey = `${signalType}:${callId}`;
     if (!callId || dedupeKey === lastCallSignalKeyRef.current) {
       return;

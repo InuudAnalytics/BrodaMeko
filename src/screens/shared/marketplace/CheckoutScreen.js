@@ -146,7 +146,7 @@ const readSummaryAmount = (responseData, key, fallback = 0) => {
 
 const CheckoutScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const { items, calculateTotal, clearCart, addToCart } = useCart();
+  const { items, calculateTotal, clearCart, reloadCart, addToCart } = useCart();
   const [deliveryType, setDeliveryType] = useState('pickup');
   const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,18 +160,18 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [verifyingPaystack, setVerifyingPaystack] = useState(false);
 
   const directProduct = route?.params?.directProduct || null;
-  const product = directProduct ||
-    items?.[0]?.product || {};
+  const vendorItemIds = route?.params?.itemIds || null;
+  const vendorLabel = String(route?.params?.vendorLabel || '').trim();
+  const product = directProduct || items?.[0]?.product || {};
 
   const image = resolveImageUri(product?.images?.[0]);
   const hasProductPrice = Number.isFinite(Number(product?.price));
   const quantity = Number(product?.quantity || items?.[0]?.quantity || 1);
   const subtotal = useMemo(() => {
-    if (directProduct) {
-      return Number(product?.price || 0) * quantity;
-    }
+    if (directProduct) return Number(product?.price || 0) * quantity;
+    if (vendorItemIds) return Number(route?.params?.vendorSubtotal || 0);
     return calculateTotal();
-  }, [calculateTotal, directProduct, product?.price, quantity]);
+  }, [calculateTotal, directProduct, product?.price, quantity, vendorItemIds, route?.params?.vendorSubtotal]);
   const deliveryFee = 0;
   const total = subtotal + deliveryFee;
   const productId = String(
@@ -232,7 +232,7 @@ const CheckoutScreen = ({ navigation, route }) => {
     };
   }, []);
 
-  const storeName = String(
+  const storeName = vendorLabel || String(
     pickFirstDefined(
       product?.store?.name,
       hydratedPart?.store_name,
@@ -285,7 +285,13 @@ const CheckoutScreen = ({ navigation, route }) => {
   };
 
   const finalizeOrderSuccess = async successParams => {
-    await clearCart();
+    if (vendorItemIds) {
+      // Only this vendor's items were checked out — reload cart to reflect
+      // the remaining items from other vendors instead of clearing everything.
+      await reloadCart();
+    } else {
+      await clearCart();
+    }
     navigation.navigate('PaymentSuccessScreen', successParams);
   };
 
@@ -383,6 +389,7 @@ const CheckoutScreen = ({ navigation, route }) => {
           : {}),
         contact_phone: String(user?.phone_number || user?.phone || '').trim(),
         email: String(user?.email || '').trim(),
+        ...(vendorItemIds?.length ? { item_ids: vendorItemIds } : {}),
       };
 
       if (deliveryType === 'delivery' && (!deliveryStreet || !deliveryCity || !deliveryState || !deliveryCountry)) {
@@ -431,9 +438,11 @@ const CheckoutScreen = ({ navigation, route }) => {
       );
       const createdOrderId = readOrderId(responseData);
       const pickupCode =
-        String(responseData?.pickup_code || '')
-          .replace(/\D/g, '')
-          .slice(0, 4) || undefined;
+        String(
+          responseData?.pickup_code ||
+          responseData?.fulfillment_summary?.[0]?.pickup_code ||
+          ''
+        ).replace(/\D/g, '').slice(0, 4) || undefined;
       const shopCoordinates = extractShopCoordinates({
         ...product,
         shopCoordinates: product?.shopCoordinates ||

@@ -89,6 +89,7 @@ const PickupTrackingScreen = ({ navigation, route }) => {
   const { role } = useAuth();
   const [resolvedPickupCode, setResolvedPickupCode] = React.useState('');
   const [isHydratingOrder, setIsHydratingOrder] = React.useState(false);
+  const [allOrderItems, setAllOrderItems] = React.useState([]);
   const [product, setProduct] = React.useState(route?.params?.product || null);
   const [seller, setSeller] = React.useState(route?.params?.seller || null);
   const [pickupAddress, setPickupAddress] = React.useState(
@@ -118,6 +119,18 @@ const PickupTrackingScreen = ({ navigation, route }) => {
     // TODO: backend should provide shop coordinates for pickup navigation
     return extractShopCoordinates({ route, product, seller });
   }, [product, route, seller]);
+
+  // Filter order items to only those belonging to the current seller's store.
+  // Guards against backends that return all cart items regardless of item_ids.
+  const displayItems = useMemo(() => {
+    if (!allOrderItems.length) return allOrderItems;
+    const currentStoreName = String(seller?.name || '').trim().toLowerCase();
+    if (!currentStoreName) return allOrderItems;
+    const filtered = allOrderItems.filter(
+      item => !item.storeName || item.storeName.toLowerCase() === currentStoreName,
+    );
+    return filtered.length > 0 ? filtered : allOrderItems;
+  }, [allOrderItems, seller?.name]);
   const liveCoordinates = useMemo(() => {
     if (permissionStatus !== 'granted') {
       return null;
@@ -171,12 +184,20 @@ const PickupTrackingScreen = ({ navigation, route }) => {
         const response = await getMarketplaceOrder(orderId);
         const payload = response?.data || response || {};
         const data = payload?.data || payload || {};
-        const code = String(data?.pickup_code || '').replace(/\D/g, '').slice(0, 4);
+        const items = data?.items || data?.order_items || data?.products || [];
+        const firstItem = items?.[0] || {};
+        const code = String(firstItem?.pickup_code || '').replace(/\D/g, '').slice(0, 4);
         if (active && code.length === 4) {
           setResolvedPickupCode(code);
         }
-        const items = data?.items || data?.order_items || data?.products || [];
-        const firstItem = items?.[0] || {};
+        if (active && items.length > 0) {
+          setAllOrderItems(items.map(item => ({
+            partName: String(item.part_name || item.name || '').trim(),
+            quantity: Number(item.quantity || 1),
+            unitPrice: Number(item.unit_price || item.unitPrice || 0),
+            storeName: String(item.store_name || '').trim(),
+          })).filter(i => i.partName));
+        }
         if (active) {
           const itemStatus = String(firstItem?.status || '').trim().toLowerCase();
           const orderLevelStatus = String(data?.status || '').trim().toLowerCase();
@@ -558,6 +579,24 @@ const PickupTrackingScreen = ({ navigation, route }) => {
                   <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
                 </View>
               </View>
+            ) : displayItems.length > 1 ? (
+              /* multiple items from same vendor */
+              <View style={styles.productCard}>
+                <View style={styles.productInfo}>
+                  <TouchableOpacity activeOpacity={0.85} onPress={handleOpenStoreDetails}>
+                    <AppText style={styles.productShop}>{String(product?.shop || '').trim() || 'Unavailable'}</AppText>
+                  </TouchableOpacity>
+                  <AppText style={styles.productAddress} numberOfLines={2}>{pickupAddress || 'Pickup address unavailable'}</AppText>
+                  <View style={styles.multiItemList}>
+                    {displayItems.map((item, idx) => (
+                      <View key={idx} style={styles.multiItemRow}>
+                        <AppText style={styles.multiItemName} numberOfLines={1}>{item.partName}</AppText>
+                        <AppText style={styles.multiItemMeta}>×{item.quantity}  {formatNaira(item.unitPrice * item.quantity)}</AppText>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
             ) : (
               <View style={styles.productCard}>
                 {imageUri ? <Image source={{ uri: imageUri }} style={styles.productImage} /> : <View style={styles.imagePlaceholder} />}
@@ -787,6 +826,29 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     fontSize: 11,
     lineHeight: 15,
+  },
+  multiItemList: {
+    marginTop: 8,
+    rowGap: 6,
+  },
+  multiItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    columnGap: 8,
+  },
+  multiItemName: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  multiItemMeta: {
+    color: '#E6C714',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
   },
   sellerCard: {
     borderWidth: 1,

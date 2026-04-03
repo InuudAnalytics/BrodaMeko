@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import notifee, { AndroidImportance } from '@notifee/react-native';
 import { RESULTS, checkNotifications, requestNotifications } from 'react-native-permissions';
 
 const loadMessagingModules = () => {
@@ -254,6 +255,38 @@ export const listenForTokenRefresh = (handler) => {
   });
 };
 
+const CALL_CHANNEL_ID = 'brodameko_calls';
+
+const showIncomingCallNotification = async (data = {}) => {
+  try {
+    await notifee.createChannel({
+      id: CALL_CHANNEL_ID,
+      name: 'Incoming Calls',
+      importance: AndroidImportance.HIGH,
+      sound: 'default',
+    });
+    const callerName = String(data.caller_name || 'Someone').trim();
+    await notifee.displayNotification({
+      id: 'incoming_call',
+      title: `\uD83D\uDCDE ${callerName} is calling`,
+      body: 'Tap to answer',
+      data,
+      android: {
+        channelId: CALL_CHANNEL_ID,
+        importance: AndroidImportance.HIGH,
+        fullScreenAction: { id: 'default', launchActivity: 'default' },
+        pressAction: { id: 'default' },
+        smallIcon: 'ic_launcher',
+        sound: 'default',
+        // Auto-dismiss after 35 s — matches the backend's 30 s call window + buffer.
+        timeoutAfter: 35000,
+      },
+    });
+  } catch (e) {
+    if (__DEV__) console.warn('[Notifications] showIncomingCallNotification error:', e?.message);
+  }
+};
+
 export const registerBackgroundMessageHandler = () => {
   const messagingState = getMessagingState();
   if (!messagingState) {
@@ -261,9 +294,21 @@ export const registerBackgroundMessageHandler = () => {
   }
 
   const backgroundHandler = async (remoteMessage) => {
+    const data = remoteMessage?.data || {};
+    const callId = String(data?.call_id || '').trim();
+    const callType = String(data?.type || '').trim();
+
+    // For incoming calls on Android the backend sends data-only FCM (no notification
+    // key) so this handler runs. Display a full-screen-intent notification via
+    // notifee so the call breaks through the lock screen.
+    if (callId && callType === 'call.incoming') {
+      await showIncomingCallNotification(data);
+      return;
+    }
+
     if (__DEV__) {
       const messageId = String(remoteMessage?.messageId || '').trim();
-      const dataKeys = Object.keys(remoteMessage?.data || {});
+      const dataKeys = Object.keys(data);
       console.log('[Notifications] Background message received', {
         hasMessageId: Boolean(messageId),
         dataKeys,

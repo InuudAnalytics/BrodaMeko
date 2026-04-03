@@ -135,18 +135,20 @@ export const receivedMarketplaceOrderItem = async (orderId, itemId) => {
   return response.data;
 };
 
-export const sellerConfirmMarketplacePickup = async (orderId, pickupCode) => {
+export const sellerConfirmMarketplacePickup = async (orderId, itemId, pickupCode) => {
   const safeOrderId = String(orderId || '').trim();
+  const safeItemId = String(itemId || '').trim();
   const safePickupCode = String(pickupCode || '').replace(/\D/g, '').slice(0, 4);
-  if (!safeOrderId || !safePickupCode) {
-    const error = new Error('orderId and pickupCode are required.');
+  if (!safeOrderId || !safeItemId || !safePickupCode) {
+    const error = new Error('orderId, itemId, and pickupCode are required.');
     error.statusCode = 400;
     error.data = null;
     throw error;
   }
-  const response = await api.patch(ENDPOINTS.marketplace.orderPickupConfirm(safeOrderId), {
-    pickup_code: safePickupCode,
-  }, { skipUnauthorizedHandler: true });
+  const response = await api.patch(
+    ENDPOINTS.marketplace.orderPickupConfirm(safeOrderId, safeItemId),
+    { pickup_code: safePickupCode },
+  );
   return response.data;
 };
 
